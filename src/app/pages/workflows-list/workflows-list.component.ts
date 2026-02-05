@@ -1,0 +1,311 @@
+import { Component, inject, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
+import { WorkflowService, WorkflowMeta } from '../../services/workflow.service';
+
+@Component({
+  selector: 'app-workflows-list',
+  standalone: true,
+  imports: [CommonModule],
+  template: `
+    <div class="workflows-page">
+      <header class="page-header">
+        <div class="brand">
+          <span class="logo">Δ</span>
+          <div>
+            <h1>FluxPilot Workflow Lab</h1>
+            <p>Конструктор экспериментов для product-команд</p>
+          </div>
+        </div>
+        <button class="primary" (click)="createWorkflow()">
+          + Создать workflow
+        </button>
+      </header>
+
+      <main class="workflows-grid">
+        @for (workflow of workflowService.workflows(); track workflow.id) {
+          <div class="workflow-card" (click)="openWorkflow(workflow.id)">
+            <div class="card-header">
+              <span class="card-icon" [style.background]="getStatusColor(workflow.status)">
+                {{ getStatusIcon(workflow.status) }}
+              </span>
+              <span class="card-status" [class]="workflow.status">{{ workflow.status }}</span>
+            </div>
+            <h3>{{ workflow.name }}</h3>
+            <p class="card-description">{{ workflow.description || 'Без описания' }}</p>
+            <div class="card-meta">
+              <span>{{ workflow.nodesCount }} нод</span>
+              <span>{{ formatDate(workflow.updatedAt) }}</span>
+            </div>
+            <div class="card-actions">
+              <button class="ghost" (click)="duplicateWorkflow($event, workflow.id)">Копировать</button>
+              <button class="ghost danger" (click)="deleteWorkflow($event, workflow.id)">Удалить</button>
+            </div>
+          </div>
+        } @empty {
+          <div class="empty-state">
+            <div class="empty-icon">Δ</div>
+            <h2>Нет workflows</h2>
+            <p>Создайте первый workflow для A/B тестирования</p>
+            <button class="primary" (click)="createWorkflow()">+ Создать workflow</button>
+          </div>
+        }
+      </main>
+    </div>
+  `,
+  styles: [`
+    .workflows-page {
+      min-height: 100vh;
+      background: #f8fafc;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 48px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand .logo {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: var(--accent);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 24px;
+    }
+
+    .page-header h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .page-header p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .workflows-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 24px;
+      padding: 32px 48px;
+    }
+
+    .workflow-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .workflow-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: white;
+      font-size: 18px;
+    }
+
+    .card-status {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+
+    .card-status.draft {
+      background: #f1f5f9;
+      color: #64748b;
+    }
+
+    .card-status.running {
+      background: #dcfce7;
+      color: #16a34a;
+    }
+
+    .card-status.completed {
+      background: #dbeafe;
+      color: #2563eb;
+    }
+
+    .card-status.paused {
+      background: #fef3c7;
+      color: #d97706;
+    }
+
+    .workflow-card h3 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+
+    .card-description {
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0 0 16px;
+      line-height: 1.5;
+    }
+
+    .card-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--muted);
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .card-actions button {
+      flex: 1;
+    }
+
+    button {
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 14px;
+      background: var(--panel);
+      color: #0f172a;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: transform 0.1s ease, box-shadow 0.2s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: white;
+    }
+
+    button.ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+    }
+
+    button.ghost.danger:hover {
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 80px 20px;
+    }
+
+    .empty-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 24px;
+      border-radius: 20px;
+      background: var(--accent);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-size: 36px;
+      font-weight: 700;
+    }
+
+    .empty-state h2 {
+      margin: 0 0 8px;
+      font-size: 24px;
+    }
+
+    .empty-state p {
+      color: var(--muted);
+      margin: 0 0 24px;
+    }
+  `]
+})
+export class WorkflowsListComponent {
+  workflowService = inject(WorkflowService);
+  private router = inject(Router);
+
+  createWorkflow(): void {
+    const id = this.workflowService.createNewWorkflow();
+    this.router.navigate(['/workflow', id]);
+  }
+
+  openWorkflow(id: string): void {
+    this.workflowService.loadWorkflow(id);
+    this.router.navigate(['/workflow', id]);
+  }
+
+  duplicateWorkflow(event: MouseEvent, id: string): void {
+    event.stopPropagation();
+    this.workflowService.duplicateWorkflow(id);
+  }
+
+  deleteWorkflow(event: MouseEvent, id: string): void {
+    event.stopPropagation();
+    if (confirm('Удалить этот workflow?')) {
+      this.workflowService.deleteWorkflow(id);
+    }
+  }
+
+  getStatusColor(status: string): string {
+    switch (status) {
+      case 'running': return '#16a34a';
+      case 'completed': return '#2563eb';
+      case 'paused': return '#d97706';
+      default: return '#64748b';
+    }
+  }
+
+  getStatusIcon(status: string): string {
+    switch (status) {
+      case 'running': return '▶';
+      case 'completed': return '✓';
+      case 'paused': return '⏸';
+      default: return 'Δ';
+    }
+  }
+
+  formatDate(date: Date): string {
+    return new Intl.DateTimeFormat('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  }
+}
