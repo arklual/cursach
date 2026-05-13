@@ -52,10 +52,8 @@ function fromBackendType(type: string | undefined): { kind: NodeKind; subtype?: 
 }
 
 export function frontNodeToBackend(node: FrontNode): BackendNode {
-    const cfg = node.data as unknown as { config?: Record<string, unknown> };
-    const userConfig = cfg.config ?? {};
-    const subtype = (userConfig['subtype'] as string | undefined) ??
-        ((node.data as unknown as { __subtype?: string }).__subtype);
+    const userConfig = node.data.config ?? {};
+    const subtype = node.data.__subtype ?? (userConfig['subtype'] as string | undefined);
 
     const config: Record<string, unknown> = {
         ...userConfig,
@@ -85,6 +83,14 @@ export function backendNodeToFront(backend: BackendNode): FrontNode {
     const data = backend.data ?? {};
     const config = (data.config ?? {}) as Record<string, unknown>;
 
+    // user-config = всё, что не начинается с __
+    const userConfig: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(config)) {
+        if (!k.startsWith('__')) {
+            userConfig[k] = v;
+        }
+    }
+
     const front: NodeData = {
         id,
         kind,
@@ -94,10 +100,10 @@ export function backendNodeToFront(backend: BackendNode): FrontNode {
         variants: (config['__variants'] as Variant[]) ?? [],
         randomization: (config['__randomization'] as NodeData['randomization']) ?? 'simple',
         metrics: (config['__metrics'] as NodeMetrics) ?? defaultMetrics(),
+        config: userConfig,
     };
-    // subtype для dataflow-нод хранится в служебном поле для удобства Inspector'а.
     if (subtype) {
-        (front as unknown as { __subtype?: string }).__subtype = subtype;
+        front.__subtype = subtype;
     }
 
     return {
