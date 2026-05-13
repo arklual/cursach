@@ -5,6 +5,8 @@ import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { WorkflowService, WorkflowMeta } from '../../services/workflow.service';
 import { WorkflowFacade } from '../../core/api/workflow.facade';
+import { WorkflowWsService } from '../../core/ws/workflow-ws.service';
+import { parseGraphFromBackend } from '../../core/api/workflow.mapper';
 import { SimulationService } from '../../services/simulation.service';
 import { calcSampleSize, calcPValue } from '../../services/statistics.utils';
 import { WorkflowCanvasComponent } from '../../components/workflow-canvas/workflow-canvas.component';
@@ -694,10 +696,14 @@ import { ExperimentConfig } from '../../models/workflow.model';
 export class WorkflowEditorComponent implements OnInit, OnDestroy {
   workflowService = inject(WorkflowService);
   private facade = inject(WorkflowFacade);
+  private ws = inject(WorkflowWsService);
   private simulationService = inject(SimulationService);
   private http = inject(HttpClient);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+
+  private wsUnsubscribe: (() => void) | null = null;
+  private wsGraphSub: import('rxjs').Subscription | null = null;
 
   private currentWorkflowId = signal<string | null>(null);
   private currentVersionId = signal<string | null>(null);
@@ -806,6 +812,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
           this.workflowService.setActiveNode(loaded.nodes[0]?.id ?? null);
           this.workflowService.clearLogs();
           this.workflowService.log(`Загружен workflow: ${loaded.meta.name}`);
+          this.subscribeWs(id);
         },
         error: err => {
           console.error('Failed to load workflow', err);
@@ -837,6 +844,24 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
       clearInterval(this.autoSaveInterval);
     }
     this.saveGraphToBackend();
+    this.wsUnsubscribe?.();
+    this.wsGraphSub?.unsubscribe();
+  }
+
+  private subscribeWs(workflowId: string): void {
+    this.wsUnsubscribe?.();
+    this.wsGraphSub?.unsubscribe();
+    this.wsUnsubscribe = this.ws.subscribeToWorkflow(workflowId);
+    this.wsGraphSub = this.ws.graphUpdates.subscribe(evt => {
+      if (evt.workflowId !== workflowId) {
+        return;
+      }
+      // Игнорируем "эхо" нашего собственного save (нет надёжного признака — фильтруем по совпадению).
+      const { nodes, edges } = parseGraphFromBackend(evt.graph);
+      this.workflowService.setNodes(nodes);
+      this.workflowService.setEdges(edges);
+      this.workflowService.log('Граф обновлён через WebSocket');
+    });
   }
 
   private saveGraphToBackend(): void {
