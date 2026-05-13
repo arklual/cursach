@@ -1,7 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { WorkflowService, WorkflowMeta } from '../../services/workflow.service';
+import { WorkflowMeta } from '../../services/workflow.service';
+import { WorkflowFacade } from '../../core/api/workflow.facade';
 
 @Component({
   selector: 'app-workflows-list',
@@ -22,8 +23,15 @@ import { WorkflowService, WorkflowMeta } from '../../services/workflow.service';
         </button>
       </header>
 
+      @if (loading()) {
+        <div class="loading-banner">Загрузка…</div>
+      }
+      @if (errorMessage()) {
+        <div class="error-banner">{{ errorMessage() }}</div>
+      }
+
       <main class="workflows-grid">
-        @for (workflow of workflowService.workflows(); track workflow.id) {
+        @for (workflow of workflows(); track workflow.id) {
           <div class="workflow-card" (click)="openWorkflow(workflow.id)">
             <div class="card-header">
               <span class="card-icon" [style.background]="getStatusColor(workflow.status)">
@@ -94,6 +102,23 @@ import { WorkflowService, WorkflowMeta } from '../../services/workflow.service';
     .page-header p {
       margin: 0;
       color: var(--muted);
+    }
+
+    .loading-banner, .error-banner {
+      margin: 16px 48px 0;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+    }
+
+    .loading-banner {
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .error-banner {
+      background: #fee2e2;
+      color: #b91c1c;
     }
 
     .workflows-grid {
@@ -256,30 +281,72 @@ import { WorkflowService, WorkflowMeta } from '../../services/workflow.service';
     }
   `]
 })
-export class WorkflowsListComponent {
-  workflowService = inject(WorkflowService);
-  private router = inject(Router);
+export class WorkflowsListComponent implements OnInit {
+  private readonly facade = inject(WorkflowFacade);
+  private readonly router = inject(Router);
+
+  readonly workflows = signal<WorkflowMeta[]>([]);
+  readonly loading = signal(false);
+  readonly errorMessage = signal<string | null>(null);
+
+  ngOnInit(): void {
+    this.refresh();
+  }
+
+  private refresh(): void {
+    this.loading.set(true);
+    this.errorMessage.set(null);
+    this.facade.listWorkflows().subscribe({
+      next: list => {
+        this.workflows.set(list);
+        this.loading.set(false);
+      },
+      error: err => {
+        this.errorMessage.set('Не удалось загрузить список workflow. Проверьте бэкенд.');
+        this.loading.set(false);
+        console.error(err);
+      },
+    });
+  }
 
   createWorkflow(): void {
-    const id = this.workflowService.createNewWorkflow();
-    this.router.navigate(['/workflow', id]);
+    const defaultName = `Workflow ${this.workflows().length + 1}`;
+    this.facade.createWorkflow(defaultName).subscribe({
+      next: ({ workflowId }) => this.router.navigate(['/workflow', workflowId]),
+      error: err => {
+        this.errorMessage.set('Не удалось создать workflow.');
+        console.error(err);
+      },
+    });
   }
 
   openWorkflow(id: string): void {
-    this.workflowService.loadWorkflow(id);
     this.router.navigate(['/workflow', id]);
   }
 
   duplicateWorkflow(event: MouseEvent, id: string): void {
     event.stopPropagation();
-    this.workflowService.duplicateWorkflow(id);
+    this.facade.duplicateWorkflow(id).subscribe({
+      next: () => this.refresh(),
+      error: err => {
+        this.errorMessage.set('Не удалось скопировать workflow.');
+        console.error(err);
+      },
+    });
   }
 
   deleteWorkflow(event: MouseEvent, id: string): void {
     event.stopPropagation();
-    if (confirm('Удалить этот workflow?')) {
-      this.workflowService.deleteWorkflow(id);
+    if (!confirm('Удалить этот workflow?')) {
+      return;
     }
+    this.facade.deleteWorkflow(id).subscribe({
+      next: () => this.refresh(),
+      error: err => {
+        this.errorMessage.set('Не удалось удалить workflow.');
+        console.error(err);
+      },
+    });
   }
 
   getStatusColor(status: string): string {
