@@ -19,24 +19,57 @@ import type {
     Variant,
 } from '../../models/workflow.model';
 
-const META_KEYS = ['__variants', '__randomization', '__metrics', '__successProb', '__color'] as const;
+const META_KEYS = ['__variants', '__randomization', '__metrics', '__successProb', '__color', '__subtype'] as const;
+
+const DATAFLOW_SUBTYPES = ['filter', 'map', 'reduce', 'foreach', 'flatmap'] as const;
+type DataflowSubtype = typeof DATAFLOW_SUBTYPES[number];
 
 function defaultMetrics(): NodeMetrics {
     return { reached: 0, converted: 0, pHat: 0, variance: 0, ci: [0, 0], users: [], events: [] };
 }
 
+/** front-kind + subtype -> backend type. */
+function toBackendType(kind: NodeKind, subtype: string | undefined): string {
+    if (kind === 'dataflow') {
+        const sub = (DATAFLOW_SUBTYPES as readonly string[]).includes(subtype ?? '')
+            ? subtype
+            : 'filter';
+        return `dataflow.${sub}`;
+    }
+    return kind;
+}
+
+/** backend type -> { kind, subtype? }. */
+function fromBackendType(type: string | undefined): { kind: NodeKind; subtype?: DataflowSubtype } {
+    if (type && type.startsWith('dataflow.')) {
+        const sub = type.substring('dataflow.'.length) as DataflowSubtype;
+        if ((DATAFLOW_SUBTYPES as readonly string[]).includes(sub)) {
+            return { kind: 'dataflow', subtype: sub };
+        }
+        return { kind: 'dataflow' };
+    }
+    return { kind: (type ?? 'http') as NodeKind };
+}
+
 export function frontNodeToBackend(node: FrontNode): BackendNode {
+    const cfg = node.data as unknown as { config?: Record<string, unknown> };
+    const userConfig = cfg.config ?? {};
+    const subtype = (userConfig['subtype'] as string | undefined) ??
+        ((node.data as unknown as { __subtype?: string }).__subtype);
+
     const config: Record<string, unknown> = {
+        ...userConfig,
         __variants: node.data.variants,
         __randomization: node.data.randomization,
         __metrics: node.data.metrics,
         __successProb: node.data.successProb,
         __color: node.data.color,
+        __subtype: subtype,
     };
 
     return {
         id: node.id,
-        type: node.data.kind,
+        type: toBackendType(node.data.kind, subtype),
         position: node.position,
         data: {
             label: node.data.label,
@@ -48,7 +81,7 @@ export function frontNodeToBackend(node: FrontNode): BackendNode {
 
 export function backendNodeToFront(backend: BackendNode): FrontNode {
     const id = backend.id ?? crypto.randomUUID();
-    const kind = (backend.type ?? 'http') as NodeKind;
+    const { kind, subtype } = fromBackendType(backend.type);
     const data = backend.data ?? {};
     const config = (data.config ?? {}) as Record<string, unknown>;
 
@@ -62,6 +95,10 @@ export function backendNodeToFront(backend: BackendNode): FrontNode {
         randomization: (config['__randomization'] as NodeData['randomization']) ?? 'simple',
         metrics: (config['__metrics'] as NodeMetrics) ?? defaultMetrics(),
     };
+    // subtype для dataflow-нод хранится в служебном поле для удобства Inspector'а.
+    if (subtype) {
+        (front as unknown as { __subtype?: string }).__subtype = subtype;
+    }
 
     return {
         id,

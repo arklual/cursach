@@ -84,6 +84,52 @@ describe('workflow.mapper', () => {
         });
     });
 
+    describe('dataflow subtype mapping', () => {
+        it('kind=dataflow + __subtype=filter → backend type=dataflow.filter', () => {
+            const node: FrontNode = {
+                id: 'df-1',
+                type: 'workflowNode',
+                position: { x: 0, y: 0 },
+                data: {
+                    id: 'df-1',
+                    kind: 'dataflow',
+                    label: 'F',
+                    color: '#14b8a6',
+                    successProb: 0,
+                    variants: [],
+                    randomization: 'simple',
+                    metrics: { reached: 0, converted: 0, pHat: 0, variance: 0, ci: [0, 0], users: [], events: [] },
+                },
+            };
+            (node.data as unknown as { __subtype?: string }).__subtype = 'filter';
+
+            const backend = frontNodeToBackend(node);
+            expect(backend.type).toBe('dataflow.filter');
+        });
+
+        it('backend type=dataflow.map → front kind=dataflow + __subtype=map', () => {
+            const backend = { id: 'df-2', type: 'dataflow.map', position: { x: 1, y: 1 }, data: { label: 'M' } };
+            const front = backendNodeToFront(backend as never);
+            expect(front.data.kind).toBe('dataflow');
+            expect((front.data as unknown as { __subtype?: string }).__subtype).toBe('map');
+        });
+
+        it('kind=dataflow без subtype дефолтится на filter', () => {
+            const node: FrontNode = {
+                id: 'df-3',
+                type: 'workflowNode',
+                position: { x: 0, y: 0 },
+                data: {
+                    id: 'df-3', kind: 'dataflow', label: '', color: '', successProb: 0,
+                    variants: [], randomization: 'simple',
+                    metrics: { reached: 0, converted: 0, pHat: 0, variance: 0, ci: [0, 0], users: [], events: [] },
+                },
+            };
+            const backend = frontNodeToBackend(node);
+            expect(backend.type).toBe('dataflow.filter');
+        });
+    });
+
     describe('full graph round-trip', () => {
         it('buildGraphForBackend + parseGraphFromBackend сохраняют структуру', () => {
             const nodes = [sampleFrontNode()];

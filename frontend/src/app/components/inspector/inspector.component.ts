@@ -23,6 +23,19 @@ import { WorkflowNode, Variant } from '../../models/workflow.model';
                    [ngModel]="node.data.successProb"
                    (ngModelChange)="updateSuccessProb($event)">
           </label>
+          @if (node.data.kind === 'dataflow') {
+            <label>
+              Dataflow подтип
+              <select [ngModel]="getSubtype(node)" (ngModelChange)="updateSubtype($event)">
+                <option value="filter">filter</option>
+                <option value="map">map</option>
+                <option value="reduce">reduce</option>
+                <option value="foreach">foreach</option>
+                <option value="flatmap">flatmap</option>
+              </select>
+            </label>
+            <p class="hint">Config задаётся как JSON в data.config (поля field/op/value, select/rename/wrap и т.д.).</p>
+          }
           @if (node.data.kind === 'ab') {
             <div class="traffic-section">
               <h4>Traffic allocation</h4>
@@ -202,6 +215,21 @@ export class InspectorComponent {
     if (node) {
       this.workflowService.updateNodeData(node.id, data => ({ ...data, randomization }));
     }
+  }
+
+  getSubtype(node: WorkflowNode): string {
+    return (node.data as unknown as { __subtype?: string }).__subtype ?? 'filter';
+  }
+
+  updateSubtype(subtype: string): void {
+    const node = this.activeNode();
+    if (!node) {
+      return;
+    }
+    this.workflowService.updateNodeData(node.id, data => {
+      // Кладём в служебное поле data.__subtype; mapper подхватит при putGraph.
+      return { ...data, __subtype: subtype } as typeof data;
+    });
   }
 
   updateVariantWeight(index: number, value: number): void {
