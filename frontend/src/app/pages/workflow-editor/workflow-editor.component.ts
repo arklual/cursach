@@ -3,7 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
-import { WorkflowService } from '../../services/workflow.service';
+import { WorkflowService, WorkflowMeta } from '../../services/workflow.service';
+import { WorkflowFacade } from '../../core/api/workflow.facade';
 import { SimulationService } from '../../services/simulation.service';
 import { calcSampleSize, calcPValue } from '../../services/statistics.utils';
 import { WorkflowCanvasComponent } from '../../components/workflow-canvas/workflow-canvas.component';
@@ -645,10 +646,16 @@ import { ExperimentConfig } from '../../models/workflow.model';
 })
 export class WorkflowEditorComponent implements OnInit, OnDestroy {
   workflowService = inject(WorkflowService);
+  private facade = inject(WorkflowFacade);
   private simulationService = inject(SimulationService);
   private http = inject(HttpClient);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+
+  private currentWorkflowId = signal<string | null>(null);
+  private currentVersionId = signal<string | null>(null);
+  private currentMeta = signal<WorkflowMeta | null>(null);
+  loadError = signal<string | null>(null);
 
   Math = Math;
 
@@ -699,7 +706,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   schemas = signal('');
   qaText = signal('');
 
-  workflowMeta = computed(() => this.workflowService.getCurrentWorkflowMeta());
+  workflowMeta = computed(() => this.currentMeta());
 
   analyticsNode = computed(() => {
     const id = this.analyticsNodeId();
@@ -736,11 +743,22 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
-      const loaded = this.workflowService.loadWorkflow(id);
-      if (!loaded) {
-        this.router.navigate(['/']);
-        return;
-      }
+      this.currentWorkflowId.set(id);
+      this.facade.loadWorkflow(id).subscribe({
+        next: loaded => {
+          this.currentVersionId.set(loaded.versionId);
+          this.currentMeta.set(loaded.meta);
+          this.workflowService.setNodes(loaded.nodes);
+          this.workflowService.setEdges(loaded.edges);
+          this.workflowService.setActiveNode(loaded.nodes[0]?.id ?? null);
+          this.workflowService.clearLogs();
+          this.workflowService.log(`Загружен workflow: ${loaded.meta.name}`);
+        },
+        error: err => {
+          console.error('Failed to load workflow', err);
+          this.loadError.set('Не удалось загрузить workflow с бэкенда.');
+        },
+      });
     }
 
     this.http.get('docs/event_schemas.json', { responseType: 'text' })
@@ -755,9 +773,9 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
         error: () => {}
       });
 
-    // Auto-save every 30 seconds
+    // Авто-сохранение графа в бэк раз в 30 секунд
     this.autoSaveInterval = setInterval(() => {
-      this.workflowService.saveCurrentWorkflow();
+      this.saveGraphToBackend();
     }, 30000);
   }
 
@@ -765,19 +783,33 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     if (this.autoSaveInterval) {
       clearInterval(this.autoSaveInterval);
     }
-    this.workflowService.saveCurrentWorkflow();
+    this.saveGraphToBackend();
+  }
+
+  private saveGraphToBackend(): void {
+    const versionId = this.currentVersionId();
+    if (!versionId) {
+      return;
+    }
+    this.facade.saveGraph(versionId, this.workflowService.nodes(), this.workflowService.edges()).subscribe({
+      error: err => console.error('Auto-save failed', err),
+    });
   }
 
   goBack(): void {
-    this.workflowService.saveCurrentWorkflow();
+    this.saveGraphToBackend();
     this.router.navigate(['/']);
   }
 
   updateWorkflowName(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const id = this.workflowService.getCurrentWorkflowId();
-    if (id && input.value.trim()) {
-      this.workflowService.updateWorkflowMeta(id, { name: input.value.trim() });
+    const id = this.currentWorkflowId();
+    const value = input.value.trim();
+    if (id && value) {
+      this.facade.renameWorkflow(id, value).subscribe({
+        next: meta => this.currentMeta.set(meta),
+        error: err => console.error('Rename failed', err),
+      });
     }
   }
 
@@ -825,10 +857,8 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   startExperiment(): void {
     this.closeModal('abConfig');
     this.workflowService.log('Experiment started');
-    const id = this.workflowService.getCurrentWorkflowId();
-    if (id) {
-      this.workflowService.updateWorkflowMeta(id, { status: 'running' });
-    }
+    // status — UI-only поле, на бэке не хранится; обновляем локально, чтобы badge в header сменился.
+    this.currentMeta.update(m => (m ? { ...m, status: 'running' } : m));
   }
 
   // Resize handlers
