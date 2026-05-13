@@ -13,6 +13,7 @@ import { InspectorComponent } from '../../components/inspector/inspector.compone
 import { AnalyticsModalComponent } from '../../components/analytics-modal/analytics-modal.component';
 import { ModalComponent } from '../../components/modal/modal.component';
 import { RunsPanelComponent } from '../../components/runs-panel/runs-panel.component';
+import { TriggersPanelComponent } from '../../components/triggers-panel/triggers-panel.component';
 import { ExperimentConfig } from '../../models/workflow.model';
 
 @Component({
@@ -27,6 +28,7 @@ import { ExperimentConfig } from '../../models/workflow.model';
     AnalyticsModalComponent,
     ModalComponent,
     RunsPanelComponent,
+    TriggersPanelComponent,
   ],
   template: `
     <div class="app-shell">
@@ -113,6 +115,7 @@ import { ExperimentConfig } from '../../models/workflow.model';
           <div class="tabs">
             <button class="tab" [class.active]="bottomTab() === 'log'" (click)="bottomTab.set('log')">Execution log</button>
             <button class="tab" [class.active]="bottomTab() === 'runs'" (click)="bottomTab.set('runs')">Запуски</button>
+            <button class="tab" [class.active]="bottomTab() === 'triggers'" (click)="bottomTab.set('triggers')">Триггеры</button>
           </div>
           <div>
             @if (bottomTab() === 'log') {
@@ -131,9 +134,13 @@ import { ExperimentConfig } from '../../models/workflow.model';
                 <p class="log-entry">{{ line }}</p>
               }
             </div>
-          } @else if (currentWorkflowIdValue()) {
-            <div class="log-stream" [style.height.px]="logPanelHeight()">
+          } @else if (bottomTab() === 'runs' && currentWorkflowIdValue()) {
+            <div class="log-stream light" [style.height.px]="logPanelHeight()">
               <app-runs-panel [workflowId]="currentWorkflowIdValue()!"></app-runs-panel>
+            </div>
+          } @else if (bottomTab() === 'triggers' && currentWorkflowIdValue()) {
+            <div class="log-stream light" [style.height.px]="logPanelHeight()">
+              <app-triggers-panel [workflowId]="currentWorkflowIdValue()!"></app-triggers-panel>
             </div>
           }
         }
@@ -527,6 +534,12 @@ import { ExperimentConfig } from '../../models/workflow.model';
       border-color: var(--accent);
     }
 
+    .log-stream.light {
+      background: #ffffff;
+      color: #0f172a;
+      padding: 0;
+    }
+
     .log-stream {
       overflow: auto;
       font-size: 12px;
@@ -694,8 +707,8 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   /** Доступ к id из шаблона (signals private). */
   readonly currentWorkflowIdValue = this.currentWorkflowId.asReadonly();
 
-  /** Вкладка нижней панели: лог симуляций или список реальных запусков. */
-  readonly bottomTab = signal<'log' | 'runs'>('log');
+  /** Вкладка нижней панели: лог симуляций / запуски / триггеры. */
+  readonly bottomTab = signal<'log' | 'runs' | 'triggers'>('log');
 
   Math = Math;
 
