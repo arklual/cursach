@@ -1,0 +1,95 @@
+@startuml
+title Схема БД: таблицы для CAS и версионирования
+
+hide methods
+skinparam classAttributeIconSize 0
+
+' blob_index
+class blob_index {
+  + content_hash : CHAR(64) <<PK>>
+  + s3_key      : VARCHAR(255)
+  + size_bytes  : BIGINT
+  + created_at  : TIMESTAMP
+  + storage_class: VARCHAR(32)
+}
+
+' workflow_revision
+class workflow_revision {
+  + id               : BIGSERIAL <<PK>>
+  + workflow_id      : UUID <<FK workflows.id>>
+  + revision_number  : INT
+  + graph_skeleton   : JSONB  -- coordinates, nodes, edges, node.config_hash -> content_hash
+  + author_id        : UUID
+  + change_summary   : VARCHAR(255)
+  + created_at       : TIMESTAMP
+}
+
+' workflow (meta)
+class workflows {
+  + id        : UUID <<PK>>
+  + name      : VARCHAR(255)
+  + description: TEXT
+  + created_at: TIMESTAMP
+  + updated_at: TIMESTAMP
+}
+
+' workflow_version (optional logical versions)
+class workflow_version {
+  + id           : BIGSERIAL <<PK>>
+  + workflow_id  : UUID <<FK workflows.id>>
+  + version_tag  : VARCHAR(64) -- e.g. "v1.2.3"
+  + root_revision_id : BIGINT <<FK workflow_revision.id>>
+  + created_at   : TIMESTAMP
+}
+
+' workflow_deployment (active/production pointers)
+class workflow_deployment {
+  + id : BIGSERIAL <<PK>>
+  + workflow_id : UUID <<FK workflows.id>>
+  + workflow_version_id : BIGINT <<FK workflow_version.id>>
+  + deployed_at : TIMESTAMP
+  + environment : VARCHAR(32) -- prod / staging
+}
+
+' node_run / workflow_run (for completeness)
+class workflow_run {
+  + id : BIGSERIAL <<PK>>
+  + workflow_id : UUID <<FK workflows.id>>
+  + workflow_revision_id : BIGINT <<FK workflow_revision.id>>
+  + status : VARCHAR(32)
+  + started_at : TIMESTAMP
+  + finished_at : TIMESTAMP
+}
+
+class node_run {
+  + id : BIGSERIAL <<PK>>
+  + workflow_run_id : BIGINT <<FK workflow_run.id>>
+  + node_id : UUID
+  + config_hash : CHAR(64) -- link to blob_index.content_hash if node has code
+  + input_json_url : VARCHAR(512)
+  + output_json_url : VARCHAR(512)
+  + status : VARCHAR(32)
+  + started_at : TIMESTAMP
+  + finished_at : TIMESTAMP
+}
+
+' Relationships
+workflows "1" -- "0..*" workflow_revision : contains >
+workflows "1" -- "0..*" workflow_version : has >
+workflow_version "0..1" -- "1" workflow_revision : root_rev >
+workflows "1" -- "0..*" workflow_deployment : deploys >
+workflow_revision "1" -- "0..*" workflow_run : used_by >
+workflow_run "1" -- "0..*" node_run : contains >
+blob_index "1" -- "0..*" workflow_revision : referenced_in (via hashes in JSON)
+blob_index "1" -- "0..*" node_run : referenced_in
+
+' Index / notes
+note right
+  Рекомендации:
+  - PRIMARY KEY на blob_index.content_hash
+  - UNIQUE(content_hash) обеспечит idempotent upload
+  - revision_number: можно генерировать через SELECT MAX+1 или через sequence per workflow
+  - graph_skeleton содержит только метаданные и хэши (не сами тексты)
+end note
+
+@enduml
