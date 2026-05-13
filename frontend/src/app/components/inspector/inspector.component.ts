@@ -23,6 +23,49 @@ import { WorkflowNode, Variant } from '../../models/workflow.model';
                    [ngModel]="node.data.successProb"
                    (ngModelChange)="updateSuccessProb($event)">
           </label>
+          @if (node.data.kind === 'http') {
+            <fieldset class="config-section">
+              <legend>HTTP request</legend>
+              <label>
+                URL
+                <input type="text"
+                       [ngModel]="cfg(node, 'url', '')"
+                       (ngModelChange)="setCfg(node, 'url', $event)"
+                       placeholder="https://httpbin.org/get">
+              </label>
+              <label>
+                Method
+                <select [ngModel]="cfg(node, 'method', 'GET')"
+                        (ngModelChange)="setCfg(node, 'method', $event)">
+                  <option>GET</option>
+                  <option>POST</option>
+                  <option>PUT</option>
+                  <option>DELETE</option>
+                </select>
+              </label>
+              <label>
+                Timeout, ms
+                <input type="number" min="100" step="100"
+                       [ngModel]="cfg(node, 'timeoutMs', 30000)"
+                       (ngModelChange)="setCfg(node, 'timeoutMs', +$event)">
+              </label>
+              <label>
+                Headers (JSON, key→value)
+                <textarea rows="3" class="mono"
+                          [ngModel]="cfgJson(node, 'headers')"
+                          (ngModelChange)="setCfgJson(node, 'headers', $event)"
+                          placeholder='{"Authorization": "Bearer ..."}'></textarea>
+              </label>
+              <label>
+                Body (raw)
+                <textarea rows="4" class="mono"
+                          [ngModel]="cfg(node, 'body', '')"
+                          (ngModelChange)="setCfg(node, 'body', $event)"
+                          placeholder='{"hello": "world"}'></textarea>
+              </label>
+            </fieldset>
+          }
+
           @if (node.data.kind === 'dataflow') {
             <label>
               Dataflow подтип
@@ -34,7 +77,143 @@ import { WorkflowNode, Variant } from '../../models/workflow.model';
                 <option value="flatmap">flatmap</option>
               </select>
             </label>
-            <p class="hint">Config задаётся как JSON в data.config (поля field/op/value, select/rename/wrap и т.д.).</p>
+
+            @if (getSubtype(node) === 'filter') {
+              <fieldset class="config-section">
+                <legend>Filter</legend>
+                <label>
+                  Field
+                  <input type="text"
+                         [ngModel]="cfg(node, 'field', '')"
+                         (ngModelChange)="setCfg(node, 'field', $event)"
+                         placeholder="amount">
+                </label>
+                <label>
+                  Op
+                  <select [ngModel]="cfg(node, 'op', 'gt')"
+                          (ngModelChange)="setCfg(node, 'op', $event)">
+                    <option value="eq">eq</option>
+                    <option value="ne">ne</option>
+                    <option value="gt">gt</option>
+                    <option value="gte">gte</option>
+                    <option value="lt">lt</option>
+                    <option value="lte">lte</option>
+                  </select>
+                </label>
+                <label>
+                  Value (JSON)
+                  <input type="text"
+                         [ngModel]="cfgJson(node, 'value')"
+                         (ngModelChange)="setCfgJson(node, 'value', $event)"
+                         placeholder='100 или "pro"'>
+                </label>
+              </fieldset>
+            }
+
+            @if (getSubtype(node) === 'map') {
+              <fieldset class="config-section">
+                <legend>Map</legend>
+                <label>
+                  Select fields (comma-separated)
+                  <input type="text"
+                         [ngModel]="cfgList(node, 'select')"
+                         (ngModelChange)="setCfgList(node, 'select', $event)"
+                         placeholder="id, amount">
+                </label>
+                <label>
+                  Rename (JSON: new → old)
+                  <textarea rows="2" class="mono"
+                            [ngModel]="cfgJson(node, 'rename')"
+                            (ngModelChange)="setCfgJson(node, 'rename', $event)"
+                            placeholder='{"newName": "oldName"}'></textarea>
+                </label>
+                <label>
+                  Wrap field name
+                  <input type="text"
+                         [ngModel]="cfg(node, 'wrap', '')"
+                         (ngModelChange)="setCfg(node, 'wrap', $event)"
+                         placeholder="value">
+                </label>
+                <p class="hint">Использовать одно из трёх: select / rename / wrap.</p>
+              </fieldset>
+            }
+
+            @if (getSubtype(node) === 'reduce') {
+              <fieldset class="config-section">
+                <legend>Reduce</legend>
+                <label>
+                  Op
+                  <select [ngModel]="cfg(node, 'op', 'count')"
+                          (ngModelChange)="setCfg(node, 'op', $event)">
+                    <option value="count">count</option>
+                    <option value="sum">sum</option>
+                    <option value="min">min</option>
+                    <option value="max">max</option>
+                    <option value="avg">avg</option>
+                  </select>
+                </label>
+                <label>
+                  Field (для sum/min/max/avg)
+                  <input type="text"
+                         [ngModel]="cfg(node, 'field', '')"
+                         (ngModelChange)="setCfg(node, 'field', $event)"
+                         placeholder="amount">
+                </label>
+              </fieldset>
+            }
+
+            @if (getSubtype(node) === 'flatmap') {
+              <fieldset class="config-section">
+                <legend>FlatMap</legend>
+                <label>
+                  Field (массив для разворачивания)
+                  <input type="text"
+                         [ngModel]="cfg(node, 'field', '')"
+                         (ngModelChange)="setCfg(node, 'field', $event)"
+                         placeholder="items">
+                </label>
+                <p class="hint">Если пусто — ожидается массив массивов на входе.</p>
+              </fieldset>
+            }
+
+            @if (getSubtype(node) === 'foreach') {
+              <p class="hint">Foreach в MVP — passthrough (output = input как массив). Настоящий fan-out не реализован.</p>
+            }
+          }
+
+          @if (node.data.kind === 'code') {
+            <fieldset class="config-section">
+              <legend>Python sandbox</legend>
+              <label>
+                Docker image (опционально)
+                <input type="text"
+                       [ngModel]="cfg(node, 'image', '')"
+                       (ngModelChange)="setCfg(node, 'image', $event)"
+                       placeholder="python:3.12-alpine">
+              </label>
+              <label>
+                Timeout, ms
+                <input type="number" min="500" step="500"
+                       [ngModel]="cfg(node, 'timeoutMs', 5000)"
+                       (ngModelChange)="setCfg(node, 'timeoutMs', +$event)">
+              </label>
+              <label>
+                Memory, MB
+                <input type="number" min="32" step="32"
+                       [ngModel]="cfg(node, 'memoryMb', 128)"
+                       (ngModelChange)="setCfg(node, 'memoryMb', +$event)">
+              </label>
+              <label>
+                Code (получает stdin как JSON, печатает результат)
+                <textarea rows="8" class="mono"
+                          [ngModel]="cfg(node, 'code', '')"
+                          (ngModelChange)="setCfg(node, 'code', $event)"
+                          placeholder="import sys, json
+data = json.load(sys.stdin)
+print(json.dumps({'sum': sum(data.get('xs', []))}))"></textarea>
+              </label>
+              <p class="hint">Бэк запускает <code>docker run --rm -i</code>. Требуется Docker на хосте бэка.</p>
+            </fieldset>
           }
           @if (node.data.kind === 'ab') {
             <div class="traffic-section">
@@ -60,7 +239,10 @@ import { WorkflowNode, Variant } from '../../models/workflow.model';
               </label>
             </div>
           }
-          <button class="ghost" (click)="testNode.emit(node.id)">Test node</button>
+          <div class="actions-row">
+            <button class="ghost" (click)="testNode.emit(node.id)">Test node</button>
+            <button class="ghost danger" (click)="deleteNode(node.id)">Удалить ноду</button>
+          </div>
         </div>
       } @else {
         <p>Выберите ноду для настройки.</p>
@@ -110,10 +292,63 @@ import { WorkflowNode, Variant } from '../../models/workflow.model';
       gap: 4px;
     }
 
-    input, select {
+    input, select, textarea {
       border-radius: 8px;
       border: 1px solid var(--border);
       padding: 6px 8px;
+      font-family: inherit;
+      font-size: 13px;
+    }
+
+    textarea.mono, input.mono {
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .config-section {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 0;
+    }
+
+    .config-section legend {
+      padding: 0 6px;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .actions-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .actions-row button {
+      flex: 1;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    button.danger {
+      color: #b91c1c;
+      border-color: #fecaca;
+    }
+
+    button.danger:hover {
+      background: #fee2e2;
     }
 
     .traffic-section {
@@ -218,7 +453,7 @@ export class InspectorComponent {
   }
 
   getSubtype(node: WorkflowNode): string {
-    return (node.data as unknown as { __subtype?: string }).__subtype ?? 'filter';
+    return node.data.__subtype ?? 'filter';
   }
 
   updateSubtype(subtype: string): void {
@@ -226,10 +461,70 @@ export class InspectorComponent {
     if (!node) {
       return;
     }
-    this.workflowService.updateNodeData(node.id, data => {
-      // Кладём в служебное поле data.__subtype; mapper подхватит при putGraph.
-      return { ...data, __subtype: subtype } as typeof data;
-    });
+    this.workflowService.updateNodeData(node.id, data => ({ ...data, __subtype: subtype }));
+  }
+
+  // ----- helpers для редактирования data.config из шаблона -----
+
+  cfg<T = unknown>(node: WorkflowNode, key: string, fallback: T): T {
+    return (node.data.config?.[key] as T | undefined) ?? fallback;
+  }
+
+  setCfg(node: WorkflowNode, key: string, value: unknown): void {
+    this.workflowService.updateNodeData(node.id, data => ({
+      ...data,
+      config: { ...(data.config ?? {}), [key]: value },
+    }));
+  }
+
+  cfgJson(node: WorkflowNode, key: string): string {
+    const v = node.data.config?.[key];
+    if (v == null) {
+      return '';
+    }
+    if (typeof v === 'string') {
+      return v;
+    }
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return String(v);
+    }
+  }
+
+  setCfgJson(node: WorkflowNode, key: string, raw: string): void {
+    const trimmed = raw.trim();
+    let parsed: unknown = raw;
+    if (trimmed.length > 0) {
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        parsed = raw; // оставляем как строку, если ввод ещё не валиден
+      }
+    } else {
+      parsed = undefined;
+    }
+    this.setCfg(node, key, parsed);
+  }
+
+  cfgList(node: WorkflowNode, key: string): string {
+    const v = node.data.config?.[key];
+    if (Array.isArray(v)) {
+      return v.join(', ');
+    }
+    return '';
+  }
+
+  setCfgList(node: WorkflowNode, key: string, raw: string): void {
+    const list = raw.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    this.setCfg(node, key, list.length > 0 ? list : undefined);
+  }
+
+  deleteNode(nodeId: string): void {
+    if (!confirm('Удалить ноду?')) {
+      return;
+    }
+    this.workflowService.removeNode(nodeId);
   }
 
   updateVariantWeight(index: number, value: number): void {
