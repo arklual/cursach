@@ -37,6 +37,18 @@ export interface NodeData {
   variants: Variant[];
   randomization: 'simple' | 'hashed' | 'stratified';
   metrics: NodeMetrics;
+  /**
+   * Произвольный JSON-конфиг для бэкенд-executor'а:
+   *   http: { url, method, headers, body, timeoutMs }
+   *   dataflow.filter: { field, op, value }
+   *   dataflow.map: { select | rename | wrap }
+   *   dataflow.reduce / flatmap: { op?, field? }
+   *   code: { image?, code, timeoutMs?, memoryMb? }
+   * Mapper кладёт это в node.data.config на бэке.
+   */
+  config?: Record<string, unknown>;
+  /** Служебное: подтип dataflow-ноды (filter/map/reduce/foreach/flatmap). */
+  __subtype?: string;
 }
 
 export interface WorkflowNode {

@@ -84,6 +84,93 @@ describe('workflow.mapper', () => {
         });
     });
 
+    describe('user-config round-trip', () => {
+        it('сохраняет HTTP config (url, method, headers, body, timeoutMs) через round-trip', () => {
+            const original: FrontNode = {
+                id: 'http-1',
+                type: 'workflowNode',
+                position: { x: 1, y: 2 },
+                data: {
+                    id: 'http-1',
+                    kind: 'http',
+                    label: 'GET httpbin',
+                    color: '#f97316',
+                    successProb: 0.5,
+                    variants: [],
+                    randomization: 'simple',
+                    metrics: { reached: 0, converted: 0, pHat: 0, variance: 0, ci: [0, 0], users: [], events: [] },
+                    config: {
+                        url: 'https://httpbin.org/get',
+                        method: 'GET',
+                        headers: { 'X-Test': '1' },
+                        body: null,
+                        timeoutMs: 5000,
+                    },
+                },
+            };
+
+            const backend = frontNodeToBackend(original);
+            const cfg = backend.data?.config as unknown as Record<string, unknown>;
+            expect(cfg['url']).toBe('https://httpbin.org/get');
+            expect(cfg['method']).toBe('GET');
+            expect(cfg['timeoutMs']).toBe(5000);
+
+            const restored = backendNodeToFront(backend);
+            expect(restored.data.config?.['url']).toBe('https://httpbin.org/get');
+            expect(restored.data.config?.['method']).toBe('GET');
+            expect((restored.data.config?.['headers'] as { 'X-Test': string })['X-Test']).toBe('1');
+            expect(restored.data.config?.['timeoutMs']).toBe(5000);
+        });
+
+        it('не утекает служебных __-полей в data.config', () => {
+            const backend = {
+                id: 'x',
+                type: 'http',
+                position: { x: 0, y: 0 },
+                data: {
+                    label: 'X',
+                    config: {
+                        url: 'https://x',
+                        __metrics: { reached: 1 },
+                        __color: '#111',
+                        __subtype: 'filter',
+                    },
+                },
+            };
+
+            const front = backendNodeToFront(backend as never);
+            expect(front.data.config?.['url']).toBe('https://x');
+            expect(front.data.config?.['__metrics']).toBeUndefined();
+            expect(front.data.config?.['__color']).toBeUndefined();
+            expect(front.data.config?.['__subtype']).toBeUndefined();
+        });
+
+        it('dataflow-filter config (field/op/value) выживает round-trip', () => {
+            const node: FrontNode = {
+                id: 'df-1',
+                type: 'workflowNode',
+                position: { x: 0, y: 0 },
+                data: {
+                    id: 'df-1',
+                    kind: 'dataflow',
+                    label: 'F',
+                    color: '#14b8a6',
+                    successProb: 0,
+                    variants: [],
+                    randomization: 'simple',
+                    metrics: { reached: 0, converted: 0, pHat: 0, variance: 0, ci: [0, 0], users: [], events: [] },
+                    __subtype: 'filter',
+                    config: { field: 'amount', op: 'gt', value: 100 },
+                },
+            };
+
+            const restored = backendNodeToFront(frontNodeToBackend(node));
+            expect(restored.data.kind).toBe('dataflow');
+            expect(restored.data.__subtype).toBe('filter');
+            expect(restored.data.config).toEqual({ field: 'amount', op: 'gt', value: 100 });
+        });
+    });
+
     describe('dataflow subtype mapping', () => {
         it('kind=dataflow + __subtype=filter → backend type=dataflow.filter', () => {
             const node: FrontNode = {
