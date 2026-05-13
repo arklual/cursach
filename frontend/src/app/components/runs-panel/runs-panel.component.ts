@@ -9,6 +9,7 @@ import {
     signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Subscription, interval, switchMap, takeWhile } from 'rxjs';
 import { RunApiService } from '../../core/api/run.api';
 import type { NodeRun, WorkflowRun } from '../../core/api/api.models';
@@ -28,7 +29,7 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
 @Component({
     selector: 'app-runs-panel',
     standalone: true,
-    imports: [CommonModule],
+    imports: [CommonModule, FormsModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="runs-panel">
@@ -36,6 +37,16 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
                 <h3>Запуски</h3>
                 <button class="primary" (click)="onRun()">▶ Run</button>
             </div>
+
+            <details class="run-input">
+                <summary>Input JSON (передаётся в workflow как input)</summary>
+                <textarea rows="3" class="mono"
+                          [(ngModel)]="inputJsonRaw"
+                          placeholder='{"userId": "u-1", "amount": 200}'></textarea>
+                @if (inputJsonError()) {
+                    <p class="error">{{ inputJsonError() }}</p>
+                }
+            </details>
 
             @if (errorMessage()) {
                 <div class="error">{{ errorMessage() }}</div>
@@ -89,6 +100,9 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
         .runs-header { display: flex; justify-content: space-between; align-items: center; }
         .runs-header h3 { margin: 0; font-size: 14px; }
         button.primary { background: #6366f1; color: white; border: none; border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+        .run-input summary { cursor: pointer; font-size: 12px; color: #475569; user-select: none; }
+        .run-input textarea { width: 100%; box-sizing: border-box; margin-top: 6px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 6px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; }
+        .mono { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; }
         .error { background: #fee2e2; color: #b91c1c; padding: 8px; border-radius: 6px; font-size: 12px; }
         .runs-list { display: flex; flex-direction: column; gap: 6px; }
         .run-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
@@ -120,6 +134,9 @@ export class RunsPanelComponent implements OnInit, OnDestroy {
     readonly selectedRunId = signal<string | null>(null);
     readonly selectedRunNodes = signal<NodeRun[]>([]);
     readonly errorMessage = signal<string | null>(null);
+    readonly inputJsonError = signal<string | null>(null);
+    /** Сырой JSON-input для следующего запуска. */
+    inputJsonRaw = '';
 
     private listSub?: Subscription;
     private pollSub?: Subscription;
@@ -137,7 +154,20 @@ export class RunsPanelComponent implements OnInit, OnDestroy {
 
     onRun(): void {
         this.errorMessage.set(null);
-        this.runApi.enqueue(this.workflowId(), {}).subscribe({
+        this.inputJsonError.set(null);
+
+        let payload: Record<string, unknown> = {};
+        const trimmed = this.inputJsonRaw.trim();
+        if (trimmed.length > 0) {
+            try {
+                payload = JSON.parse(trimmed);
+            } catch (e) {
+                this.inputJsonError.set('Невалидный JSON: ' + (e as Error).message);
+                return;
+            }
+        }
+
+        this.runApi.enqueue(this.workflowId(), payload as never).subscribe({
             next: run => {
                 this.refresh();
                 if (run.id) {
