@@ -1,6 +1,7 @@
 package ru.startem.aelevena.workflow
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import ru.startem.aelevena.api.BadRequestException
@@ -28,6 +29,8 @@ import ru.startem.aelevena.workflow.persistence.WorkflowsRepository
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 
+data class GraphUpdatedEvent(val workflowId: UUID, val graph: WorkflowGraph)
+
 @Service
 class WorkflowService(
     private val workflows: WorkflowsRepository,
@@ -36,6 +39,7 @@ class WorkflowService(
     private val blobService: BlobService,
     private val canonicalJson: CanonicalJson,
     private val objectMapper: ObjectMapper,
+    private val events: ApplicationEventPublisher,
 ) {
 
     @Transactional
@@ -136,7 +140,9 @@ class WorkflowService(
         versions.updateRootRevision(versionId, newRevisionId)
         workflows.touchUpdatedAt(version.workflowId)
 
-        return materializeGraph(versionId, skeleton)
+        val materialized = materializeGraph(versionId, skeleton)
+        events.publishEvent(GraphUpdatedEvent(version.workflowId, materialized))
+        return materialized
     }
 
     private fun validateGraph(graph: WorkflowGraph) {
