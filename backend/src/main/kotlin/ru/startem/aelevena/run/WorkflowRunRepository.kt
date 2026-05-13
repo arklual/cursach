@@ -1,0 +1,125 @@
+package ru.startem.aelevena.run
+
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
+import org.springframework.stereotype.Repository
+import java.time.OffsetDateTime
+import java.util.UUID
+
+@Repository
+class WorkflowRunRepository(
+    private val jdbc: NamedParameterJdbcTemplate,
+) {
+    data class WorkflowRunRow(
+        val id: Long,
+        val workflowId: UUID,
+        val workflowRevisionId: Long,
+        val status: String,
+        val startedAt: OffsetDateTime?,
+        val finishedAt: OffsetDateTime?,
+        val inputJson: String?,
+        val outputJson: String?,
+        val createdAt: OffsetDateTime,
+    )
+
+    fun insertQueued(workflowId: UUID, workflowRevisionId: Long, inputJson: String?): Long {
+        val params = MapSqlParameterSource()
+            .addValue("workflowId", workflowId)
+            .addValue("workflowRevisionId", workflowRevisionId)
+            .addValue("status", "queued")
+            .addValue("input", inputJson)
+
+        return jdbc.queryForObject(
+            """
+            insert into workflow_run (workflow_id, workflow_revision_id, status, input)
+            values (:workflowId, :workflowRevisionId, :status, :input::jsonb)
+            returning id
+            """.trimIndent(),
+            params,
+            Long::class.java,
+        )!!
+    }
+
+    fun findById(runId: Long): WorkflowRunRow? {
+        val params = MapSqlParameterSource().addValue("runId", runId)
+        val rows = jdbc.query(
+            """
+            select id, workflow_id, workflow_revision_id, status, started_at, finished_at, input, output, created_at
+            from workflow_run
+            where id = :runId
+            """.trimIndent(),
+            params,
+        ) { rs, _ ->
+            WorkflowRunRow(
+                id = rs.getLong("id"),
+                workflowId = rs.getObject("workflow_id", UUID::class.java),
+                workflowRevisionId = rs.getLong("workflow_revision_id"),
+                status = rs.getString("status"),
+                startedAt = rs.getObject("started_at", OffsetDateTime::class.java),
+                finishedAt = rs.getObject("finished_at", OffsetDateTime::class.java),
+                inputJson = rs.getString("input"),
+                outputJson = rs.getString("output"),
+                createdAt = rs.getObject("created_at", OffsetDateTime::class.java),
+            )
+        }
+        return rows.firstOrNull()
+    }
+
+    fun listByWorkflow(workflowId: UUID): List<WorkflowRunRow> {
+        val params = MapSqlParameterSource().addValue("workflowId", workflowId)
+        return jdbc.query(
+            """
+            select id, workflow_id, workflow_revision_id, status, started_at, finished_at, input, output, created_at
+            from workflow_run
+            where workflow_id = :workflowId
+            order by created_at desc
+            """.trimIndent(),
+            params,
+        ) { rs, _ ->
+            WorkflowRunRow(
+                id = rs.getLong("id"),
+                workflowId = rs.getObject("workflow_id", UUID::class.java),
+                workflowRevisionId = rs.getLong("workflow_revision_id"),
+                status = rs.getString("status"),
+                startedAt = rs.getObject("started_at", OffsetDateTime::class.java),
+                finishedAt = rs.getObject("finished_at", OffsetDateTime::class.java),
+                inputJson = rs.getString("input"),
+                outputJson = rs.getString("output"),
+                createdAt = rs.getObject("created_at", OffsetDateTime::class.java),
+            )
+        }
+    }
+
+    fun markRunning(runId: Long) {
+        val params = MapSqlParameterSource()
+            .addValue("runId", runId)
+            .addValue("status", "running")
+        jdbc.update(
+            """
+            update workflow_run
+            set status = :status,
+                started_at = CURRENT_TIMESTAMP
+            where id = :runId
+            """.trimIndent(),
+            params,
+        )
+    }
+
+    fun markFinished(runId: Long, status: String, outputJson: String?) {
+        val params = MapSqlParameterSource()
+            .addValue("runId", runId)
+            .addValue("status", status)
+            .addValue("output", outputJson)
+        jdbc.update(
+            """
+            update workflow_run
+            set status = :status,
+                finished_at = CURRENT_TIMESTAMP,
+                output = :output::jsonb
+            where id = :runId
+            """.trimIndent(),
+            params,
+        )
+    }
+}
+
