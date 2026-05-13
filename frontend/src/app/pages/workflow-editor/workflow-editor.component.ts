@@ -12,6 +12,7 @@ import { PaletteComponent } from '../../components/palette/palette.component';
 import { InspectorComponent } from '../../components/inspector/inspector.component';
 import { AnalyticsModalComponent } from '../../components/analytics-modal/analytics-modal.component';
 import { ModalComponent } from '../../components/modal/modal.component';
+import { RunsPanelComponent } from '../../components/runs-panel/runs-panel.component';
 import { ExperimentConfig } from '../../models/workflow.model';
 
 @Component({
@@ -24,7 +25,8 @@ import { ExperimentConfig } from '../../models/workflow.model';
     PaletteComponent,
     InspectorComponent,
     AnalyticsModalComponent,
-    ModalComponent
+    ModalComponent,
+    RunsPanelComponent,
   ],
   template: `
     <div class="app-shell">
@@ -108,21 +110,32 @@ import { ExperimentConfig } from '../../models/workflow.model';
                   (click)="logPanelCollapsed.set(!logPanelCollapsed())">
             {{ logPanelCollapsed() ? '▲' : '▼' }}
           </button>
-          <h3>Execution log</h3>
+          <div class="tabs">
+            <button class="tab" [class.active]="bottomTab() === 'log'" (click)="bottomTab.set('log')">Execution log</button>
+            <button class="tab" [class.active]="bottomTab() === 'runs'" (click)="bottomTab.set('runs')">Запуски</button>
+          </div>
           <div>
-            <button (click)="workflowService.log('Открыты параллельные ветки')">Ветки</button>
-            <button (click)="simulateRun(200, 'simulation mode')">Run in simulation mode</button>
-            <button (click)="workflowService.clearLogs()">Clear</button>
+            @if (bottomTab() === 'log') {
+              <button (click)="workflowService.log('Открыты параллельные ветки')">Ветки</button>
+              <button (click)="simulateRun(200, 'simulation mode')">Sim</button>
+              <button (click)="workflowService.clearLogs()">Clear</button>
+            }
           </div>
         </header>
         @if (!logPanelCollapsed()) {
           <div class="resize-handle resize-handle-top"
                (mousedown)="startResize($event, 'log')"></div>
-          <div class="log-stream" [style.height.px]="logPanelHeight()">
-            @for (line of workflowService.logs(); track $index) {
-              <p class="log-entry">{{ line }}</p>
-            }
-          </div>
+          @if (bottomTab() === 'log') {
+            <div class="log-stream" [style.height.px]="logPanelHeight()">
+              @for (line of workflowService.logs(); track $index) {
+                <p class="log-entry">{{ line }}</p>
+              }
+            </div>
+          } @else if (currentWorkflowIdValue()) {
+            <div class="log-stream" [style.height.px]="logPanelHeight()">
+              <app-runs-panel [workflowId]="currentWorkflowIdValue()!"></app-runs-panel>
+            </div>
+          }
         }
       </section>
 
@@ -493,6 +506,27 @@ import { ExperimentConfig } from '../../models/workflow.model';
       gap: 8px;
     }
 
+    .tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .tabs .tab {
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      background: transparent;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    .tabs .tab.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
     .log-stream {
       overflow: auto;
       font-size: 12px;
@@ -656,6 +690,12 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   private currentVersionId = signal<string | null>(null);
   private currentMeta = signal<WorkflowMeta | null>(null);
   loadError = signal<string | null>(null);
+
+  /** Доступ к id из шаблона (signals private). */
+  readonly currentWorkflowIdValue = this.currentWorkflowId.asReadonly();
+
+  /** Вкладка нижней панели: лог симуляций или список реальных запусков. */
+  readonly bottomTab = signal<'log' | 'runs'>('log');
 
   Math = Math;
 
