@@ -28,7 +28,7 @@ jobs:
       - name: Maven verify
         if: steps.changes.outputs.backend == 'true'
         working-directory: ./backend
-        run: ./mvnw -B verify
+        run: mvn -B verify
 
   frontend-tests:
     runs-on: ubuntu-latest

@@ -32,7 +32,7 @@ jobs:
           cache: maven
       - name: Run unit + integration tests (Testcontainers)
         working-directory: ./backend
-        run: ./mvnw -B verify
+        run: mvn -B verify
 
   build-and-push:
     name: Build image and push to GHCR
