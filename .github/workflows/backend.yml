@@ -65,6 +65,9 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      VPS_HOST_RAW: ${{ secrets.VPS_HOST }}
+      VPS_USER_RAW: ${{ secrets.VPS_USER }}
     steps:
       - uses: actions/checkout@v4
 
@@ -73,20 +76,28 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 
-      - name: Add server to known_hosts
+      - name: Sanitize secrets and warm up known_hosts
         run: |
+          VPS_HOST="$(printf '%s' "$VPS_HOST_RAW" | tr -d '\r\n[:space:]')"
+          VPS_USER="$(printf '%s' "$VPS_USER_RAW" | tr -d '\r\n[:space:]')"
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
+            echo "::error::VPS_HOST or VPS_USER is empty after sanitize"
+            exit 1
+          fi
+          echo "VPS_HOST=$VPS_HOST" >> "$GITHUB_ENV"
+          echo "VPS_USER=$VPS_USER" >> "$GITHUB_ENV"
           mkdir -p ~/.ssh
-          ssh-keyscan -p 22 -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p 22 -H "$VPS_HOST" >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
       - name: Copy compose file to server
         run: |
           scp deploy/docker-compose.prod.yml \
-              "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/kursach/docker-compose.prod.yml"
+              "${VPS_USER}@${VPS_HOST}:/opt/kursach/docker-compose.prod.yml"
 
       - name: Pull new image and restart backend
         run: |
-          ssh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+          ssh "${VPS_USER}@${VPS_HOST}" \
               "cd /opt/kursach && \
                docker compose -f docker-compose.prod.yml --env-file .env pull backend && \
                docker compose -f docker-compose.prod.yml --env-file .env up -d backend && \
@@ -95,7 +106,7 @@ jobs:
       - name: Smoke test backend (внутри контейнера)
         run: |
           sleep 20
-          ssh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+          ssh "${VPS_USER}@${VPS_HOST}" \
               "for i in 1 2 3 4 5 6; do \
                  if docker exec kursach-backend wget -qO- http://localhost:8080/v1/workflows >/dev/null 2>&1; then \
                    echo 'Backend is up'; exit 0; \
