@@ -32,10 +32,6 @@ jobs:
       - name: Install
         working-directory: ./frontend
         run: npm ci
-      # Включить, когда появятся реальные spec'и:
-      # - name: Run unit tests
-      #   working-directory: ./frontend
-      #   run: npm test -- --watch=false --browsers=ChromeHeadlessCI --code-coverage
 
   build-and-push:
     name: Build image and push to GHCR
@@ -89,32 +85,30 @@ jobs:
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 
       - name: Add server to known_hosts
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SERVER_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -p 22 -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
       - name: Copy compose file to server
         run: |
-          scp -P "${{ secrets.SERVER_PORT }}" \
-              deploy/docker-compose.prod.yml \
-              "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/opt/kursach/docker-compose.prod.yml"
+          scp deploy/docker-compose.prod.yml \
+              "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/opt/kursach/docker-compose.prod.yml"
 
       - name: Pull new image and restart frontend
         run: |
-          ssh -p "${{ secrets.SERVER_PORT }}" \
-              "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
+          ssh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
               "cd /opt/kursach && \
                docker compose -f docker-compose.prod.yml --env-file .env pull frontend && \
                docker compose -f docker-compose.prod.yml --env-file .env up -d frontend && \
                docker image prune -f"
 
-      - name: Smoke test
+      - name: Smoke test frontend
         run: |
           sleep 5
           curl --fail --retry 6 --retry-delay 3 \
-               "http://${{ secrets.SERVER_HOST }}/" \
+               "http://${{ secrets.VPS_HOST }}/" \
             || (echo "Health check failed" && exit 1)
