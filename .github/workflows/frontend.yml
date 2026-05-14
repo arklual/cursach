@@ -79,6 +79,9 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
     env:
       VPS_HOST_RAW: ${{ secrets.VPS_HOST }}
       VPS_USER_RAW: ${{ secrets.VPS_USER }}
@@ -108,6 +111,13 @@ jobs:
         run: |
           scp deploy/docker-compose.prod.yml \
               "${VPS_USER}@${VPS_HOST}:/opt/kursach/docker-compose.prod.yml"
+
+      - name: Login server's Docker to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh "${VPS_USER}@${VPS_HOST}" \
+              "echo '$GHCR_TOKEN' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
 
       - name: Pull new image and restart frontend
         run: |
