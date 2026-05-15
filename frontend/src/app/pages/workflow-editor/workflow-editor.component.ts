@@ -58,6 +58,10 @@ import { ExperimentConfig } from '../../models/workflow.model';
         </div>
       </header>
 
+      @if (loadError()) {
+        <div class="editor-error-banner">{{ loadError() }}</div>
+      }
+
       <main [style.grid-template-columns]="mainGridColumns()">
         <!-- Palette -->
         <div class="panel-container palette-panel" [class.collapsed]="paletteCollapsed()">
@@ -293,6 +297,15 @@ import { ExperimentConfig } from '../../models/workflow.model';
       padding: 16px 32px;
       background: var(--panel);
       border-bottom: 1px solid var(--border);
+    }
+
+    .editor-error-banner {
+      margin: 12px 24px 0;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: #fee2e2;
+      color: #b91c1c;
+      font-size: 14px;
     }
 
     .brand {

@@ -46,6 +46,7 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
               <span>{{ formatDate(workflow.updatedAt) }}</span>
             </div>
             <div class="card-actions">
+              <button class="primary" (click)="openWorkflowFromButton($event, workflow.id)">Открыть</button>
               <button class="ghost" (click)="duplicateWorkflow($event, workflow.id)">Копировать</button>
               <button class="ghost danger" (click)="deleteWorkflow($event, workflow.id)">Удалить</button>
             </div>
@@ -312,7 +313,14 @@ export class WorkflowsListComponent implements OnInit {
   createWorkflow(): void {
     const defaultName = `Workflow ${this.workflows().length + 1}`;
     this.facade.createWorkflow(defaultName).subscribe({
-      next: ({ workflowId }) => this.router.navigate(['/workflow', workflowId]),
+      next: ({ workflowId }) => {
+        if (workflowId) {
+          this.router.navigate(['/workflow', workflowId]);
+        } else {
+          this.errorMessage.set('Workflow создан, но бэкенд не вернул id. Список обновлён.');
+          this.refresh();
+        }
+      },
       error: err => {
         this.errorMessage.set('Не удалось создать workflow.');
         console.error(err);
@@ -321,7 +329,15 @@ export class WorkflowsListComponent implements OnInit {
   }
 
   openWorkflow(id: string): void {
+    if (!id) {
+      return;
+    }
     this.router.navigate(['/workflow', id]);
+  }
+
+  openWorkflowFromButton(event: MouseEvent, id: string): void {
+    event.stopPropagation();
+    this.openWorkflow(id);
   }
 
   duplicateWorkflow(event: MouseEvent, id: string): void {
