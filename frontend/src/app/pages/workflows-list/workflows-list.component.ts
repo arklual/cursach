@@ -1,13 +1,13 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { WorkflowMeta } from '../../services/workflow.service';
 import { WorkflowFacade } from '../../core/api/workflow.facade';
 
 @Component({
   selector: 'app-workflows-list',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   template: `
     <div class="workflows-page">
       <header class="page-header">
@@ -32,21 +32,23 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
 
       <main class="workflows-grid">
         @for (workflow of workflows(); track workflow.id) {
-          <div class="workflow-card" (click)="openWorkflow(workflow.id)">
-            <div class="card-header">
-              <span class="card-icon" [style.background]="getStatusColor(workflow.status)">
-                {{ getStatusIcon(workflow.status) }}
-              </span>
-              <span class="card-status" [class]="workflow.status">{{ workflow.status }}</span>
-            </div>
-            <h3>{{ workflow.name }}</h3>
-            <p class="card-description">{{ workflow.description || 'Без описания' }}</p>
-            <div class="card-meta">
-              <span>{{ workflow.nodesCount }} нод</span>
-              <span>{{ formatDate(workflow.updatedAt) }}</span>
-            </div>
+          <div class="workflow-card">
+            <a class="workflow-card-link" [routerLink]="['/workflow', workflow.id]">
+              <div class="card-header">
+                <span class="card-icon" [style.background]="getStatusColor(workflow.status)">
+                  {{ getStatusIcon(workflow.status) }}
+                </span>
+                <span class="card-status" [class]="workflow.status">{{ workflow.status }}</span>
+              </div>
+              <h3>{{ workflow.name }}</h3>
+              <p class="card-description">{{ workflow.description || 'Без описания' }}</p>
+              <div class="card-meta">
+                <span>{{ workflow.nodesCount }} нод</span>
+                <span>{{ formatDate(workflow.updatedAt) }}</span>
+              </div>
+            </a>
             <div class="card-actions">
-              <button class="primary" (click)="openWorkflowFromButton($event, workflow.id)">Открыть</button>
+              <a class="primary btn-like" [routerLink]="['/workflow', workflow.id]">Открыть</a>
               <button class="ghost" (click)="duplicateWorkflow($event, workflow.id)">Копировать</button>
               <button class="ghost danger" (click)="deleteWorkflow($event, workflow.id)">Удалить</button>
             </div>
@@ -134,13 +136,28 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
       border: 1px solid var(--border);
       border-radius: 16px;
       padding: 20px;
-      cursor: pointer;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
     .workflow-card:hover {
       transform: translateY(-4px);
       box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+    }
+
+    .workflow-card-link {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    a.btn-like {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      box-sizing: border-box;
+      flex: 1;
     }
 
     .card-header {
@@ -315,7 +332,11 @@ export class WorkflowsListComponent implements OnInit {
     this.facade.createWorkflow(defaultName).subscribe({
       next: ({ workflowId }) => {
         if (workflowId) {
-          this.router.navigate(['/workflow', workflowId]);
+          this.router.navigate(['/workflow', workflowId]).then(navigated => {
+            if (!navigated) {
+              this.refresh();
+            }
+          });
         } else {
           this.errorMessage.set('Workflow создан, но бэкенд не вернул id. Список обновлён.');
           this.refresh();
@@ -326,18 +347,6 @@ export class WorkflowsListComponent implements OnInit {
         console.error(err);
       },
     });
-  }
-
-  openWorkflow(id: string): void {
-    if (!id) {
-      return;
-    }
-    this.router.navigate(['/workflow', id]);
-  }
-
-  openWorkflowFromButton(event: MouseEvent, id: string): void {
-    event.stopPropagation();
-    this.openWorkflow(id);
   }
 
   duplicateWorkflow(event: MouseEvent, id: string): void {
