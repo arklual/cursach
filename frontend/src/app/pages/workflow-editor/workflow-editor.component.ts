@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy, HostListener } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, HostListener, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -6,7 +6,8 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { WorkflowService, WorkflowMeta } from '../../services/workflow.service';
 import { WorkflowFacade } from '../../core/api/workflow.facade';
 import { WorkflowWsService } from '../../core/ws/workflow-ws.service';
-import { parseGraphFromBackend } from '../../core/api/workflow.mapper';
+import { buildGraphForBackend, parseGraphFromBackend } from '../../core/api/workflow.mapper';
+import { environment } from '../../../environments/environment';
 import { SimulationService } from '../../services/simulation.service';
 import { calcSampleSize, calcPValue } from '../../services/statistics.utils';
 import { WorkflowCanvasComponent } from '../../components/workflow-canvas/workflow-canvas.component';
@@ -723,6 +724,34 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   private currentMeta = signal<WorkflowMeta | null>(null);
   loadError = signal<string | null>(null);
 
+  /** Becomes true только после успешного loadWorkflow — иначе debounced save отстреливает ещё на пустом графе сразу после init и затирает реальные данные. */
+  private graphLoaded = signal(false);
+
+  /** Debounce timer для авто-сейва при изменении nodes/edges. */
+  private saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Флаг "сейчас применяем граф из WebSocket" — чтобы не зациклиться: save→WS-эхо→setNodes→save→… */
+  private applyingWsUpdate = false;
+
+  constructor() {
+    // Сохраняем граф через 500ms после ЛЮБОГО изменения nodes/edges. Это надёжнее, чем
+    // полагаться на ngOnDestroy при выходе из редактора (HTTP может не успеть уйти при
+    // SPA-навигации / browser back / закрытии вкладки).
+    effect(() => {
+      const nodes = this.workflowService.nodes();
+      const edges = this.workflowService.edges();
+      if (!this.graphLoaded() || this.applyingWsUpdate) {
+        return;
+      }
+      void nodes.length;
+      void edges.length;
+      if (this.saveDebounceTimer) {
+        clearTimeout(this.saveDebounceTimer);
+      }
+      this.saveDebounceTimer = setTimeout(() => this.saveGraphToBackend(), 500);
+    });
+  }
+
   /** Доступ к id из шаблона (signals private). */
   readonly currentWorkflowIdValue = this.currentWorkflowId.asReadonly();
 
@@ -820,12 +849,17 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
         next: loaded => {
           this.currentVersionId.set(loaded.versionId);
           this.currentMeta.set(loaded.meta);
+          // applyingWsUpdate=true на время инициальной заливки, чтобы effect не запустил
+          // save сразу после загрузки (нет смысла слать на бэк то, что мы только что прочитали).
+          this.applyingWsUpdate = true;
           this.workflowService.setNodes(loaded.nodes);
           this.workflowService.setEdges(loaded.edges);
           this.workflowService.setActiveNode(loaded.nodes[0]?.id ?? null);
           this.workflowService.clearLogs();
           this.workflowService.log(`Загружен workflow: ${loaded.meta.name}`);
           this.subscribeWs(id);
+          this.graphLoaded.set(true);
+          queueMicrotask(() => { this.applyingWsUpdate = false; });
         },
         error: err => {
           console.error('Failed to load workflow', err);
@@ -856,9 +890,45 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     if (this.autoSaveInterval) {
       clearInterval(this.autoSaveInterval);
     }
-    this.saveGraphToBackend();
+    // Если debounce ещё не отстрелял — форсируем save сейчас. ngOnDestroy не может ждать
+    // ответ (метод синхронный), но как минимум отправляем тело через sendBeacon,
+    // чтобы запрос пережил unload вкладки.
+    if (this.saveDebounceTimer) {
+      clearTimeout(this.saveDebounceTimer);
+      this.saveDebounceTimer = null;
+      this.flushSaveOnUnload();
+    }
     this.wsUnsubscribe?.();
     this.wsGraphSub?.unsubscribe();
+  }
+
+  /** Закрытие вкладки / reload: keepalive-fetch гарантирует, что PUT долетит до бэка. */
+  @HostListener('window:beforeunload')
+  onBeforeUnload(): void {
+    if (this.saveDebounceTimer) {
+      clearTimeout(this.saveDebounceTimer);
+      this.saveDebounceTimer = null;
+    }
+    this.flushSaveOnUnload();
+  }
+
+  private flushSaveOnUnload(): void {
+    const versionId = this.currentVersionId();
+    if (!versionId || !this.graphLoaded()) {
+      return;
+    }
+    const graph = buildGraphForBackend(
+      versionId,
+      this.workflowService.nodes(),
+      this.workflowService.edges(),
+    );
+    // keepalive: запрос завершится даже если страница уже выгружается.
+    fetch(`${environment.apiBaseUrl}/workflow-versions/${versionId}/graph`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(graph),
+      keepalive: true,
+    }).catch(() => { /* swallow — это best-effort save при unload */ });
   }
 
   private subscribeWs(workflowId: string): void {
@@ -869,10 +939,17 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
       if (evt.workflowId !== workflowId) {
         return;
       }
-      // Игнорируем "эхо" нашего собственного save (нет надёжного признака — фильтруем по совпадению).
       const { nodes, edges } = parseGraphFromBackend(evt.graph);
-      this.workflowService.setNodes(nodes);
-      this.workflowService.setEdges(edges);
+      // Помечаем "из WS", чтобы effect выше не запустил save в ответ на own-echo
+      // (иначе цикл: save → WS-echo → setNodes → save → …).
+      this.applyingWsUpdate = true;
+      try {
+        this.workflowService.setNodes(nodes);
+        this.workflowService.setEdges(edges);
+      } finally {
+        // Сбрасываем флаг в следующем тике, чтобы реактивные сигналы успели проинвалидироваться.
+        queueMicrotask(() => { this.applyingWsUpdate = false; });
+      }
       this.workflowService.log('Граф обновлён через WebSocket');
     });
   }
