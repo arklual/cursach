@@ -234,6 +234,32 @@ test.describe('Workflow editor — interactions', () => {
     await expect(modalTitle).toBeHidden({ timeout: 2_000 });
   });
 
+  test('addNode работает в non-secure context (без crypto.randomUUID)', async ({ page }) => {
+    // Эмулируем HTTP-прод без TLS, где Web Crypto API не отдаёт randomUUID.
+    // У `crypto.randomUUID` в Chromium свойство configurable=true, поэтому redefine работает.
+    // Скрипт ставится через addInitScript — гарантированно выполняется ДО любого app-кода.
+    await page.addInitScript(() => {
+      Object.defineProperty(window.crypto, 'randomUUID', { value: undefined, configurable: true });
+    });
+    await page.goto(`/workflow/${createdId}`);
+    // Sanity: убеждаемся что override применился именно в этой странице.
+    const noRandomUUID = await page.evaluate(() => typeof window.crypto.randomUUID !== 'function');
+    expect(noRandomUUID).toBe(true);
+    await page.evaluate(() => {
+      const paletteBtn = document.querySelector('app-palette .palette-item') as HTMLElement;
+      const canvas = document.querySelector('.canvas-viewport') as HTMLElement;
+      const dt = new DataTransfer();
+      dt.setData('application/workflow-node', 'trigger');
+      paletteBtn.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      const rect = canvas.getBoundingClientRect();
+      canvas.dispatchEvent(new DragEvent('drop', {
+        bubbles: true, cancelable: true, dataTransfer: dt,
+        clientX: rect.left + 200, clientY: rect.top + 200,
+      }));
+    });
+    await expect(page.locator('app-workflow-canvas .node-wrap')).toHaveCount(1, { timeout: 3_000 });
+  });
+
   test('Drag node из палитры → нода появляется на canvas', async ({ page }) => {
     await page.goto(`/workflow/${createdId}`);
     await expect(page.locator('.app-header')).toBeVisible();

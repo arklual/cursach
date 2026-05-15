@@ -18,6 +18,7 @@ import type {
     NodeMetrics,
     Variant,
 } from '../../models/workflow.model';
+import { uuid } from '../uuid';
 
 const META_KEYS = ['__variants', '__randomization', '__metrics', '__successProb', '__color', '__subtype'] as const;
 
@@ -78,7 +79,7 @@ export function frontNodeToBackend(node: FrontNode): BackendNode {
 }
 
 export function backendNodeToFront(backend: BackendNode): FrontNode {
-    const id = backend.id ?? crypto.randomUUID();
+    const id = backend.id ?? uuid();
     const { kind, subtype } = fromBackendType(backend.type);
     const data = backend.data ?? {};
     const config = (data.config ?? {}) as Record<string, unknown>;
