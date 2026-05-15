@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, HostListener, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -72,4 +72,11 @@ export class ModalComponent {
   wide = input<boolean>(false);
   showFooter = input<boolean>(false);
   close = output<void>();
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.open()) {
+      this.close.emit();
+    }
+  }
 }
