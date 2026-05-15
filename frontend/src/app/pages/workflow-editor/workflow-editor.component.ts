@@ -859,7 +859,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
           this.workflowService.log(`Загружен workflow: ${loaded.meta.name}`);
           this.subscribeWs(id);
           this.graphLoaded.set(true);
-          queueMicrotask(() => { this.applyingWsUpdate = false; });
+          setTimeout(() => { this.applyingWsUpdate = false; }, 0);
         },
         error: err => {
           console.error('Failed to load workflow', err);
@@ -948,7 +948,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
         this.workflowService.setEdges(edges);
       } finally {
         // Сбрасываем флаг в следующем тике, чтобы реактивные сигналы успели проинвалидироваться.
-        queueMicrotask(() => { this.applyingWsUpdate = false; });
+        setTimeout(() => { this.applyingWsUpdate = false; }, 0);
       }
       this.workflowService.log('Граф обновлён через WebSocket');
     });
@@ -957,10 +957,15 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   private saveGraphToBackend(): void {
     const versionId = this.currentVersionId();
     if (!versionId) {
+      console.warn('[editor] save skipped: no versionId');
       return;
     }
-    this.facade.saveGraph(versionId, this.workflowService.nodes(), this.workflowService.edges()).subscribe({
-      error: err => console.error('Auto-save failed', err),
+    const nodes = this.workflowService.nodes();
+    const edges = this.workflowService.edges();
+    console.debug(`[editor] saveGraph PUT versionId=${versionId} nodes=${nodes.length} edges=${edges.length}`);
+    this.facade.saveGraph(versionId, nodes, edges).subscribe({
+      next: () => console.debug(`[editor] saveGraph OK nodes=${nodes.length}`),
+      error: err => console.error('[editor] saveGraph FAILED', err),
     });
   }
 
