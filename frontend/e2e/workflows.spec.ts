@@ -281,8 +281,35 @@ test.describe('Workflow editor — interactions', () => {
     await expect(page.locator('app-workflow-canvas .node-wrap')).toHaveCount(1, { timeout: 3_000 });
   });
 
+  test('Browser back из редактора сохраняет ноды (BUG-7 repro)', async ({ page, request }) => {
+    await page.goto('/');
+    await page.goto(`/workflow/${createdId}`);
+    await expect(page.locator('.app-header')).toBeVisible();
+    await page.evaluate(() => {
+      const paletteBtn = document.querySelector('app-palette .palette-item') as HTMLElement;
+      const canvas = document.querySelector('.canvas-viewport') as HTMLElement;
+      const dt = new DataTransfer();
+      dt.setData('application/workflow-node', 'trigger');
+      paletteBtn.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      const rect = canvas.getBoundingClientRect();
+      canvas.dispatchEvent(new DragEvent('drop', {
+        bubbles: true, cancelable: true, dataTransfer: dt,
+        clientX: rect.left + 200, clientY: rect.top + 200,
+      }));
+    });
+    await expect(page.locator('app-workflow-canvas .node-wrap')).toHaveCount(1);
+    // Эмулируем browser back (не клик по .back-btn)
+    await page.goBack();
+    await page.waitForURL(/\/$/);
+    // Дадим время фоновым запросам долететь
+    await page.waitForTimeout(500);
+    const wf = await (await request.get(`http://localhost:8080/v1/workflows/${createdId}`)).json();
+    expect(wf.graph?.nodes?.length).toBeGreaterThan(0);
+  });
+
   test('Drag node + save → нода персистится на бэке', async ({ page, request }) => {
     await page.goto(`/workflow/${createdId}`);
+    await expect(page.locator('app-palette .palette-item').first()).toBeVisible();
     await page.evaluate(() => {
       const paletteBtn = document.querySelector('app-palette .palette-item') as HTMLElement;
       const canvas = document.querySelector('.canvas-viewport') as HTMLElement;
