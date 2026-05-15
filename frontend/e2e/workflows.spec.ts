@@ -281,6 +281,72 @@ test.describe('Workflow editor — interactions', () => {
     await expect(page.locator('app-workflow-canvas .node-wrap')).toHaveCount(1, { timeout: 3_000 });
   });
 
+  test('Multi-cycle: add → leave → reopen sохраняет все ноды', async ({ page, request }) => {
+    const dragOneNode = async () => {
+      await page.evaluate(() => {
+        const paletteBtn = document.querySelector('app-palette .palette-item') as HTMLElement;
+        const canvas = document.querySelector('.canvas-viewport') as HTMLElement;
+        const dt = new DataTransfer();
+        dt.setData('application/workflow-node', 'trigger');
+        paletteBtn.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+        const rect = canvas.getBoundingClientRect();
+        canvas.dispatchEvent(new DragEvent('drop', {
+          bubbles: true, cancelable: true, dataTransfer: dt,
+          clientX: rect.left + 200 + Math.random() * 100, clientY: rect.top + 200 + Math.random() * 100,
+        }));
+      });
+    };
+
+    // Цикл 1: 1 нода
+    await page.goto(`/workflow/${createdId}`);
+    await expect(page.locator('app-palette .palette-item').first()).toBeVisible();
+    await dragOneNode();
+    await expect(page.locator('app-workflow-canvas .node-wrap')).toHaveCount(1);
+    await page.locator('.back-btn').click();
+    await page.waitForURL(/\/$/);
+
+    // Reopen, проверяем что нода осталась
+    await page.goto(`/workflow/${createdId}`);
+    await expect(page.locator('app-workflow-canvas .node-wrap')).toHaveCount(1, { timeout: 5_000 });
+
+    // Цикл 2: добавляем ещё ноду, выходим через browser back
+    await dragOneNode();
+    await expect(page.locator('app-workflow-canvas .node-wrap')).toHaveCount(2);
+    await page.goBack();
+    await page.waitForURL(/\/$/);
+
+    // Reopen, проверяем что обе ноды на месте
+    await page.goto(`/workflow/${createdId}`);
+    await expect(page.locator('app-workflow-canvas .node-wrap')).toHaveCount(2, { timeout: 5_000 });
+
+    // На уровне backend тоже должно быть 2 ноды
+    const wf = await (await request.get(`http://localhost:8080/v1/workflows/${createdId}`)).json();
+    expect(wf.graph.nodes.length).toBe(2);
+  });
+
+  test('F5 reload сохраняет ноды (beforeunload + keepalive)', async ({ page, request }) => {
+    await page.goto(`/workflow/${createdId}`);
+    await expect(page.locator('app-palette .palette-item').first()).toBeVisible();
+    await page.evaluate(() => {
+      const paletteBtn = document.querySelector('app-palette .palette-item') as HTMLElement;
+      const canvas = document.querySelector('.canvas-viewport') as HTMLElement;
+      const dt = new DataTransfer();
+      dt.setData('application/workflow-node', 'trigger');
+      paletteBtn.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+      const rect = canvas.getBoundingClientRect();
+      canvas.dispatchEvent(new DragEvent('drop', {
+        bubbles: true, cancelable: true, dataTransfer: dt,
+        clientX: rect.left + 200, clientY: rect.top + 200,
+      }));
+    });
+    await expect(page.locator('app-workflow-canvas .node-wrap')).toHaveCount(1);
+    // F5 — beforeunload → keepalive fetch
+    await page.reload();
+    await expect(page.locator('app-workflow-canvas .node-wrap')).toHaveCount(1, { timeout: 5_000 });
+    const wf = await (await request.get(`http://localhost:8080/v1/workflows/${createdId}`)).json();
+    expect(wf.graph.nodes.length).toBe(1);
+  });
+
   test('Browser back из редактора сохраняет ноды (BUG-7 repro)', async ({ page, request }) => {
     await page.goto('/');
     await page.goto(`/workflow/${createdId}`);
