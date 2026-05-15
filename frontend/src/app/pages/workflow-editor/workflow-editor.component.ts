@@ -888,8 +888,21 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   }
 
   goBack(): void {
-    this.saveGraphToBackend();
-    this.router.navigate(['/']);
+    // Сохраняем граф ДО навигации: иначе при размонтировании компонента HTTP-запрос
+    // отменяется и пользователь теряет изменения. Если save упадёт — всё равно ухо́дим,
+    // чтобы UI не залипал, но логируем ошибку.
+    const versionId = this.currentVersionId();
+    if (!versionId) {
+      this.router.navigate(['/']);
+      return;
+    }
+    this.facade.saveGraph(versionId, this.workflowService.nodes(), this.workflowService.edges()).subscribe({
+      next: () => this.router.navigate(['/']),
+      error: err => {
+        console.error('Save before navigation failed', err);
+        this.router.navigate(['/']);
+      },
+    });
   }
 
   updateWorkflowName(event: Event): void {
