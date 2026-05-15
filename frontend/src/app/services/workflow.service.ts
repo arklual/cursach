@@ -8,6 +8,7 @@ import {
   NodeData,
   Variant,
 } from '../models/workflow.model';
+import { uuid } from '../core/uuid';
 
 /**
  * UI-уровневая метаинформация о workflow (с UI-only полями status / nodesCount).
@@ -98,7 +99,7 @@ export class WorkflowService {
   }
 
   addNode(type: NodeKind, position: { x: number; y: number }): string {
-    const id = `${type}-${crypto.randomUUID().slice(0, 5)}`;
+    const id = `${type}-${uuid().slice(0, 5)}`;
     const newNode = this.makeNode(id, type, position);
     this.nodesSignal.update(nodes => [...nodes, newNode]);
     this.activeNodeIdSignal.set(id);
@@ -119,7 +120,7 @@ export class WorkflowService {
   }
 
   addEdge(source: string, target: string, label?: string, variant?: string): void {
-    const id = `e-${crypto.randomUUID().slice(0, 5)}`;
+    const id = `e-${uuid().slice(0, 5)}`;
     const edge: WorkflowEdge = { id, source, target };
     if (label) edge.label = label;
     if (variant) edge.data = { variant };
