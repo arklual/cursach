@@ -11,7 +11,11 @@ import { CommonModule } from '@angular/common';
         <div class="modal-card" [style.width]="wide() ? 'min(960px,95vw)' : 'min(700px, 90vw)'" (click)="$event.stopPropagation()">
           <header>
             <h2>{{ title() }}</h2>
-            <button class="ghost" (click)="close.emit()">✕</button>
+            <button class="ghost" (click)="close.emit()" title="Close">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+          </button>
           </header>
           <div class="modal-content">
             <ng-content></ng-content>
@@ -63,6 +67,12 @@ import { CommonModule } from '@angular/common';
       gap: 8px;
       padding-top: 12px;
       border-top: 1px solid var(--border);
+    }
+
+    .icon {
+      display: block;
+      color: inherit;
+      vertical-align: middle;
     }
   `]
 })

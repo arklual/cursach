@@ -9,7 +9,11 @@ import { NodeKind } from '../../models/workflow.model';
   imports: [CommonModule],
   template: `
     <div class="canvas-empty-state">
-      <div class="empty-icon">🎨</div>
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="64" height="64">
+          <path d="M20 3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H4V5h16v14z"/>
+        </svg>
+      </div>
       <h3>Холст пуст</h3>
       <p class="empty-description">
         Перетащите ноду из палитры слева или выберите готовый тип ниже
@@ -18,35 +22,43 @@ import { NodeKind } from '../../models/workflow.model';
       <div class="quick-start">
         <p class="quick-start-title">Популярные ноды:</p>
         <div class="quick-start-nodes">
-          <button 
+          <button
             class="quick-node-btn"
             (click)="addQuickNode('trigger')"
             title="Стартовая точка workflow">
-            <span class="node-icon">🎯</span>
+            <svg class="node-icon" viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-2-3.5l6-4.5-6-4.5z"/>
+            </svg>
             <span class="node-label">Trigger</span>
           </button>
-          
-          <button 
+
+          <button
             class="quick-node-btn"
             (click)="addQuickNode('ab')"
             title="Разделение трафика на варианты">
-            <span class="node-icon">⚖</span>
+            <svg class="node-icon" viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+            </svg>
             <span class="node-label">A/B Fork</span>
           </button>
-          
-          <button 
+
+          <button
             class="quick-node-btn"
             (click)="addQuickNode('http')"
             title="HTTP запрос к API">
-            <span class="node-icon">🌐</span>
+            <svg class="node-icon" viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+            </svg>
             <span class="node-label">HTTP</span>
           </button>
-          
-          <button 
+
+          <button
             class="quick-node-btn"
             (click)="addQuickNode('code')"
             title="Python код для обработки">
-            <span class="node-icon">💻</span>
+            <svg class="node-icon" viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
+              <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>
+            </svg>
             <span class="node-label">Code</span>
           </button>
         </div>
@@ -68,10 +80,10 @@ import { NodeKind } from '../../models/workflow.model';
       gap: 16px;
       pointer-events: none;
       text-align: center;
-      color: #475569;
+      color: var(--fg-secondary);
       z-index: 1;
       padding: 24px;
-      background: rgba(255, 255, 255, 0.95);
+      background: var(--panel);
     }
 
     .empty-icon {
@@ -80,10 +92,16 @@ import { NodeKind } from '../../models/workflow.model';
       opacity: 0.8;
     }
 
+    .node-icon {
+      display: block;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
     h3 {
       margin: 0;
       font-size: 22px;
-      color: #0f172a;
+      color: var(--fg-primary);
     }
 
     .empty-description {
@@ -91,7 +109,7 @@ import { NodeKind } from '../../models/workflow.model';
       font-size: 14px;
       line-height: 1.5;
       max-width: 420px;
-      color: #64748b;
+      color: var(--fg-muted);
     }
 
     .quick-start {
@@ -103,7 +121,7 @@ import { NodeKind } from '../../models/workflow.model';
       margin: 0 0 12px;
       font-size: 13px;
       font-weight: 600;
-      color: #475569;
+      color: var(--fg-secondary);
     }
 
     .quick-start-nodes {
@@ -119,8 +137,8 @@ import { NodeKind } from '../../models/workflow.model';
       align-items: center;
       gap: 6px;
       padding: 16px 20px;
-      background: white;
-      border: 2px solid #e2e8f0;
+      background: var(--panel);
+      border: 2px solid var(--border);
       border-radius: 12px;
       cursor: pointer;
       transition: all 0.2s;
@@ -128,10 +146,10 @@ import { NodeKind } from '../../models/workflow.model';
     }
 
     .quick-node-btn:hover {
-      border-color: #6366f1;
-      background: #f8fafc;
+      border-color: var(--accent);
+      background: var(--panel-hover);
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+      box-shadow: var(--shadow-md), var(--accent-glow);
     }
 
     .quick-node-btn:active {
@@ -146,14 +164,14 @@ import { NodeKind } from '../../models/workflow.model';
     .node-label {
       font-size: 13px;
       font-weight: 600;
-      color: #1e293b;
+      color: var(--fg-primary);
     }
 
     .empty-hint {
       margin-top: 16px;
       padding: 12px 20px;
-      background: #f0f9ff;
-      border: 1px solid #bae6fd;
+      background: var(--accent-glow);
+      border: 1px solid var(--accent);
       border-radius: 8px;
       pointer-events: auto;
     }
@@ -161,7 +179,7 @@ import { NodeKind } from '../../models/workflow.model';
     .empty-hint p {
       margin: 0;
       font-size: 13px;
-      color: #0369a1;
+      color: var(--accent);
     }
   `]
 })

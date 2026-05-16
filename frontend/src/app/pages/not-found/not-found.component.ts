@@ -14,10 +14,10 @@ import { RouterLink } from '@angular/router';
     </section>
   `,
   styles: [`
-    .nf { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 80px 16px; color: #475569; }
-    .nf h1 { font-size: 64px; margin: 0; color: #0f172a; }
+    .nf { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 80px 16px; color: var(--fg-secondary); }
+    .nf h1 { font-size: 64px; margin: 0; color: var(--fg-primary); }
     .nf p { margin: 0; font-size: 16px; }
-    .nf a { color: #6366f1; text-decoration: none; font-weight: 500; }
+    .nf a { color: var(--accent); text-decoration: none; font-weight: 500; }
     .nf a:hover { text-decoration: underline; }
   `],
 })

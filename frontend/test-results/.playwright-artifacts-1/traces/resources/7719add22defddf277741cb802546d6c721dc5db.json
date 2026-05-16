@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "FluxPilot Workflow Events",
+  "type": "object",
+  "properties": {
+    "node_reached": {
+      "type": "object",
+      "required": [
+        "event",
+        "workflow_id",
+        "run_id",
+        "node_id",
+        "user_id_hash",
+        "timestamp",
+        "payload_summary",
+        "path",
+        "session_id"
+      ],
+      "properties": {
+        "event": { "const": "node_reached" },
+        "workflow_id": { "type": "string" },
+        "run_id": { "type": "string" },
+        "node_id": { "type": "string" },
+        "variant": { "type": ["string", "null"], "description": "Label A/B" },
+        "user_id_hash": { "type": "string", "description": "Salted hash" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "payload_summary": {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["string", "number", "boolean", "null"]
+          },
+          "description": "PII-free sample payload, ≤4KB"
+        },
+        "path": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered node ids"
+        },
+        "session_id": { "type": "string" }
+      }
+    },
+    "node_action": {
+      "type": "object",
+      "required": [
+        "event",
+        "action_type",
+        "node_id",
+        "workflow_id",
+        "user_id_hash",
+        "timestamp",
+        "metadata"
+      ],
+      "properties": {
+        "event": { "const": "node_action" },
+        "action_type": { "type": "string", "enum": ["click", "submit", "error"] },
+        "node_id": { "type": "string" },
+        "workflow_id": { "type": "string" },
+        "user_id_hash": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "latency_ms": { "type": "integer", "minimum": 0 },
+            "error": { "type": ["string", "null"] }
+          },
+          "required": ["latency_ms"]
+        }
+      }
+    },
+    "node_exited": {
+      "type": "object",
+      "required": [
+        "event",
+        "node_id",
+        "workflow_id",
+        "status",
+        "duration_ms",
+        "timestamp"
+      ],
+      "properties": {
+        "event": { "const": "node_exited" },
+        "node_id": { "type": "string" },
+        "workflow_id": { "type": "string" },
+        "status": { "type": "string", "enum": ["success", "failure", "timeout"] },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "error_message": { "type": ["string", "null"] },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

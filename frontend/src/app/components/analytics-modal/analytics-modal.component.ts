@@ -69,26 +69,29 @@ import { Chart } from 'chart.js/auto';
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 12px;
-      background: #fdfdff;
+      background: var(--panel);
     }
 
     .analytics-card h4 {
       margin: 0 0 8px 0;
       font-size: 14px;
+      color: var(--fg-primary);
     }
 
     .analytics-card p {
       margin: 4px 0;
       font-size: 13px;
+      color: var(--fg-secondary);
     }
 
     .hint {
-      color: var(--muted);
+      color: var(--fg-muted);
       font-size: 11px;
     }
 
     h4 {
       margin: 16px 0 8px;
+      color: var(--fg-primary);
     }
 
     .table {
@@ -103,11 +106,17 @@ import { Chart } from 'chart.js/auto';
       padding: 6px;
       text-align: left;
       font-size: 12px;
+      color: var(--fg-secondary);
+    }
+
+    .table th {
+      color: var(--fg-primary);
+      font-weight: 600;
     }
 
     button.secondary {
-      background: #0f172a;
-      color: white;
+      background: var(--bg-primary);
+      color: var(--fg-primary);
       border: none;
       border-radius: 8px;
       padding: 8px 14px;
@@ -121,6 +130,7 @@ import { Chart } from 'chart.js/auto';
       padding: 4px 8px;
       cursor: pointer;
       font-size: 11px;
+      color: var(--fg-primary);
     }
   `]
 })

@@ -58,7 +58,28 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
             <a class="workflow-card-link" [routerLink]="['/workflow', workflow.id]">
               <div class="card-header">
                 <span class="card-icon" [style.background]="getStatusColor(workflow.status)">
-                  {{ getStatusIcon(workflow.status) }}
+                  @switch (workflow.status) {
+                    @case ('running') {
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                    }
+                    @case ('completed') {
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                      </svg>
+                    }
+                    @case ('paused') {
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                      </svg>
+                    }
+                    @default {
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                      </svg>
+                    }
+                  }
                 </span>
                 <span class="card-status" [class]="workflow.status">{{ workflow.status }}</span>
               </div>
@@ -70,7 +91,6 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
               </div>
             </a>
             <div class="card-actions">
-              <a class="primary btn-like" [routerLink]="['/workflow', workflow.id]">Открыть</a>
               <button class="ghost" (click)="duplicateWorkflow($event, workflow.id)">Копировать</button>
               <button class="ghost danger" (click)="deleteWorkflow($event, workflow.id)">Удалить</button>
             </div>
@@ -89,7 +109,7 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
   styles: [`
     .workflows-page {
       min-height: 100vh;
-      background: #f8fafc;
+      background: var(--bg-primary);
     }
 
     .page-header {
@@ -122,11 +142,12 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
     .page-header h1 {
       margin: 0;
       font-size: 24px;
+      color: var(--fg-primary);
     }
 
     .page-header p {
       margin: 0;
-      color: var(--muted);
+      color: var(--fg-muted);
     }
 
     .loading-banner, .error-banner {
@@ -137,13 +158,13 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
     }
 
     .loading-banner {
-      background: #f1f5f9;
-      color: #475569;
+      background: var(--bg-tertiary);
+      color: var(--fg-secondary);
     }
 
     .error-banner {
-      background: #fee2e2;
-      color: #b91c1c;
+      background: var(--danger-bg);
+      color: var(--danger);
     }
 
     .workflows-grid {
@@ -163,7 +184,7 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
 
     .workflow-card:hover {
       transform: translateY(-4px);
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+      box-shadow: var(--shadow-lg);
     }
 
     .workflow-card-link {
@@ -196,7 +217,10 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
       display: grid;
       place-items: center;
       color: white;
-      font-size: 18px;
+    }
+
+    .card-icon svg {
+      display: block;
     }
 
     .card-status {
@@ -207,32 +231,33 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
     }
 
     .card-status.draft {
-      background: #f1f5f9;
-      color: #64748b;
+      background: var(--bg-tertiary);
+      color: var(--fg-muted);
     }
 
     .card-status.running {
-      background: #dcfce7;
-      color: #16a34a;
+      background: var(--success-bg);
+      color: var(--success);
     }
 
     .card-status.completed {
-      background: #dbeafe;
-      color: #2563eb;
+      background: var(--accent-glow);
+      color: var(--accent);
     }
 
     .card-status.paused {
-      background: #fef3c7;
-      color: #d97706;
+      background: var(--warning-bg);
+      color: var(--warning);
     }
 
     .workflow-card h3 {
       margin: 0 0 8px;
       font-size: 18px;
+      color: var(--fg-primary);
     }
 
     .card-description {
-      color: var(--muted);
+      color: var(--fg-secondary);
       font-size: 14px;
       margin: 0 0 16px;
       line-height: 1.5;
@@ -242,7 +267,7 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
       display: flex;
       justify-content: space-between;
       font-size: 12px;
-      color: var(--muted);
+      color: var(--fg-muted);
       padding-top: 12px;
       border-top: 1px solid var(--border);
     }
@@ -265,7 +290,7 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
       padding: 10px 18px;
       font-size: 14px;
       background: var(--panel);
-      color: #0f172a;
+      color: var(--fg-primary);
       cursor: pointer;
       border: 1px solid transparent;
       transition: transform 0.1s ease, box-shadow 0.2s ease;
@@ -273,7 +298,7 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
 
     button:hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+      box-shadow: var(--shadow-md);
     }
 
     button.primary {
@@ -284,11 +309,12 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
     button.ghost {
       background: transparent;
       border: 1px solid var(--border);
+      color: var(--fg-primary);
     }
 
     button.ghost.danger:hover {
-      border-color: #ef4444;
-      color: #ef4444;
+      border-color: var(--danger);
+      color: var(--danger);
     }
 
     .empty-state {
@@ -313,18 +339,19 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
     .empty-state h2 {
       margin: 0 0 8px;
       font-size: 24px;
+      color: var(--fg-primary);
     }
 
     .empty-state p {
-      color: var(--muted);
+      color: var(--fg-muted);
       margin: 0 0 24px;
     }
 
     .intro-banner {
       margin: 16px 48px 0;
       padding: 24px;
-      background: linear-gradient(135deg, #eef2ff 0%, #fdf2f8 100%);
-      border: 1px solid #c7d2fe;
+      background: linear-gradient(135deg, var(--accent-glow) 0%, rgba(236, 72, 153, 0.1) 100%);
+      border: 1px solid var(--border-light);
       border-radius: 16px;
       display: grid;
       grid-template-columns: 1fr auto;
@@ -335,14 +362,14 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
     .intro-text h2 {
       margin: 0 0 8px;
       font-size: 20px;
-      color: #1e1b4b;
+      color: var(--fg-primary);
     }
 
     .intro-text p {
       margin: 0 0 12px;
       font-size: 14px;
       line-height: 1.5;
-      color: #334155;
+      color: var(--fg-secondary);
     }
 
     .intro-text ul {
@@ -352,7 +379,7 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
       flex-direction: column;
       gap: 4px;
       font-size: 13px;
-      color: #475569;
+      color: var(--fg-secondary);
     }
 
     .intro-actions {
@@ -478,15 +505,6 @@ export class WorkflowsListComponent implements OnInit {
       case 'completed': return '#2563eb';
       case 'paused': return '#d97706';
       default: return '#64748b';
-    }
-  }
-
-  getStatusIcon(status: string): string {
-    switch (status) {
-      case 'running': return '▶';
-      case 'completed': return '✓';
-      case 'paused': return '⏸';
-      default: return 'Δ';
     }
   }
 

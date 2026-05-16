@@ -237,6 +237,11 @@ export class SimulationService {
       metrics.variance = metrics.reached ? (metrics.pHat * (1 - metrics.pHat)) / metrics.reached : 0;
       metrics.ci = this.calcCI(metrics.reached, metrics.converted);
 
+      // Для code нод — симулируем вывод
+      if (data.kind === 'code') {
+        metrics.lastOutput = `✓ Executed at ${timestamp}\nResult: success=${success}`;
+      }
+
       return { ...data, metrics };
     });
 

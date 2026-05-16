@@ -97,29 +97,29 @@ type TriggerType = 'webhook' | 'cron' | 'interval';
     `,
     styles: [`
         .triggers-panel { display: flex; flex-direction: column; gap: 16px; padding: 12px; height: 100%; overflow-y: auto; }
-        .error { background: #fee2e2; color: #b91c1c; padding: 8px; border-radius: 6px; font-size: 12px; }
-        .status { background: #dcfce7; color: #15803d; padding: 6px 8px; border-radius: 6px; font-size: 12px; }
-        h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; color: #475569; }
-        .trigger-form { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .error { background: var(--danger-bg); color: var(--danger); padding: 8px; border-radius: 6px; font-size: 12px; }
+        .status { background: var(--success-bg); color: var(--success); padding: 6px 8px; border-radius: 6px; font-size: 12px; }
+        h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; color: var(--fg-secondary); }
+        .trigger-form { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
         .form-row { display: flex; align-items: center; gap: 8px; }
-        .form-row label { font-size: 12px; color: #475569; min-width: 80px; }
-        .form-row select, .form-row input { padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; flex: 1; }
-        .hint { font-size: 11px; color: #94a3b8; margin: 4px 0 0; }
-        button.primary { background: #6366f1; color: white; border: none; border-radius: 6px; padding: 6px 14px; cursor: pointer; align-self: flex-start; }
-        button.ghost { background: transparent; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
-        button.ghost.danger:hover { border-color: #ef4444; color: #ef4444; }
+        .form-row label { font-size: 12px; color: var(--fg-secondary); min-width: 80px; }
+        .form-row select, .form-row input { padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; flex: 1; background: var(--bg-secondary); color: var(--fg-primary); }
+        .hint { font-size: 11px; color: var(--fg-muted); margin: 4px 0 0; }
+        button.primary { background: var(--accent); color: white; border: none; border-radius: 6px; padding: 6px 14px; cursor: pointer; align-self: flex-start; }
+        button.ghost { background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--fg-primary); }
+        button.ghost.danger:hover { border-color: var(--danger); color: var(--danger); }
         .triggers-list { display: flex; flex-direction: column; gap: 8px; }
-        .trigger-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
+        .trigger-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
         .trigger-head { display: flex; align-items: center; gap: 8px; }
         .type-badge { font-size: 10px; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
-        .type-badge.webhook { background: #dbeafe; color: #1d4ed8; }
-        .type-badge.cron { background: #fef3c7; color: #92400e; }
-        .type-badge.interval { background: #dcfce7; color: #15803d; }
-        .trigger-id { flex: 1; font-family: monospace; font-size: 11px; color: #64748b; }
+        .type-badge.webhook { background: rgba(59, 130, 246, 0.15); color: var(--accent); }
+        .type-badge.cron { background: var(--warning-bg); color: var(--warning); }
+        .type-badge.interval { background: var(--success-bg); color: var(--success); }
+        .trigger-id { flex: 1; font-family: var(--font-mono); font-size: 11px; color: var(--fg-muted); }
         .webhook-url { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
-        .webhook-url code { flex: 1; background: #f1f5f9; padding: 4px 6px; border-radius: 4px; font-size: 11px; word-break: break-all; }
-        .config { background: #f1f5f9; padding: 6px; border-radius: 4px; font-size: 11px; margin-top: 6px; max-height: 100px; overflow-y: auto; }
-        .empty { color: #94a3b8; font-size: 13px; padding: 8px; }
+        .webhook-url code { flex: 1; background: var(--bg-tertiary); padding: 4px 6px; border-radius: 4px; font-size: 11px; word-break: break-all; color: var(--fg-primary); }
+        .config { background: var(--bg-tertiary); padding: 6px; border-radius: 4px; font-size: 11px; margin-top: 6px; max-height: 100px; overflow-y: auto; color: var(--fg-primary); }
+        .empty { color: var(--fg-muted); font-size: 13px; padding: 8px; }
     `]
 })
 export class TriggersPanelComponent implements OnInit {
