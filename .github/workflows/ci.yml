@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   backend-tests:
     if: contains(toJson(github.event.pull_request.labels.*.name), 'backend') || true
@@ -74,19 +78,6 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
-      minio:
-        image: bitnami/minio:latest
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-          MINIO_DEFAULT_BUCKETS: a11a-blobs
-        ports:
-          - 6005:9000
-        options: >-
-          --health-cmd="curl -sf http://localhost:9000/minio/health/ready || exit 1"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=20
     env:
       SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5433/a11a
       SPRING_DATASOURCE_USERNAME: a11a
@@ -108,6 +99,25 @@ jobs:
               - 'backend/**'
               - 'frontend/**'
               - '.github/workflows/ci.yml'
+
+      - name: Start MinIO + create bucket
+        if: steps.changes.outputs.relevant == 'true'
+        run: |
+          docker run -d --name minio \
+            -p 6005:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio server /data
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:6005/minio/health/ready -o /dev/null; then
+              echo "MinIO ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          docker run --rm --network host \
+            -e MC_HOST_local=http://minioadmin:minioadmin@localhost:6005 \
+            minio/mc mb local/a11a-blobs
 
       - name: Set up JDK 24
         if: steps.changes.outputs.relevant == 'true'
