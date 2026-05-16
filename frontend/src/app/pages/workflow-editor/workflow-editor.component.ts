@@ -18,6 +18,8 @@ import { AnalyticsModalComponent } from '../../components/analytics-modal/analyt
 import { ModalComponent } from '../../components/modal/modal.component';
 import { RunsPanelComponent } from '../../components/runs-panel/runs-panel.component';
 import { TriggersPanelComponent } from '../../components/triggers-panel/triggers-panel.component';
+import { WorkflowValidatorService, ValidationResult } from '../../services/workflow-validator.service';
+import { StatisticsTermsService } from '../../services/statistics-terms.service';
 import { ExperimentConfig } from '../../models/workflow.model';
 
 @Component({
@@ -67,6 +69,17 @@ import { ExperimentConfig } from '../../models/workflow.model';
             </button>
           </div>
           <div class="action-group action-group-primary">
+            <!-- Индикатор готовности -->
+            <div 
+              class="validation-indicator" 
+              [title]="validationResult().message"
+              [class.validation-error]="validationResult().status === 'error'"
+              [class.validation-warning]="validationResult().status === 'warning'"
+              [class.validation-ready]="validationResult().status === 'ready'">
+              <span class="validation-icon">{{ validationResult().status === 'error' ? '🔴' : validationResult().status === 'warning' ? '🟡' : '🟢' }}</span>
+              <span class="validation-text">{{ validationResult().message }}</span>
+            </div>
+            
             <button class="secondary" (click)="simulateRun(1, 'sample')" title="Прогнать пайплайн с одним тестовым событием">
               Тест-запуск
             </button>
@@ -495,6 +508,60 @@ import { ExperimentConfig } from '../../models/workflow.model';
     .action-group-primary {
       padding-left: 16px;
       border-left: 1px solid var(--border);
+    }
+
+    .validation-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      font-size: 13px;
+      margin-right: 8px;
+      transition: all 0.2s;
+    }
+
+    .validation-indicator:hover {
+      background: #f1f5f9;
+    }
+
+    .validation-icon {
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .validation-text {
+      color: #475569;
+      font-weight: 500;
+    }
+
+    .validation-indicator.validation-error {
+      background: #fee2e2;
+      border-color: #fecaca;
+    }
+
+    .validation-indicator.validation-error .validation-text {
+      color: #b91c1c;
+    }
+
+    .validation-indicator.validation-warning {
+      background: #fef3c7;
+      border-color: #fde68a;
+    }
+
+    .validation-indicator.validation-warning .validation-text {
+      color: #92400e;
+    }
+
+    .validation-indicator.validation-ready {
+      background: #dcfce7;
+      border-color: #bbf7d0;
+    }
+
+    .validation-indicator.validation-ready .validation-text {
+      color: #166534;
     }
 
     .guide-btn .q-mark {
@@ -944,6 +1011,10 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   /** Флаг "сейчас применяем граф из WebSocket" — чтобы не зациклиться: save→WS-эхо→setNodes→save→… */
   private applyingWsUpdate = false;
 
+  // Inject services
+  private validator = inject(WorkflowValidatorService);
+  private termsService = inject(StatisticsTermsService);
+
   constructor() {
     // Сохраняем граф через 500ms после ЛЮБОГО изменения nodes/edges. Это надёжнее, чем
     // полагаться на ngOnDestroy при выходе из редактора (HTTP может не успеть уйти при
@@ -960,6 +1031,15 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
         clearTimeout(this.saveDebounceTimer);
       }
       this.saveDebounceTimer = setTimeout(() => this.saveGraphToBackend(), 500);
+    });
+    
+    // Проверка валидации при изменении графа
+    effect(() => {
+      const nodes = this.workflowService.nodes();
+      const edges = this.workflowService.edges();
+      if (nodes.length > 0 || edges.length > 0) {
+        this.validationResult.set(this.validator.validate(nodes, edges));
+      }
     });
   }
 
@@ -1018,6 +1098,14 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
 
   schemas = signal('');
   qaText = signal('');
+
+  // Валидация графа
+  validationResult = signal<ValidationResult>({
+    ready: true,
+    status: 'ready',
+    message: 'Готов к запуску',
+    issues: []
+  });
 
   workflowMeta = computed(() => this.currentMeta());
 

@@ -2,11 +2,12 @@ import { Component, input, output, inject, ElementRef, viewChild, signal, HostLi
 import { CommonModule } from '@angular/common';
 import { WorkflowService } from '../../services/workflow.service';
 import { WorkflowNode, WorkflowEdge, NodeKind } from '../../models/workflow.model';
+import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
 
 @Component({
   selector: 'app-workflow-canvas',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, CanvasEmptyComponent],
   template: `
     <section class="canvas-wrapper">
       <div class="canvas-toolbar">
@@ -25,17 +26,7 @@ import { WorkflowNode, WorkflowEdge, NodeKind } from '../../models/workflow.mode
            (dragover)="onDragOver($event)">
 
         @if (nodes().length === 0) {
-          <div class="canvas-empty">
-            <div class="canvas-empty-arrow">←</div>
-            <h3>Холст пуст</h3>
-            <p>
-              Перетащите тип ноды из <b>палитры слева</b> сюда,<br>
-              чтобы начать собирать пайплайн.
-            </p>
-            <p class="canvas-empty-hint">
-              Затем соедините ноды линией: потяните за правую точку у одной ноды к левой точке у другой.
-            </p>
-          </div>
+          <app-canvas-empty (nodeAdded)="onNodeAdded($event)"></app-canvas-empty>
         }
 
         <div class="canvas-layer"
@@ -909,6 +900,12 @@ export class WorkflowCanvasComponent implements AfterViewInit {
       x: canvas.x - this.NODE_W / 2,
       y: canvas.y - this.NODE_H / 2
     });
+  }
+
+  /** Обработчик добавления ноды из CanvasEmptyComponent */
+  onNodeAdded(type: NodeKind): void {
+    // Нода уже добавлена сервисом, можно просто прокрутить к ней
+    setTimeout(() => this.centerView(), 100);
   }
 
   @HostListener('contextmenu', ['$event'])
