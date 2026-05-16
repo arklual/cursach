@@ -351,12 +351,12 @@ print(json.dumps({'sum': sum(data.get('xs', []))}))"></textarea>
     }
 
     button.danger {
-      color: #b91c1c;
-      border-color: #fecaca;
+      color: var(--danger);
+      border-color: var(--danger);
     }
 
     button.danger:hover {
-      background: #fee2e2;
+      background: var(--danger-bg);
     }
 
     .traffic-section {
@@ -390,7 +390,7 @@ print(json.dumps({'sum': sum(data.get('xs', []))}))"></textarea>
     }
 
     .inspector-section {
-      background: #f8fafc;
+      background: var(--bg-secondary);
       padding: 12px;
       border-radius: 12px;
       border: 1px solid var(--border);
@@ -409,7 +409,7 @@ print(json.dumps({'sum': sum(data.get('xs', []))}))"></textarea>
     }
 
     .hint {
-      color: var(--muted);
+      color: var(--fg-muted);
       font-size: 12px;
       margin: 8px 0 0;
     }
@@ -428,7 +428,7 @@ print(json.dumps({'sum': sum(data.get('xs', []))}))"></textarea>
     }
 
     button.ghost:hover {
-      background: #f1f5f9;
+      background: var(--panel-hover);
     }
   `]
 })

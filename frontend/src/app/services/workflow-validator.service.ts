@@ -190,9 +190,9 @@ export class WorkflowValidatorService {
    */
   getStatusIcon(status: 'ready' | 'warning' | 'error'): string {
     switch (status) {
-      case 'ready': return '🟢';
-      case 'warning': return '🟡';
-      case 'error': return '🔴';
+      case 'ready': return 'check_circle';
+      case 'warning': return 'warning';
+      case 'error': return 'error';
     }
   }
 

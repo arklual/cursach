@@ -76,7 +76,8 @@ test.describe('Workflow card', () => {
     await gotoList(page);
     const card = page.locator('.workflow-card', { hasText: 'E2E-' }).first();
     await expect(card).toBeVisible();
-    await card.getByRole('link', { name: 'Открыть' }).click();
+    // Click on the card link (no separate "Open" button exists)
+    await card.click();
     await page.waitForURL(new RegExp(`/workflow/${createdId}$`), { timeout: 8_000 });
     expect(errs.errors, JSON.stringify(errs.errors, null, 2)).toEqual([]);
   });
@@ -213,7 +214,7 @@ test.describe('Workflow editor — interactions', () => {
     await page.goto(`/workflow/${createdId}`);
     await expect(page.locator('.app-header')).toBeVisible();
     const logsBefore = await page.locator('.log-entry').count();
-    await page.getByRole('button', { name: /Симуляция/i }).click();
+    await page.getByRole('button', { name: /Симуляция \(500\)/i }).click();
     await expect.poll(async () => page.locator('.log-entry').count(), { timeout: 5_000 })
       .toBeGreaterThan(logsBefore);
   });
@@ -237,7 +238,7 @@ test.describe('Workflow editor — interactions', () => {
 
   test('addNode работает в non-secure context (без crypto.randomUUID)', async ({ page }) => {
     // Эмулируем HTTP-прод без TLS, где Web Crypto API не отдаёт randomUUID.
-    // У `crypto.randomUUID` в Chromium свойство configurable=true, поэтому redefine работает.
+    // У `crypto.randomUUID` в Chromium свой configurable=true, поэтому redefine работает.
     // Скрипт ставится через addInitScript — гарантированно выполняется ДО любого app-кода.
     await page.addInitScript(() => {
       Object.defineProperty(window.crypto, 'randomUUID', { value: undefined, configurable: true });
@@ -246,6 +247,11 @@ test.describe('Workflow editor — interactions', () => {
     // Sanity: убеждаемся что override применился именно в этой странице.
     const noRandomUUID = await page.evaluate(() => typeof window.crypto.randomUUID !== 'function');
     expect(noRandomUUID).toBe(true);
+    
+    // Ждём появления палитры и канваса
+    await page.waitForSelector('app-palette .palette-item', { timeout: 5000 });
+    await page.waitForSelector('.canvas-viewport', { timeout: 5000 });
+    
     await page.evaluate(() => {
       const paletteBtn = document.querySelector('app-palette .palette-item') as HTMLElement;
       const canvas = document.querySelector('.canvas-viewport') as HTMLElement;

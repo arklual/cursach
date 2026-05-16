@@ -31,7 +31,25 @@ interface NodeCategory {
       @for (category of filteredCategories(); track category.id) {
         <section class="category">
           <div class="category-header" [style.borderLeftColor]="category.color">
-            <span class="category-icon">{{ category.icon }}</span>
+            <span class="category-icon">
+              @switch (category.id) {
+                @case ('entry') {
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                  </svg>
+                }
+                @case ('logic') {
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                  </svg>
+                }
+                @case ('action') {
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M13 2L3 14h8l-2 8 10-12h-8l2-8z"/>
+                  </svg>
+                }
+              }
+            </span>
             <h3>{{ category.name }}</h3>
             <span class="category-count">{{ category.types.length }}</span>
           </div>
@@ -42,7 +60,11 @@ interface NodeCategory {
                 draggable="true"
                 (dragstart)="onDragStart($event, item.type)"
                 [title]="item.template.label">
-                <span class="palette-item-icon">{{ getNodeIcon(item.type) }}</span>
+                <span class="palette-item-icon">
+                  <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                    <path [attr.d]="getNodeIcon(item.type)"/>
+                  </svg>
+                </span>
                 <span class="palette-item-label">{{ item.template.label }}</span>
               </button>
             }
@@ -57,18 +79,6 @@ interface NodeCategory {
         </div>
       }
 
-      <section class="calc-card">
-        <header>
-          <h3>📊 Power Analysis</h3>
-          <span class="badge">α=0.05 · power={{ power() }}</span>
-        </header>
-        <div class="calc-content">
-          <p><strong>Baseline:</strong> p₀ = 0.25</p>
-          <p><strong>MDE:</strong> Δ = 0.05</p>
-          <p class="result"><strong>n ≈ {{ sampleSize() }}</strong> / вариант</p>
-        </div>
-        <p class="hint">n ≈ ((z₁₋α/₂ + z₁₋β)² · p(1−p)) / d²</p>
-      </section>
     </aside>
   `,
   styles: [`
@@ -138,8 +148,8 @@ interface NodeCategory {
     }
 
     .category-icon {
-      font-size: 14px;
-      line-height: 1;
+      display: block;
+      color: inherit;
     }
 
     .category-header h3 {
@@ -178,10 +188,15 @@ interface NodeCategory {
       cursor: grab;
       font-size: 12px;
       font-weight: 500;
-      color: var(--text-primary);
+      color: var(--fg-primary);
       transition: all var(--transition-base);
       text-align: left;
       min-height: 44px;
+    }
+
+    .palette-item-icon {
+      display: block;
+      color: var(--accent);
     }
 
     .palette-item:hover {
@@ -303,14 +318,14 @@ export class PaletteComponent {
     {
       id: 'entry',
       name: 'Вход',
-      icon: '📥',
+      icon: '○',
       types: ['trigger', 'http'],
       color: 'var(--success-500)'
     },
     {
       id: 'logic',
       name: 'Логика',
-      icon: '🔀',
+      icon: '◇',
       types: ['ab', 'dataflow'],
       color: 'var(--primary-500)'
     },
@@ -358,14 +373,14 @@ export class PaletteComponent {
 
   getNodeIcon(type: NodeKind): string {
     const icons: Record<NodeKind, string> = {
-      trigger: '🎯',
-      http: '🌐',
-      dataflow: '📊',
-      code: '💻',
-      ab: '⚖',
-      join: '⏹'
+      trigger: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-2-3.5l6-4.5-6-4.5z',
+      http: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z',
+      dataflow: 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z',
+      code: 'M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z',
+      ab: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm-1-4h2v2h-2zm0-2h2V7h-2z',
+      join: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z'
     };
-    return icons[type] || '•';
+    return icons[type] || '';
   }
 
   onDragStart(event: DragEvent, type: NodeKind): void {

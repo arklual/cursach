@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   attachConsoleSpy,
+  connectNodes,
   createWorkflowViaApi,
   deleteWorkflowsByPrefix,
   dragPaletteNode,
@@ -30,7 +31,7 @@ test.describe('Canvas editing', () => {
 
   test('empty-state shows on fresh workflow and disappears after first node', async ({ page }) => {
     await page.goto(`/workflow/${createdId}`);
-    const empty = page.locator('.canvas-empty');
+    const empty = page.locator('.canvas-empty-state');
     await expect(empty).toBeVisible();
     await expect(empty.getByRole('heading', { name: 'Холст пуст' })).toBeVisible();
 
@@ -81,26 +82,13 @@ test.describe('Canvas editing', () => {
     await dragPaletteNode(page, 'http', { x: 500, y: 250 });
     await expect(page.locator('.node-wrap')).toHaveCount(2);
 
-    const sourceHandle = page.locator('.node-wrap').nth(0).locator('.handle-out');
-    const targetHandle = page.locator('.node-wrap').nth(1).locator('.handle-in');
-    const src = await sourceHandle.boundingBox();
-    const tgt = await targetHandle.boundingBox();
-    expect(src, 'source handle box').not.toBeNull();
-    expect(tgt, 'target handle box').not.toBeNull();
-    if (!src || !tgt) throw new Error('no boxes');
-
-    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(tgt.x + tgt.width / 2, tgt.y + tgt.height / 2, { steps: 10 });
-    await page.mouse.up();
+    // Use helper to connect nodes
+    await connectNodes(page, 0, 1);
 
     await expect(page.locator('.edge-group')).toHaveCount(1, { timeout: 3_000 });
     await expect(page.locator('.info-panel')).toContainText('Связи: 1');
 
     // Save by navigating away, then verify the connection persisted on the backend.
-    // The editor debounces graph saves, so poll briefly instead of asserting once —
-    // the keepalive flush triggered by back-btn navigation can land a few hundred ms
-    // after the URL change.
     await page.locator('.back-btn').click();
     await page.waitForURL(/\/$/);
     await expect.poll(async () => {
@@ -114,14 +102,7 @@ test.describe('Canvas editing', () => {
     await dragPaletteNode(page, 'trigger', { x: 200, y: 250 });
     await dragPaletteNode(page, 'http', { x: 500, y: 250 });
 
-    const src = await page.locator('.node-wrap').nth(0).locator('.handle-out').boundingBox();
-    const tgt = await page.locator('.node-wrap').nth(1).locator('.handle-in').boundingBox();
-    if (!src || !tgt) throw new Error('no handles');
-    await page.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(tgt.x + tgt.width / 2, tgt.y + tgt.height / 2, { steps: 10 });
-    await page.mouse.up();
-
+    await connectNodes(page, 0, 1);
     await expect(page.locator('.edge-group')).toHaveCount(1);
     // SVG <g class="edge-group"> spans both nodes' bounding boxes; a real click at
     // any coordinate inside that box gets intercepted by .node-header. dispatchEvent
@@ -157,7 +138,7 @@ test.describe('Canvas editing', () => {
     const errs = attachConsoleSpy(page);
     await page.goto(`/workflow/${createdId}`);
     await dragPaletteNode(page, 'trigger', { x: 200, y: 200 });
-    await page.getByRole('button', { name: 'Center view' }).click();
+    await page.getByRole('button', { name: 'Center' }).click();
     expect(errs.errors, JSON.stringify(errs.errors, null, 2)).toEqual([]);
   });
 });

@@ -21,6 +21,8 @@ import { TriggersPanelComponent } from '../../components/triggers-panel/triggers
 import { WorkflowValidatorService, ValidationResult } from '../../services/workflow-validator.service';
 import { StatisticsTermsService } from '../../services/statistics-terms.service';
 import { ExperimentConfig } from '../../models/workflow.model';
+import { ExecutionService } from '../../services/execution.service';
+import { ExecutionPanelComponent } from '../../components/execution-panel/execution-panel.component';
 
 @Component({
   selector: 'app-workflow-editor',
@@ -35,13 +37,16 @@ import { ExperimentConfig } from '../../models/workflow.model';
     ModalComponent,
     RunsPanelComponent,
     TriggersPanelComponent,
+    ExecutionPanelComponent,
   ],
   template: `
     <div class="app-shell">
       <header class="app-header">
         <div class="brand">
           <button class="back-btn" (click)="goBack()">
-            <span>←</span>
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+              <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+            </svg>
           </button>
           <span class="logo">Δ</span>
           <div class="workflow-info">
@@ -76,7 +81,25 @@ import { ExperimentConfig } from '../../models/workflow.model';
               [class.validation-error]="validationResult().status === 'error'"
               [class.validation-warning]="validationResult().status === 'warning'"
               [class.validation-ready]="validationResult().status === 'ready'">
-              <span class="validation-icon">{{ validationResult().status === 'error' ? '🔴' : validationResult().status === 'warning' ? '🟡' : '🟢' }}</span>
+              <span class="validation-icon">
+                @switch (validationResult().status) {
+                  @case ('error') {
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
+                  }
+                  @case ('warning') {
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                      <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                    </svg>
+                  }
+                  @default {
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                  }
+                }
+              </span>
               <span class="validation-text">{{ validationResult().message }}</span>
             </div>
             
@@ -84,7 +107,10 @@ import { ExperimentConfig } from '../../models/workflow.model';
               Тест-запуск
             </button>
             <button class="primary" (click)="simulateRun(500)" title="Сгенерировать трафик из 500 «пользователей» и собрать метрики">
-              ▶ Симуляция (500)
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+              Симуляция (500)
             </button>
           </div>
         </div>
@@ -109,7 +135,15 @@ import { ExperimentConfig } from '../../models/workflow.model';
           }
           <button class="collapse-btn collapse-btn-right"
                   (click)="paletteCollapsed.set(!paletteCollapsed())">
-            {{ paletteCollapsed() ? '→' : '←' }}
+            @if (paletteCollapsed()) {
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+              </svg>
+            } @else {
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+              </svg>
+            }
           </button>
         </div>
 
@@ -117,28 +151,49 @@ import { ExperimentConfig } from '../../models/workflow.model';
           [nodes]="workflowService.nodes()"
           [edges]="workflowService.edges()"
           [activeNodeId]="workflowService.activeNodeId()"
+          [executionStatus]="executionStatus()"
+          [isExecuting]="isExecuting()"
+          [progress]="executionProgress()"
           (openAnalytics)="handleOpenAnalytics($event)"
           (testNode)="handleTestNode($event)"
           (nodeSelected)="workflowService.setActiveNode($event)"
           (openAbConfig)="openModal('abConfig')"
-          (replayRun)="simulateRun(100, 'replay')">
+          (replayRun)="simulateRun(100, 'replay')"
+          (executeWorkflow)="executeWorkflow()"
+          (executeFromNode)="executeFromNode()">
         </app-workflow-canvas>
 
         <!-- Inspector -->
         <div class="panel-container inspector-panel" [class.collapsed]="inspectorCollapsed()">
           <button class="collapse-btn collapse-btn-left"
                   (click)="inspectorCollapsed.set(!inspectorCollapsed())">
-            {{ inspectorCollapsed() ? '←' : '→' }}
+            @if (inspectorCollapsed()) {
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+              </svg>
+            } @else {
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+              </svg>
+            }
           </button>
           @if (!inspectorCollapsed()) {
             <div class="resize-handle resize-handle-left"
                  (mousedown)="startResize($event, 'inspector')"></div>
             <div class="panel-content" [style.width.px]="inspectorWidth()">
-              <app-inspector
-                [activeNode]="workflowService.activeNode()"
-                (testNode)="handleTestNode($event)"
-                (promoteWinner)="workflowService.log('Promote winner triggered')">
-              </app-inspector>
+              @if (showExecutionPanel() && selectedExecutionNodeId()) {
+                <app-execution-panel
+                  [nodeId]="selectedExecutionNodeId()"
+                  (close)="closeExecutionPanel()"
+                  (reset)="resetExecution()">
+                </app-execution-panel>
+              } @else {
+                <app-inspector
+                  [activeNode]="workflowService.activeNode()"
+                  (testNode)="handleTestNode($event)"
+                  (promoteWinner)="workflowService.log('Promote winner triggered')">
+                </app-inspector>
+              }
             </div>
           }
         </div>
@@ -148,10 +203,18 @@ import { ExperimentConfig } from '../../models/workflow.model';
         <header>
           <button class="collapse-btn collapse-btn-top"
                   (click)="logPanelCollapsed.set(!logPanelCollapsed())">
-            {{ logPanelCollapsed() ? '▲' : '▼' }}
+            @if (logPanelCollapsed()) {
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z"/>
+              </svg>
+            } @else {
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/>
+              </svg>
+            }
           </button>
           <div class="tabs">
-            <button class="tab" [class.active]="bottomTab() === 'log'" (click)="bottomTab.set('log')">Execution log</button>
+            <button class="tab" [class.active]="bottomTab() === 'log'" (click)="bottomTab.set('log')">Симуляция</button>
             <button class="tab" [class.active]="bottomTab() === 'runs'" (click)="bottomTab.set('runs')">Запуски</button>
             <button class="tab" [class.active]="bottomTab() === 'triggers'" (click)="bottomTab.set('triggers')">Триггеры</button>
           </div>
@@ -253,7 +316,12 @@ import { ExperimentConfig } from '../../models/workflow.model';
           </label>
         </div>
         <div class="warnings">
-          <p>⚠ Малые выборки → широкие CI. Следите за FDR при множественных проверках.</p>
+          <p>
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16" style="display:inline-block;vertical-align:middle;margin-right:4px;">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
+            Малые выборки → широкие CI. Следите за FDR при множественных проверках.
+          </p>
           <p class="hint">CI = p̂ ± z₀.₉₇₅·√(p̂(1-p̂)/N)</p>
         </div>
         <div footer>
@@ -344,7 +412,10 @@ import { ExperimentConfig } from '../../models/workflow.model';
                 <p>
                   У каждой ноды есть точки-«хэндлы» по бокам: левая — вход, правая — выход.
                   Нажмите на правый хэндл и протяните линию к левому хэндлу следующей ноды.
-                  Чтобы удалить связь — кликните по линии и нажмите 🗑.
+                  Чтобы удалить связь — кликните по линии и нажмите
+                  <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="14" height="14" style="display:inline-block;vertical-align:middle;">
+                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                  </svg>.
                 </p>
               </div>
             </li>
@@ -399,9 +470,11 @@ import { ExperimentConfig } from '../../models/workflow.model';
   `,
   styles: [`
     .app-shell {
-      min-height: 100vh;
+      height: 100vh;
+      max-height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow: hidden;
     }
 
     .app-header {
@@ -436,6 +509,7 @@ import { ExperimentConfig } from '../../models/workflow.model';
       border: 1px solid var(--border);
       cursor: pointer;
       display: grid;
+      justify-content: center;
       place-items: center;
       font-size: 18px;
       transition: background 0.2s;
@@ -443,6 +517,11 @@ import { ExperimentConfig } from '../../models/workflow.model';
 
     .back-btn:hover {
       background: #f1f5f9;
+    }
+
+    .icon {
+      display: block;
+      color: inherit;
     }
 
     .brand .logo {
@@ -584,11 +663,13 @@ import { ExperimentConfig } from '../../models/workflow.model';
       padding: 16px;
       overflow: hidden;
       min-height: 0;
+      position: relative;
     }
 
     main > app-workflow-canvas {
       min-width: 0;
       min-height: 0;
+      flex: 1;
       overflow: hidden;
     }
 
@@ -596,6 +677,8 @@ import { ExperimentConfig } from '../../models/workflow.model';
       position: relative;
       display: flex;
       min-width: 0;
+      max-height: 100%;
+      overflow: hidden;
     }
 
     .panel-container.collapsed {
@@ -744,15 +827,15 @@ import { ExperimentConfig } from '../../models/workflow.model';
 
     .log-stream.light {
       background: #ffffff;
-      color: #0f172a;
+      color: #1e293b;
       padding: 0;
     }
 
     .log-stream {
       overflow: auto;
       font-size: 12px;
-      background: #0f172a;
-      color: #e2e8f0;
+      background: var(--bg-secondary);
+      color: var(--fg-secondary);
       padding: 12px;
       border-radius: 12px;
     }
@@ -768,7 +851,7 @@ import { ExperimentConfig } from '../../models/workflow.model';
       padding: 8px 14px;
       font-size: 14px;
       background: var(--panel);
-      color: #0f172a;
+      color: var(--fg-primary);
       cursor: pointer;
       border: 1px solid transparent;
       transition: transform 0.1s ease, box-shadow 0.2s ease;
@@ -785,7 +868,7 @@ import { ExperimentConfig } from '../../models/workflow.model';
     }
 
     button.secondary {
-      background: #0f172a;
+      background: var(--bg-tertiary);
       color: white;
     }
 
@@ -805,7 +888,7 @@ import { ExperimentConfig } from '../../models/workflow.model';
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 12px;
-      background: #fdfdff;
+      background: var(--bg-secondary);
     }
 
     .analytics-card h4 {
@@ -818,8 +901,8 @@ import { ExperimentConfig } from '../../models/workflow.model';
     }
 
     pre {
-      background: #0f172a;
-      color: #e2e8f0;
+      background: var(--bg-primary);
+      color: var(--fg-secondary);
       padding: 12px;
       border-radius: 12px;
       font-size: 12px;
@@ -902,13 +985,13 @@ import { ExperimentConfig } from '../../models/workflow.model';
       display: flex;
       flex-direction: column;
       gap: 20px;
-      color: #0f172a;
+      color: var(--fg-primary);
     }
 
     .guide-lead {
       margin: 0;
       font-size: 14px;
-      color: #475569;
+      color: var(--fg-secondary);
       line-height: 1.55;
     }
 
@@ -980,6 +1063,10 @@ import { ExperimentConfig } from '../../models/workflow.model';
       font-size: 13px;
       color: #1e293b;
     }
+
+    .execution-panel {
+      display: none; /* Удалено - теперь execution panel внутри inspector */
+    }
   `]
 })
 export class WorkflowEditorComponent implements OnInit, OnDestroy {
@@ -1014,7 +1101,16 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   // Inject services
   private validator = inject(WorkflowValidatorService);
   private termsService = inject(StatisticsTermsService);
+  private executionService = inject(ExecutionService);
 
+  // Execution signals
+  showExecutionPanel = signal(false);
+  selectedExecutionNodeId = signal<string | null>(null);
+  executionStatus = signal<Record<string, 'pending' | 'running' | 'success' | 'error' | 'skipped'>>({});
+  executionProgress = signal<number>(0);
+  isExecuting = signal(false);
+
+  // Effect для отслеживания исполнения
   constructor() {
     // Сохраняем граф через 500ms после ЛЮБОГО изменения nodes/edges. Это надёжнее, чем
     // полагаться на ngOnDestroy при выходе из редактора (HTTP может не успеть уйти при
@@ -1039,6 +1135,36 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
       const edges = this.workflowService.edges();
       if (nodes.length > 0 || edges.length > 0) {
         this.validationResult.set(this.validator.validate(nodes, edges));
+      }
+    });
+
+    // Отслеживание статусов исполнения для UI
+    effect(() => {
+      const statuses = this.executionService.nodeStatusesMap();
+      this.executionStatus.set(statuses);
+
+      // Автовыбор первой активной ноды
+      const runningNode = Object.entries(statuses).find(([_, status]) => status === 'running');
+      if (runningNode) {
+        this.selectedExecutionNodeId.set(runningNode[0]);
+      }
+
+      // Обновляем прогресс
+      const total = Object.keys(statuses).length;
+      const completed = Object.values(statuses).filter(s => s === 'success' || s === 'error').length;
+      if (total > 0) {
+        this.executionProgress.set(Math.round((completed / total) * 100));
+      }
+
+      // Проверка завершения
+      const isRunning = Object.values(statuses).some(s => s === 'running');
+      this.isExecuting.set(isRunning);
+      
+      // Автоматически показываем нижнюю панель после завершения
+      if (!isRunning && completed > 0) {
+        setTimeout(() => {
+          this.logPanelCollapsed.set(false);
+        }, 500);
       }
     });
   }
@@ -1338,6 +1464,55 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
 
   handleTestNode(nodeId: string): void {
     this.simulationService.testNode(nodeId);
+  }
+
+  executeWorkflow(): void {
+    const workflowId = this.currentWorkflowId();
+    if (!workflowId) {
+      console.warn('No workflow ID selected');
+      return;
+    }
+
+    console.log('Starting execution for workflow:', workflowId);
+    
+    // Автоматически скрываем нижнюю панель и показываем Execution Panel
+    this.logPanelCollapsed.set(true);
+    this.showExecutionPanel.set(true);
+    this.selectedExecutionNodeId.set(null);
+    this.executionStatus.set({});
+    this.executionProgress.set(0);
+    this.isExecuting.set(true);
+
+    // Запускаем исполнение
+    this.executionService.executeWorkflow(workflowId).subscribe({
+      next: () => console.log('Execution started'),
+      error: (err) => {
+        console.error('Execution error:', err);
+        this.isExecuting.set(false);
+      }
+    });
+  }
+
+  executeFromNode(): void {
+    // TODO: Реализовать выбор ноды для запуска
+    alert('Выберите ноду для запуска (будет реализовано)');
+  }
+
+  closeExecutionPanel(): void {
+    // Не очищаем executionStatus - сохраняем подсветку нод
+    this.showExecutionPanel.set(false);
+    this.selectedExecutionNodeId.set(null);
+    // executionService.clearExecution() не вызываем - сохраняем статусы нод
+  }
+
+  resetExecution(): void {
+    // Сброс исполнения с очисткой статусов
+    this.executionService.clearExecution();
+    this.showExecutionPanel.set(false);
+    this.selectedExecutionNodeId.set(null);
+    this.executionStatus.set({});
+    this.executionProgress.set(0);
+    this.isExecuting.set(false);
   }
 
   simulateRun(count: number, mode: string = 'bulk'): void {

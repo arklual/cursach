@@ -81,10 +81,8 @@ test.describe('Workflow editor — Guide modal first-visit', () => {
     const stepNums = page.locator('.guide-step-num');
     await expect(stepNums).toHaveCount(5);
 
-    await page.locator('.modal-card').getByRole('button', { name: '✕' }).click().catch(async () => {
-      // Fallback: Esc
-      await page.keyboard.press('Escape');
-    });
+    // Close modal via Escape (more reliable than clicking close button)
+    await page.keyboard.press('Escape');
     await expect(guideTitle).toBeHidden({ timeout: 2_000 });
 
     const flag = await page.evaluate(() => localStorage.getItem('fluxpilot.guideSeen'));
