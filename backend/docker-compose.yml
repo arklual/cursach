@@ -19,7 +19,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        MVN_INSECURE: ${MVN_INSECURE:-false}
+        MVN_INSECURE: ${MVN_INSECURE:-true}
     container_name: a11a-app
     depends_on:
       postgres:

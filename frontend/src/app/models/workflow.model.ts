@@ -26,6 +26,8 @@ export interface NodeMetrics {
   ci: [number, number];
   users: UserEntry[];
   events: EventEntry[];
+  /** Последний результат выполнения кода (для code нод) */
+  lastOutput?: string;
 }
 
 export interface NodeData {

@@ -11,12 +11,33 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
   template: `
     <section class="canvas-wrapper">
       <div class="canvas-toolbar">
-        <button (click)="openAbConfig.emit()">A/B Test Config</button>
-        <button (click)="replayRun.emit()">Replay run</button>
-        <button (click)="centerView()">Center view</button>
-        <button (click)="resetView()">Reset</button>
-        <span class="zoom-info">{{ (zoom() * 100).toFixed(0) }}%</span>
-        <span class="hint">⌘+Scroll = zoom, Drag = pan</span>
+        <div class="toolbar-actions">
+          <button class="primary execute-btn" [class.executing]="isExecuting()" (click)="executeWorkflow.emit()" title="Execute workflow (Ctrl+Enter)">
+            @if (isExecuting()) {
+              <span class="spinner"></span>
+            }
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            Execute
+          </button>
+          @if (isExecuting()) {
+            <div class="execution-progress">
+              <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="progress()"></div>
+              </div>
+              <span class="progress-text">{{ progress() }}%</span>
+            </div>
+          }
+        </div>
+        <div class="toolbar-tools">
+          <button (click)="openAbConfig.emit()">A/B Config</button>
+          <button (click)="replayRun.emit()">Replay</button>
+          <button (click)="centerView()">Center</button>
+          <button (click)="resetView()">Reset</button>
+          <span class="zoom-info">{{ (zoom() * 100).toFixed(0) }}%</span>
+          <span class="hint">⌘+Scroll = zoom, Drag = pan</span>
+        </div>
       </div>
       <div class="canvas-viewport"
            #canvasArea
@@ -66,7 +87,9 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
                     [style.left.px]="getDeleteBtnPos(edgeId).x"
                     [style.top.px]="getDeleteBtnPos(edgeId).y"
                     (click)="deleteEdge(edgeId); $event.stopPropagation()">
-              🗑
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+              </svg>
             </button>
           }
 
@@ -76,6 +99,9 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
                  [style.left.px]="node.position.x"
                  [style.top.px]="node.position.y"
                  [class.selected]="node.id === activeNodeId()"
+                 [class.executing]="executionStatus()[node.id] === 'running'"
+                 [class.success]="executionStatus()[node.id] === 'success'"
+                 [class.error]="executionStatus()[node.id] === 'error'"
                  [class.drop-target]="isDrawing() && dropTargetNodeId() === node.id"
                  (mousedown)="startDragNode($event, node)"
                  (click)="selectNode($event, node.id)"
@@ -86,10 +112,18 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
 
               <div class="node-content" [style.borderColor]="node.data.color + '55'">
                 <div class="node-header" [style.background]="node.data.color + '20'">
-                  <span>{{ node.data.label }}</span>
+                  <span class="node-label">{{ node.data.label }}</span>
                   <div class="node-actions">
-                    <button (click)="openAnalytics.emit(node.id); $event.stopPropagation()">📊</button>
-                    <button (click)="testNode.emit(node.id); $event.stopPropagation()">⚙</button>
+                    <button (click)="openAnalytics.emit(node.id); $event.stopPropagation()" title="Analytics">
+                      <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+                      </svg>
+                    </button>
+                    <button (click)="testNode.emit(node.id); $event.stopPropagation()" title="Test node">
+                      <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                      </svg>
+                    </button>
                   </div>
                 </div>
                 <div class="node-body">
@@ -101,6 +135,9 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
                     <div class="variant-badge">
                       {{ formatVariants(node.data.variants) }}
                     </div>
+                  }
+                  @if (node.data.metrics.lastOutput) {
+                    <pre class="code-output">{{ node.data.metrics.lastOutput }}</pre>
                   }
                 </div>
               </div>
@@ -130,47 +167,133 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
       flex: 1;
       display: flex;
       flex-direction: column;
-      background: #fff;
-      border: 1px solid #e2e8f0;
+      background: var(--panel);
+      border: 1px solid var(--border);
       border-radius: 12px;
       overflow: hidden;
       min-height: 0;
     }
 
     .canvas-toolbar {
-      padding: 8px 12px;
+      padding: 10px 16px;
       display: flex;
       align-items: center;
-      gap: 10px;
-      border-bottom: 1px solid #e2e8f0;
-      background: #f8fafc;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .toolbar-actions button.primary {
+      background: var(--accent);
+      color: white;
+      border: none;
+      font-weight: 600;
+    }
+
+    .toolbar-actions button.primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .execute-btn {
+      position: relative;
+      min-width: 120px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .execute-btn.executing {
+      background: var(--accent);
+      opacity: 0.8;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .execution-progress {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: 12px;
+    }
+
+    .progress-bar {
+      width: 150px;
+      height: 6px;
+      background: var(--bg-tertiary);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-glow));
+      transition: width 0.3s ease;
+    }
+
+    .progress-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      min-width: 35px;
+    }
+
+    .toolbar-tools {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .icon {
+      display: block;
+      color: inherit;
+      vertical-align: middle;
     }
 
     .canvas-toolbar button {
       padding: 6px 12px;
-      border: 1px solid #e2e8f0;
+      border: 1px solid var(--border);
       border-radius: 6px;
-      background: #fff;
+      background: var(--panel);
       cursor: pointer;
       font-size: 13px;
+      color: var(--fg-primary);
     }
 
     .canvas-toolbar button:hover {
-      background: #f1f5f9;
+      background: var(--panel-hover);
     }
 
     .hint {
-      color: #64748b;
+      color: var(--fg-muted);
       font-size: 12px;
       margin-left: auto;
     }
 
     .zoom-info {
-      background: #e2e8f0;
+      background: var(--bg-tertiary);
       padding: 4px 8px;
       border-radius: 4px;
       font-size: 12px;
       font-weight: 500;
+      color: var(--fg-primary);
     }
 
     .canvas-viewport {
@@ -179,11 +302,10 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
       overflow: hidden;
       min-height: 0;
       cursor: grab;
-      background:
-        linear-gradient(90deg, #e2e8f0 1px, transparent 1px),
-        linear-gradient(#e2e8f0 1px, transparent 1px);
-      background-size: 20px 20px;
-      background-color: #f8fafc;
+      background: var(--bg-secondary);
+      background-image: 
+        radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
+      background-size: 24px 24px;
     }
 
     .canvas-viewport:active {
@@ -219,30 +341,37 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
     }
 
     .edge-line {
-      stroke: #94a3b8;
+      stroke: var(--border-light);
       stroke-width: 2;
       transition: stroke 0.15s, stroke-width 0.15s;
     }
 
     .edge-line.hovered {
-      stroke: #6366f1;
+      stroke: var(--accent);
       stroke-width: 2.5;
     }
 
     .edge-line.selected {
-      stroke: #ef4444;
+      stroke: var(--danger);
       stroke-width: 3;
     }
 
     .edge-temp {
-      stroke: #6366f1;
+      stroke: var(--accent);
       stroke-width: 2;
       stroke-dasharray: 6 4;
+      animation: dash-scroll 30s linear infinite;
+    }
+
+    @keyframes dash-scroll {
+      to {
+        stroke-dashoffset: -1000;
+      }
     }
 
     .edge-text {
       font-size: 11px;
-      fill: #475569;
+      fill: var(--fg-muted);
       pointer-events: none;
     }
 
@@ -252,19 +381,20 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
       width: 28px;
       height: 28px;
       border-radius: 50%;
-      border: 2px solid #ef4444;
-      background: #fff;
+      border: 2px solid var(--danger);
+      background: var(--panel);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 14px;
       z-index: 50;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      box-shadow: var(--shadow-md);
+      color: var(--fg-primary);
     }
 
     .edge-delete-btn:hover {
-      background: #fee2e2;
+      background: var(--danger-bg);
       transform: translate(-50%, -50%) scale(1.1);
     }
 
@@ -281,7 +411,7 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
     }
 
     .node-wrap.selected .node-content {
-      box-shadow: 0 0 0 2px #6366f1;
+      box-shadow: 0 0 0 2px var(--accent);
     }
 
     .node-wrap.drop-target {
@@ -290,16 +420,56 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
     }
 
     .node-wrap.drop-target .node-content {
-      box-shadow: 0 0 0 3px #22c55e, 0 8px 24px rgba(34, 197, 94, 0.25);
+      box-shadow: 0 0 0 3px var(--success), 0 8px 24px rgba(34, 197, 94, 0.25);
+    }
+
+    .node-wrap.executing .node-content {
+      border-color: var(--accent);
+      border-width: 3px;
+      box-shadow: 0 0 20px var(--accent-glow), 0 0 40px var(--accent-glow-strong), var(--shadow-lg);
+      animation: node-pulse 0.8s ease-in-out infinite;
+      z-index: 10;
+    }
+
+    .node-wrap.success .node-content {
+      border-color: var(--success);
+      border-width: 3px;
+      box-shadow: 0 0 15px var(--success-glow), 0 0 30px var(--success-glow-strong), var(--shadow-lg);
+    }
+
+    .node-wrap.error .node-content {
+      border-color: var(--danger);
+      border-width: 3px;
+      box-shadow: 0 0 15px var(--danger-glow), 0 0 30px var(--danger-glow-strong), var(--shadow-lg);
+      animation: node-shake 0.5s ease-in-out;
+    }
+
+    @keyframes node-pulse {
+      0%, 100% { 
+        transform: scale(1.05);
+        box-shadow: 0 0 10px var(--accent-glow), 0 0 20px var(--accent-glow-strong), var(--shadow-lg);
+      }
+      50% { 
+        transform: scale(1.08);
+        box-shadow: 0 0 30px var(--accent-glow), 0 0 60px var(--accent-glow-strong), var(--shadow-lg);
+      }
+    }
+
+    @keyframes node-shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px) rotate(-2deg); }
+      40% { transform: translateX(8px) rotate(2deg); }
+      60% { transform: translateX(-8px) rotate(-2deg); }
+      80% { transform: translateX(8px) rotate(2deg); }
     }
 
     .node-content {
       width: 200px;
-      background: #fff;
-      border: 1px solid #e2e8f0;
+      background: var(--panel);
+      border: 1px solid var(--border);
       border-radius: 10px;
       overflow: hidden;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      box-shadow: var(--shadow-md);
     }
 
     .node-header {
@@ -309,6 +479,7 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
       display: flex;
       justify-content: space-between;
       align-items: center;
+      color: var(--fg-primary);
     }
 
     .node-actions {
@@ -323,10 +494,13 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
       padding: 2px;
       font-size: 14px;
       opacity: 0.7;
+      color: var(--fg-secondary);
     }
 
     .node-actions button:hover {
       opacity: 1;
+      background: var(--bg-tertiary);
+      border-radius: 4px;
     }
 
     .node-body {
@@ -338,29 +512,49 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
       display: flex;
       justify-content: space-between;
       padding: 2px 0;
-      color: #64748b;
+      color: var(--fg-muted);
     }
 
     .metric b {
-      color: #1e293b;
+      color: var(--fg-primary);
+      font-family: var(--font-mono);
     }
 
     .variant-badge {
       margin-top: 6px;
       padding: 3px 6px;
-      background: #dcfce7;
-      color: #16a34a;
+      background: var(--success-bg);
+      color: var(--success);
       border-radius: 4px;
       font-size: 11px;
       text-align: center;
+    }
+
+    .code-output {
+      margin-top: 8px;
+      padding: 6px 8px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--fg-secondary);
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 60px;
+      overflow: auto;
+    }
+
+    .node-label {
+      font-weight: 600;
     }
 
     .handle {
       position: absolute;
       width: 14px;
       height: 14px;
-      background: #6366f1;
-      border: 2px solid #fff;
+      background: var(--bg-tertiary);
+      border: 2px solid var(--border-light);
       border-radius: 50%;
       top: 50%;
       transform: translateY(-50%);
@@ -371,27 +565,32 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
 
     .handle:hover {
       transform: translateY(-50%) scale(1.3);
-      background: #4f46e5;
+      background: var(--accent);
+      border-color: var(--accent);
     }
 
     .handle-in {
       left: -7px;
+      top: 50%;
+      transform: translateY(-50%);
     }
 
     .handle-out {
-      right: -7px;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%) translateX(50%);
     }
 
     .info-panel {
       position: absolute;
       bottom: 10px;
       right: 10px;
-      background: rgba(255,255,255,0.9);
-      border: 1px solid #e2e8f0;
+      background: var(--panel);
+      border: 1px solid var(--border);
       border-radius: 6px;
       padding: 6px 10px;
       font-size: 11px;
-      color: #64748b;
+      color: var(--fg-muted);
       z-index: 100;
     }
 
@@ -405,7 +604,7 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
       gap: 8px;
       pointer-events: none;
       text-align: center;
-      color: #475569;
+      color: var(--fg-secondary);
       z-index: 1;
       padding: 24px;
     }
@@ -420,7 +619,7 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
     .canvas-empty h3 {
       margin: 0;
       font-size: 22px;
-      color: #0f172a;
+      color: var(--fg-primary);
     }
 
     .canvas-empty p {
@@ -431,7 +630,7 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
     }
 
     .canvas-empty-hint {
-      color: #94a3b8;
+      color: var(--fg-muted);
       font-size: 13px;
     }
 
@@ -447,12 +646,17 @@ export class WorkflowCanvasComponent implements AfterViewInit {
   nodes = input.required<WorkflowNode[]>();
   edges = input.required<WorkflowEdge[]>();
   activeNodeId = input<string | null>(null);
+  executionStatus = input<Record<string, 'pending' | 'running' | 'success' | 'error' | 'skipped'>>({});
+  isExecuting = input<boolean>(false);
+  progress = input<number>(0);
 
   openAnalytics = output<string>();
   testNode = output<string>();
   nodeSelected = output<string>();
   openAbConfig = output<void>();
   replayRun = output<void>();
+  executeWorkflow = output<void>();
+  executeFromNode = output<void>();
 
   canvasArea = viewChild<ElementRef<HTMLDivElement>>('canvasArea');
 
@@ -481,10 +685,20 @@ export class WorkflowCanvasComponent implements AfterViewInit {
   private readonly NODE_W = 200;
   private readonly NODE_H = 130; // Базовая высота
   private readonly NODE_H_AB = 155; // Высота A/B Fork (с бейджем вариантов)
+  private readonly NODE_H_CODE = 210; // Высота Code/Python (с output блоком)
   private readonly HANDLE_RADIUS = 14; // Радиус хендла для расширения зоны попадания
 
   private getNodeHeight(node: WorkflowNode): number {
-    return node.data.kind === 'ab' ? this.NODE_H_AB : this.NODE_H;
+    // Если есть output — нода выше (Code/Python)
+    if (node.data.metrics.lastOutput) {
+      return this.NODE_H_CODE;
+    }
+    // A/B нода с бейджем вариантов
+    if (node.data.kind === 'ab') {
+      return this.NODE_H_AB;
+    }
+    // Базовая высота
+    return this.NODE_H;
   }
 
   ngAfterViewInit() {
@@ -595,7 +809,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     const h = this.getNodeHeight(node);
     return {
       x: node.position.x + this.NODE_W,
-      y: node.position.y + h / 2
+      y: node.position.y + h / 2 + 20
     };
   }
 
@@ -603,7 +817,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     const h = this.getNodeHeight(node);
     return {
       x: node.position.x,
-      y: node.position.y + h / 2
+      y: node.position.y + h / 2 + 20
     };
   }
 

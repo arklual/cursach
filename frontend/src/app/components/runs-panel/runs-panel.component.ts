@@ -37,7 +37,11 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
             <div class="runs-header">
                 <h3>Запуски</h3>
                 <button class="primary" (click)="onRun()" [disabled]="isRunning()">
-                    {{ isRunning() ? '...' : '▶ Run' }}
+                    {{ isRunning() ? '...' : '' }}
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="14" height="14" style="display:inline-block;vertical-align:middle;margin-right:4px;">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    Run
                 </button>
             </div>
 
@@ -99,33 +103,38 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
         </div>
     `,
     styles: [`
+        .icon {
+            display: block;
+            color: inherit;
+            vertical-align: middle;
+        }
         .runs-panel { display: flex; flex-direction: column; gap: 12px; padding: 12px; height: 100%; overflow-y: auto; }
         .runs-header { display: flex; justify-content: space-between; align-items: center; }
-        .runs-header h3 { margin: 0; font-size: 14px; }
-        button.primary { background: #6366f1; color: white; border: none; border-radius: 8px; padding: 6px 14px; cursor: pointer; }
-        .run-input summary { cursor: pointer; font-size: 12px; color: #475569; user-select: none; }
-        .run-input textarea { width: 100%; box-sizing: border-box; margin-top: 6px; padding: 6px; border: 1px solid #e2e8f0; border-radius: 6px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; }
-        .mono { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; }
-        .error { background: #fee2e2; color: #b91c1c; padding: 8px; border-radius: 6px; font-size: 12px; }
+        .runs-header h3 { margin: 0; font-size: 14px; color: var(--fg-primary); }
+        button.primary { background: var(--accent); color: white; border: none; border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+        .run-input summary { cursor: pointer; font-size: 12px; color: var(--fg-secondary); user-select: none; }
+        .run-input textarea { width: 100%; box-sizing: border-box; margin-top: 6px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; font-family: var(--font-mono); font-size: 12px; background: var(--bg-secondary); color: var(--fg-primary); }
+        .mono { font-family: var(--font-mono); font-size: 12px; }
+        .error { background: var(--danger-bg); color: var(--danger); padding: 8px; border-radius: 6px; font-size: 12px; }
         .runs-list { display: flex; flex-direction: column; gap: 6px; }
-        .run-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; cursor: pointer; }
-        .run-card.selected { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15); }
+        .run-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+        .run-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
         .run-line { display: flex; justify-content: space-between; align-items: center; }
-        .run-id { font-family: monospace; font-size: 12px; color: #475569; }
+        .run-id { font-family: var(--font-mono); font-size: 12px; color: var(--fg-secondary); }
         .status { font-size: 11px; padding: 2px 8px; border-radius: 999px; text-transform: lowercase; }
-        .status.queued { background: #fef3c7; color: #92400e; }
-        .status.running { background: #dbeafe; color: #1d4ed8; }
-        .status.success { background: #dcfce7; color: #15803d; }
-        .status.failed { background: #fee2e2; color: #b91c1c; }
-        .status.unknown { background: #f1f5f9; color: #475569; }
-        .run-meta { font-size: 11px; color: #64748b; margin-top: 4px; }
-        .empty { color: #94a3b8; font-size: 13px; padding: 8px; }
-        .node-runs h4 { margin: 8px 0 6px; font-size: 12px; color: #475569; text-transform: uppercase; }
-        .node-run { background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 8px; margin-bottom: 4px; }
+        .status.queued { background: var(--warning-bg); color: var(--warning); }
+        .status.running { background: var(--accent-glow); color: var(--accent); }
+        .status.success { background: var(--success-bg); color: var(--success); }
+        .status.failed { background: var(--danger-bg); color: var(--danger); }
+        .status.unknown { background: var(--bg-tertiary); color: var(--fg-muted); }
+        .run-meta { font-size: 11px; color: var(--fg-muted); margin-top: 4px; }
+        .empty { color: var(--fg-muted); font-size: 13px; padding: 8px; }
+        .node-runs h4 { margin: 8px 0 6px; font-size: 12px; color: var(--fg-secondary); text-transform: uppercase; }
+        .node-run { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin-bottom: 4px; }
         .nr-head { display: flex; justify-content: space-between; align-items: center; }
-        .err { background: #fef2f2; color: #b91c1c; padding: 4px 6px; border-radius: 4px; font-size: 11px; white-space: pre-wrap; }
-        details summary { cursor: pointer; font-size: 11px; color: #64748b; }
-        pre { font-family: monospace; font-size: 11px; background: #f1f5f9; padding: 6px; border-radius: 4px; overflow-x: auto; max-height: 160px; }
+        .err { background: var(--danger-bg); color: var(--danger); padding: 4px 6px; border-radius: 4px; font-size: 11px; white-space: pre-wrap; }
+        details summary { cursor: pointer; font-size: 11px; color: var(--fg-muted); }
+        pre { font-family: var(--font-mono); font-size: 11px; background: var(--bg-primary); padding: 6px; border-radius: 4px; overflow-x: auto; max-height: 160px; color: var(--fg-secondary); }
     `]
 })
 export class RunsPanelComponent implements OnInit {

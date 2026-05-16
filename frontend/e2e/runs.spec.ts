@@ -65,7 +65,7 @@ test.describe('Runs — UI', () => {
     await page.goto(`/workflow/${createdId}`);
     await expect(page.locator('.app-header')).toBeVisible();
     const before = await page.locator('.log-entry').count();
-    await page.getByRole('button', { name: /Симуляция/i }).click();
+    await page.getByRole('button', { name: /Симуляция \(500\)/i }).click();
     await expect.poll(async () => page.locator('.log-entry').count(), { timeout: 8_000 })
       .toBeGreaterThan(before);
   });

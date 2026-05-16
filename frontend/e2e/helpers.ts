@@ -68,6 +68,10 @@ export async function deleteWorkflowsByPrefix(
  * 'application/workflow-node', so we dispatch the events directly.
  */
 export async function dragPaletteNode(page: Page, kind: string, offset: { x: number; y: number } = { x: 200, y: 200 }) {
+  // Ждём появления палитры и канваса
+  await page.waitForSelector('app-palette .palette-item', { timeout: 5000 });
+  await page.waitForSelector('.canvas-viewport', { timeout: 5000 });
+  
   await page.evaluate(({ kind, offset }) => {
     const items = document.querySelectorAll('app-palette .palette-item');
     let paletteBtn: HTMLElement | null = null;
