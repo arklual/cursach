@@ -38,7 +38,7 @@ test.describe('Triggers — API', () => {
   test('create cron trigger with config and persist it', async ({ request }) => {
     const created = await createTriggerViaApi(request, createdId, {
       type: 'cron',
-      config: { cron: '*/5 * * * *' },
+      config: { cron: '0 */5 * * * *' },
     });
     expect(created.id).toBeTruthy();
     expect(created.type).toBe('cron');
