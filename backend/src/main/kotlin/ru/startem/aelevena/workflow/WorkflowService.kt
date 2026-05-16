@@ -67,9 +67,11 @@ class WorkflowService(
         return Workflow(meta = meta, graph = graph)
     }
 
+    @Transactional(readOnly = true)
     fun listWorkflows(): List<WorkflowMeta> =
         workflows.list().map { it.toMeta() }
 
+    @Transactional(readOnly = true)
     fun getWorkflow(workflowId: UUID): Workflow {
         val workflow = workflows.findById(workflowId) ?: throw NotFoundException("Workflow not found")
 
@@ -116,6 +118,7 @@ class WorkflowService(
         return newVersion.toDto()
     }
 
+    @Transactional(readOnly = true)
     fun listVersions(workflowId: UUID): List<WorkflowVersion> {
         if (workflows.findById(workflowId) == null) {
             throw NotFoundException("Workflow not found")

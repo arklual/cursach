@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import ru.startem.aelevena.api.BadRequestException
 import ru.startem.aelevena.api.NotFoundException
 import ru.startem.aelevena.api.dto.Trigger
@@ -48,12 +50,23 @@ class TriggerService(
         val row = triggers.findById(triggerId) ?: throw IllegalStateException("Just inserted trigger not found")
 
         if (row.type == "cron" || row.type == "interval") {
-            scheduler.schedule(row)
+            registerAfterCommit { scheduler.schedule(row) }
         }
 
         return row.toDto()
     }
 
+    private fun registerAfterCommit(action: () -> Unit) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+                override fun afterCommit() = action()
+            })
+        } else {
+            action()
+        }
+    }
+
+    @Transactional(readOnly = true)
     fun list(workflowId: UUID): List<Trigger> {
         if (workflows.findById(workflowId) == null) {
             throw NotFoundException("Workflow not found")
@@ -63,11 +76,11 @@ class TriggerService(
 
     @Transactional
     fun delete(triggerId: Long) {
-        val row = triggers.findById(triggerId) ?: throw NotFoundException("Trigger not found")
-        scheduler.cancel(triggerId)
+        triggers.findById(triggerId) ?: throw NotFoundException("Trigger not found")
         if (!triggers.delete(triggerId)) {
             throw NotFoundException("Trigger not found")
         }
+        registerAfterCommit { scheduler.cancel(triggerId) }
     }
 
     @Transactional

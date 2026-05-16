@@ -1,5 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, PLATFORM_ID, inject, signal } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { WorkflowMeta } from '../../services/workflow.service';
 import { WorkflowFacade } from '../../core/api/workflow.facade';
@@ -28,6 +28,28 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
       }
       @if (errorMessage()) {
         <div class="error-banner">{{ errorMessage() }}</div>
+      }
+
+      @if (showIntro()) {
+        <section class="intro-banner">
+          <div class="intro-text">
+            <h2>Что это вообще такое?</h2>
+            <p>
+              FluxPilot — визуальный конструктор пайплайнов событий с A/B-экспериментами.
+              Создайте workflow, перетаскивайте ноды на холст, соединяйте их и запускайте
+              симуляцию пользователей.
+            </p>
+            <ul>
+              <li><b>Workflow</b> — это набор соединённых нод (HTTP-вызовов, кода, A/B-веток, ожиданий).</li>
+              <li><b>Запуск</b> прогоняет один payload через граф, <b>симуляция</b> — много пользователей сразу.</li>
+              <li><b>Триггеры</b> — webhook / cron, которые запускают workflow автоматически.</li>
+            </ul>
+          </div>
+          <div class="intro-actions">
+            <button class="primary" (click)="createWorkflow()">+ Создать workflow</button>
+            <button class="ghost" (click)="dismissIntro()">Понятно, скрыть</button>
+          </div>
+        </section>
       }
 
       <main class="workflows-grid">
@@ -297,18 +319,94 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
       color: var(--muted);
       margin: 0 0 24px;
     }
+
+    .intro-banner {
+      margin: 16px 48px 0;
+      padding: 24px;
+      background: linear-gradient(135deg, #eef2ff 0%, #fdf2f8 100%);
+      border: 1px solid #c7d2fe;
+      border-radius: 16px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 24px;
+      align-items: center;
+    }
+
+    .intro-text h2 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      color: #1e1b4b;
+    }
+
+    .intro-text p {
+      margin: 0 0 12px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #334155;
+    }
+
+    .intro-text ul {
+      margin: 0;
+      padding-left: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 13px;
+      color: #475569;
+    }
+
+    .intro-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 200px;
+    }
+
+    @media (max-width: 768px) {
+      .intro-banner {
+        grid-template-columns: 1fr;
+      }
+    }
   `]
 })
 export class WorkflowsListComponent implements OnInit {
   private readonly facade = inject(WorkflowFacade);
   private readonly router = inject(Router);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly introStorageKey = 'fluxpilot.introSeen';
 
   readonly workflows = signal<WorkflowMeta[]>([]);
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly showIntro = signal(true);
 
   ngOnInit(): void {
+    this.hydrateIntroFlag();
     this.refresh();
+  }
+
+  private hydrateIntroFlag(): void {
+    if (!isPlatformBrowser(this.platformId)) {
+      this.showIntro.set(false);
+      return;
+    }
+    let seen: string | null = null;
+    try {
+      seen = localStorage.getItem(this.introStorageKey);
+    } catch {
+      /* ignore */
+    }
+    this.showIntro.set(seen !== '1');
+  }
+
+  dismissIntro(): void {
+    this.showIntro.set(false);
+    if (!isPlatformBrowser(this.platformId)) return;
+    try {
+      localStorage.setItem(this.introStorageKey, '1');
+    } catch {
+      /* ignore */
+    }
   }
 
   private refresh(): void {
