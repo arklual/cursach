@@ -118,7 +118,10 @@ test.describe('Canvas editing', () => {
     await page.mouse.up();
 
     await expect(page.locator('.edge-group')).toHaveCount(1);
-    await page.locator('.edge-group').first().click({ position: { x: 5, y: 5 } });
+    // SVG <g class="edge-group"> spans both nodes' bounding boxes; a real click at
+    // any coordinate inside that box gets intercepted by .node-header. dispatchEvent
+    // routes the click straight to the Angular handler without pointer-event hit-testing.
+    await page.locator('.edge-group').first().dispatchEvent('click');
     const deleteBtn = page.locator('.edge-delete-btn');
     await expect(deleteBtn).toBeVisible({ timeout: 2_000 });
     await deleteBtn.click();
