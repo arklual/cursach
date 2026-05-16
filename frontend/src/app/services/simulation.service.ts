@@ -8,6 +8,45 @@ import {
   ExperimentVariant
 } from '../models/workflow.model';
 
+/**
+ * Сценарии симуляции с реалистичными данными
+ */
+export interface SimulationScenario {
+  id: string;
+  name: string;
+  description: string;
+  context: string;
+  baselineConversion: number;
+  expectedUplift: number;
+}
+
+export const SIMULATION_SCENARIOS: SimulationScenario[] = [
+  {
+    id: 'ab-button-test',
+    name: 'A/B тест кнопки',
+    description: 'Сравнение цвета кнопки "Купить"',
+    context: 'Контрольная группа (A) видит зелёную кнопку, тестовая (B) — оранжевую',
+    baselineConversion: 0.25,
+    expectedUplift: 0.06
+  },
+  {
+    id: 'onboarding-funnel',
+    name: 'Воронка онбординга',
+    description: 'Анализ потерь на этапах активации',
+    context: 'Пользователи проходят: Регистрация → Активация → Первая оплата',
+    baselineConversion: 0.26,
+    expectedUplift: 0
+  },
+  {
+    id: 'pricing-page',
+    name: 'Тест страницы оплаты',
+    description: 'Сравнение двух вариантов ценообразования',
+    context: 'Вариант A показывает 3 тарифа, вариант B — 2 с выделенным "Популярным"',
+    baselineConversion: 0.18,
+    expectedUplift: 0.04
+  }
+];
+
 interface User {
   id: string;
   device: string;
