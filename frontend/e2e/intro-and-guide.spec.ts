@@ -21,11 +21,8 @@ test.describe('Workflows list — intro banner', () => {
   test('shows intro banner on first visit and hides it after dismiss + reload', async ({ page }) => {
     const errs = attachConsoleSpy(page);
 
-    // Ensure no leftover localStorage from prior tests in the same browser context.
-    await page.addInitScript(() => {
-      try { localStorage.removeItem('fluxpilot.introSeen'); } catch { /* ignore */ }
-    });
-
+    // Fresh Playwright context already has empty localStorage. Avoid addInitScript here:
+    // it would re-run on page.reload() and wipe the dismissed flag we want to verify persists.
     await gotoList(page);
     const banner = page.locator('.intro-banner');
     await expect(banner).toBeVisible();
@@ -51,9 +48,7 @@ test.describe('Workflows list — intro banner', () => {
   });
 
   test('intro banner has primary "+ Создать workflow" that navigates to editor', async ({ page }) => {
-    await page.addInitScript(() => {
-      try { localStorage.removeItem('fluxpilot.introSeen'); } catch { /* ignore */ }
-    });
+    // Fresh context → localStorage empty → banner shows by default.
     await gotoList(page);
     const banner = page.locator('.intro-banner');
     await expect(banner).toBeVisible();
@@ -75,9 +70,9 @@ test.describe('Workflow editor — Guide modal first-visit', () => {
   });
 
   test('Guide modal auto-opens on first visit and persists "seen" on close', async ({ page }) => {
-    await page.addInitScript(() => {
-      try { localStorage.removeItem('fluxpilot.guideSeen'); } catch { /* ignore */ }
-    });
+    // Fresh context → localStorage empty → guide auto-opens by default. We don't use
+    // addInitScript here because it would re-run on page.reload() and remove the
+    // 'guideSeen' flag we just set, falsely reopening the modal.
     await page.goto(`/workflow/${createdId}`);
 
     const guideTitle = page.getByRole('heading', { name: 'Как пользоваться редактором' });

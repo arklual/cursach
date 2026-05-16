@@ -62,12 +62,12 @@ test.describe('Backend API contract — workflows', () => {
   });
 
   test('GET unknown workflow returns 404', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/workflows/f619fdbd-e7e6-4359-9c07-b0df826c59d1`);
+    const res = await request.get(`${API_BASE}/workflows/00000000-0000-4000-8000-000000000044`);
     expect(res.status()).toBe(404);
   });
 
   test('DELETE unknown workflow returns 404', async ({ request }) => {
-    const res = await request.delete(`${API_BASE}/workflows/UUID3`);
+    const res = await request.delete(`${API_BASE}/workflows/d68f1ee0-739b-4c21-a965-47a43bdd5ec7`);
     expect(res.status()).toBe(404);
   });
 });
