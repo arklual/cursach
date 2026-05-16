@@ -3,6 +3,7 @@ package ru.startem.aelevena.run
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.NullNode
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import ru.startem.aelevena.api.NotFoundException
 import ru.startem.aelevena.blob.BlobService
@@ -13,6 +14,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.RejectedExecutionException
 
 @Service
 class WorkflowExecutionService(
@@ -24,8 +26,23 @@ class WorkflowExecutionService(
     private val objectMapper: ObjectMapper,
     private val workflowExecutor: ExecutorService,
 ) {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     fun start(runId: Long) {
-        workflowExecutor.submit { execute(runId) }
+        try {
+            workflowExecutor.submit {
+                try {
+                    execute(runId)
+                } catch (ex: Throwable) {
+                    log.error("Workflow run {} failed unexpectedly", runId, ex)
+                    runCatching { workflowRuns.markFinished(runId, "failed", outputJson = null) }
+                }
+            }
+        } catch (ex: RejectedExecutionException) {
+            log.error("Workflow executor rejected run {}", runId, ex)
+            runCatching { workflowRuns.markFinished(runId, "failed", outputJson = null) }
+            throw ex
+        }
     }
 
     fun execute(runId: Long) {

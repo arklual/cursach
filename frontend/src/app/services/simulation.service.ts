@@ -82,7 +82,9 @@ export class SimulationService {
     const nodes = this.workflowService.nodes();
     const edges = this.workflowService.edges();
 
-    const nodeMap = new Map(nodes.map(node => [node.id, JSON.parse(JSON.stringify(node))]));
+    const nodeMap = new Map<string, WorkflowNode>(
+      nodes.map(node => [node.id, structuredClone(node)])
+    );
     const adjacency: Record<string, WorkflowEdge[]> = {};
 
     edges.forEach(edge => {

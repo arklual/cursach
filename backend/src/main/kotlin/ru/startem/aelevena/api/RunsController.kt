@@ -1,6 +1,7 @@
 package ru.startem.aelevena.api
 
 import com.fasterxml.jackson.databind.JsonNode
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -21,7 +22,7 @@ class RunsController(
     @PostMapping("/workflows/{workflowId}/runs")
     fun runWorkflow(
         @PathVariable workflowId: UUID,
-        @RequestBody(required = false) payload: JsonNode?,
+        @RequestBody(required = false) @Valid payload: JsonNode?,
     ): ResponseEntity<WorkflowRun> {
         val runId = runEnqueueService.enqueue(workflowId, payload)
         return ResponseEntity.accepted().body(runQueryService.getWorkflowRun(runId))

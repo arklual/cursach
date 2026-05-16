@@ -1,16 +1,17 @@
 import {
     ChangeDetectionStrategy,
     Component,
-    OnDestroy,
+    DestroyRef,
     OnInit,
-    computed,
     inject,
     input,
     signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subscription, interval, switchMap, takeWhile } from 'rxjs';
+import { Subscription, forkJoin, interval, of, switchMap, takeWhile } from 'rxjs';
+import { catchError, finalize } from 'rxjs/operators';
 import { RunApiService } from '../../core/api/run.api';
 import type { NodeRun, WorkflowRun } from '../../core/api/api.models';
 
@@ -35,7 +36,9 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
         <div class="runs-panel">
             <div class="runs-header">
                 <h3>Запуски</h3>
-                <button class="primary" (click)="onRun()">▶ Run</button>
+                <button class="primary" (click)="onRun()" [disabled]="isRunning()">
+                    {{ isRunning() ? '...' : '▶ Run' }}
+                </button>
             </div>
 
             <details class="run-input">
@@ -125,8 +128,9 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
         pre { font-family: monospace; font-size: 11px; background: #f1f5f9; padding: 6px; border-radius: 4px; overflow-x: auto; max-height: 160px; }
     `]
 })
-export class RunsPanelComponent implements OnInit, OnDestroy {
+export class RunsPanelComponent implements OnInit {
     private readonly runApi = inject(RunApiService);
+    private readonly destroyRef = inject(DestroyRef);
 
     readonly workflowId = input.required<string>();
 
@@ -135,24 +139,23 @@ export class RunsPanelComponent implements OnInit, OnDestroy {
     readonly selectedRunNodes = signal<NodeRun[]>([]);
     readonly errorMessage = signal<string | null>(null);
     readonly inputJsonError = signal<string | null>(null);
+    readonly isRunning = signal(false);
     /** Сырой JSON-input для следующего запуска. */
     inputJsonRaw = '';
 
-    private listSub?: Subscription;
     private pollSub?: Subscription;
 
     ngOnInit(): void {
         this.refresh();
-        // Лёгкий polling списка раз в 5 секунд — лучше WS, но это Фаза 4.
-        this.listSub = interval(5000).subscribe(() => this.refresh());
-    }
-
-    ngOnDestroy(): void {
-        this.listSub?.unsubscribe();
-        this.pollSub?.unsubscribe();
+        interval(5000)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(() => this.refresh());
     }
 
     onRun(): void {
+        if (this.isRunning()) {
+            return;
+        }
         this.errorMessage.set(null);
         this.inputJsonError.set(null);
 
@@ -167,31 +170,36 @@ export class RunsPanelComponent implements OnInit, OnDestroy {
             }
         }
 
-        this.runApi.enqueue(this.workflowId(), payload as never).subscribe({
-            next: run => {
-                this.refresh();
-                if (run.id) {
-                    this.selectRun(run.id);
-                }
-            },
-            error: err => {
-                console.error('enqueue failed', err);
-                this.errorMessage.set('Не удалось запустить workflow.');
-            },
-        });
+        this.isRunning.set(true);
+        this.runApi.enqueue(this.workflowId(), payload as never)
+            .pipe(
+                finalize(() => this.isRunning.set(false)),
+                takeUntilDestroyed(this.destroyRef),
+            )
+            .subscribe({
+                next: run => {
+                    this.refresh();
+                    if (run.id) {
+                        this.selectRun(run.id);
+                    }
+                },
+                error: err => {
+                    console.error('enqueue failed', err);
+                    this.errorMessage.set('Не удалось запустить workflow.');
+                },
+            });
     }
 
     selectRun(runId: string): void {
         this.selectedRunId.set(runId);
         this.pollSub?.unsubscribe();
-        // poll каждые 1500мс пока статус не финальный
         this.pollSub = interval(1500).pipe(
             switchMap(() => this.runApi.get(runId)),
             takeWhile(run => !TERMINAL.has(normaliseStatus(run.status)), true),
+            takeUntilDestroyed(this.destroyRef),
         ).subscribe({
             next: run => {
                 this.runs.update(list => list.map(r => (r.id === run.id ? run : r)));
-                // подгрузим NodeRun'ы для выбранного run'а через list refresh
                 this.loadNodeRunsFor(run);
             },
             error: err => console.error('run polling failed', err),
@@ -199,31 +207,31 @@ export class RunsPanelComponent implements OnInit, OnDestroy {
     }
 
     private loadNodeRunsFor(run: WorkflowRun): void {
-        // swagger.yaml не предоставляет list-эндпоинт NodeRun под runId — только getNodeRun(id).
-        // Берём массив id'шников NodeRun'ов из самого WorkflowRun, если он там есть.
-        // Если бэк не отдаёт его в `output` или дополнительном поле, остаётся пусто.
         const nodeRunIds = (run as unknown as { nodeRunIds?: string[] }).nodeRunIds ?? [];
         if (nodeRunIds.length === 0) {
             return;
         }
-        Promise.all(nodeRunIds.map(id => new Promise<NodeRun | null>(resolve => {
-            this.runApi.getNodeRun(id).subscribe({
-                next: nr => resolve(nr),
-                error: () => resolve(null),
+        forkJoin(
+            nodeRunIds.map(id => this.runApi.getNodeRun(id).pipe(
+                catchError(() => of(null as NodeRun | null)),
+            )),
+        )
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(results => {
+                this.selectedRunNodes.set(results.filter((r): r is NodeRun => r !== null));
             });
-        }))).then(results => {
-            this.selectedRunNodes.set(results.filter((r): r is NodeRun => r !== null));
-        });
     }
 
     private refresh(): void {
-        this.runApi.list(this.workflowId()).subscribe({
-            next: list => this.runs.set(list),
-            error: err => {
-                console.error('list runs failed', err);
-                this.errorMessage.set('Не удалось загрузить запуски.');
-            },
-        });
+        this.runApi.list(this.workflowId())
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: list => this.runs.set(list),
+                error: err => {
+                    console.error('list runs failed', err);
+                    this.errorMessage.set('Не удалось загрузить запуски.');
+                },
+            });
     }
 
     normalise = (s: string | undefined): RunStatus => normaliseStatus(s);

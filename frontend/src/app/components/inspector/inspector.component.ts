@@ -1,4 +1,4 @@
-import { Component, input, output, inject } from '@angular/core';
+import { Component, input, output, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WorkflowService } from '../../services/workflow.service';
@@ -250,8 +250,16 @@ print(json.dumps({'sum': sum(data.get('xs', []))}))"></textarea>
 
       <section class="inspector-section">
         <h3>Stopping rules</h3>
-        <label><input type="radio" name="stopping" checked> Fixed horizon (α контролируется)</label>
-        <label><input type="radio" name="stopping"> Sequential (SPRT) + FDR alert</label>
+        <label>
+          <input type="radio" name="stopping"
+                 [checked]="stoppingRule() === 'fixed'"
+                 (change)="stoppingRule.set('fixed')"> Fixed horizon (α контролируется)
+        </label>
+        <label>
+          <input type="radio" name="stopping"
+                 [checked]="stoppingRule() === 'sequential'"
+                 (change)="stoppingRule.set('sequential')"> Sequential (SPRT) + FDR alert
+        </label>
         <p class="hint">Контролируйте вероятность ложной тревоги (Type I error).</p>
       </section>
 
@@ -430,6 +438,8 @@ export class InspectorComponent {
   activeNode = input<WorkflowNode | null>(null);
   testNode = output<string>();
   promoteWinner = output<void>();
+
+  readonly stoppingRule = signal<'fixed' | 'sequential'>('fixed');
 
   updateLabel(label: string): void {
     const node = this.activeNode();

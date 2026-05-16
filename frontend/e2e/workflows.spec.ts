@@ -5,6 +5,7 @@ import {
   createWorkflowViaApi,
   deleteWorkflowViaApi,
   deleteWorkflowsByPrefix,
+  suppressFirstVisitHints,
 } from './helpers';
 
 // Глобальный cleanup: до и после каждого теста сносим всё, что осталось с префиксом E2E-.
@@ -103,10 +104,11 @@ test.describe('Workflow card', () => {
 test.describe('Workflow editor page', () => {
   let createdId: string;
 
-  test.beforeEach(async ({ request }) => {
+  test.beforeEach(async ({ page, request }) => {
     await deleteWorkflowsByPrefix(request, 'E2E-');
     const wf = await createWorkflowViaApi(request, `E2E-Editor-${Date.now()}`);
     createdId = wf.meta.id;
+    await suppressFirstVisitHints(page);
   });
 
   test.afterEach(async ({ request }) => {
@@ -165,12 +167,11 @@ test.describe('Workflow editor page', () => {
 
   test('modals open and close', async ({ page }) => {
     await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'Схема событий' }).click();
-    await expect(page.getByText('JSON Schema событий')).toBeVisible();
-    // Close
+    await page.getByRole('button', { name: 'События' }).click();
+    await expect(page.getByRole('heading', { name: /JSON Schema/i })).toBeVisible();
     await page.keyboard.press('Escape').catch(() => {});
-    await page.getByRole('button', { name: 'QA сценарии' }).click();
-    await expect(page.getByText('QA сценарии').first()).toBeVisible();
+    await page.getByRole('button', { name: 'QA-чеклист' }).click();
+    await expect(page.locator('.modal-backdrop')).toBeVisible();
   });
 });
 
@@ -191,10 +192,11 @@ test.describe('Smoke — API/WS connectivity', () => {
 test.describe('Workflow editor — interactions', () => {
   let createdId: string;
 
-  test.beforeEach(async ({ request }) => {
+  test.beforeEach(async ({ page, request }) => {
     await deleteWorkflowsByPrefix(request, 'E2E-');
     const wf = await createWorkflowViaApi(request, `E2E-Inter-${Date.now()}`);
     createdId = wf.meta.id;
+    await suppressFirstVisitHints(page);
   });
 
   test.afterEach(async ({ request }) => {
@@ -211,15 +213,15 @@ test.describe('Workflow editor — interactions', () => {
     await page.goto(`/workflow/${createdId}`);
     await expect(page.locator('.app-header')).toBeVisible();
     const logsBefore = await page.locator('.log-entry').count();
-    await page.getByRole('button', { name: 'Simulate 500 users' }).click();
+    await page.getByRole('button', { name: /Симуляция/i }).click();
     await expect.poll(async () => page.locator('.log-entry').count(), { timeout: 5_000 })
       .toBeGreaterThan(logsBefore);
   });
 
   test('Escape закрывает модалку', async ({ page }) => {
     await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'Схема событий' }).click();
-    const modalTitle = page.getByRole('heading', { name: 'JSON Schema событий' });
+    await page.getByRole('button', { name: 'События' }).click();
+    const modalTitle = page.getByRole('heading', { name: /JSON Schema/i });
     await expect(modalTitle).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(modalTitle).toBeHidden({ timeout: 2_000 });
@@ -227,11 +229,10 @@ test.describe('Workflow editor — interactions', () => {
 
   test('Click по backdrop закрывает модалку', async ({ page }) => {
     await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'QA сценарии' }).click();
-    const modalTitle = page.getByRole('heading', { name: 'QA сценарии' });
-    await expect(modalTitle).toBeVisible();
+    await page.getByRole('button', { name: 'QA-чеклист' }).click();
+    await expect(page.locator('.modal-backdrop')).toBeVisible();
     await page.locator('.modal-backdrop').click({ position: { x: 5, y: 5 } });
-    await expect(modalTitle).toBeHidden({ timeout: 2_000 });
+    await expect(page.locator('.modal-backdrop')).toBeHidden({ timeout: 2_000 });
   });
 
   test('addNode работает в non-secure context (без crypto.randomUUID)', async ({ page }) => {

@@ -24,6 +24,20 @@ import { WorkflowNode, WorkflowEdge, NodeKind } from '../../models/workflow.mode
            (drop)="onDrop($event)"
            (dragover)="onDragOver($event)">
 
+        @if (nodes().length === 0) {
+          <div class="canvas-empty">
+            <div class="canvas-empty-arrow">←</div>
+            <h3>Холст пуст</h3>
+            <p>
+              Перетащите тип ноды из <b>палитры слева</b> сюда,<br>
+              чтобы начать собирать пайплайн.
+            </p>
+            <p class="canvas-empty-hint">
+              Затем соедините ноды линией: потяните за правую точку у одной ноды к левой точке у другой.
+            </p>
+          </div>
+        }
+
         <div class="canvas-layer"
              [style.transform]="'translate(' + panX() + 'px, ' + panY() + 'px) scale(' + zoom() + ')'"
              (click)="onCanvasClick()">
@@ -389,6 +403,51 @@ import { WorkflowNode, WorkflowEdge, NodeKind } from '../../models/workflow.mode
       color: #64748b;
       z-index: 100;
     }
+
+    .canvas-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      pointer-events: none;
+      text-align: center;
+      color: #475569;
+      z-index: 1;
+      padding: 24px;
+    }
+
+    .canvas-empty-arrow {
+      font-size: 64px;
+      line-height: 1;
+      color: var(--accent);
+      animation: empty-bounce 1.6s ease-in-out infinite;
+    }
+
+    .canvas-empty h3 {
+      margin: 0;
+      font-size: 22px;
+      color: #0f172a;
+    }
+
+    .canvas-empty p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 420px;
+    }
+
+    .canvas-empty-hint {
+      color: #94a3b8;
+      font-size: 13px;
+    }
+
+    @keyframes empty-bounce {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(-12px); }
+    }
   `]
 })
 export class WorkflowCanvasComponent implements AfterViewInit {
@@ -495,8 +554,11 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     // ЛКМ - начинаем pan (если не кликнули на ноду или другой интерактивный элемент)
     if (e.button === 0) {
       const target = e.target as HTMLElement;
-      // Не начинаем pan если клик на ноде, кнопке или хендле
-      if (target.closest('.node-wrap') || target.closest('button') || target.closest('.handle')) {
+      // Не начинаем pan если клик на ноде, кнопке, хендле или стрелке
+      if (target.closest('.node-wrap')
+        || target.closest('button')
+        || target.closest('.handle')
+        || target.closest('.edge-group')) {
         return;
       }
       e.preventDefault();

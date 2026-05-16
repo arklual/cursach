@@ -1,5 +1,6 @@
 package ru.startem.aelevena.api
 
+import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -16,7 +17,7 @@ class WorkflowVersionsController(
     @PutMapping("/{versionId}/graph")
     fun putGraph(
         @PathVariable versionId: Long,
-        @RequestBody body: WorkflowGraph,
+        @RequestBody @Valid body: WorkflowGraph,
     ): WorkflowGraph = workflowService.updateGraph(versionId, body)
 }
 
