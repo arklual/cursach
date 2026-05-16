@@ -98,10 +98,15 @@ test.describe('Canvas editing', () => {
     await expect(page.locator('.info-panel')).toContainText('Связи: 1');
 
     // Save by navigating away, then verify the connection persisted on the backend.
+    // The editor debounces graph saves, so poll briefly instead of asserting once —
+    // the keepalive flush triggered by back-btn navigation can land a few hundred ms
+    // after the URL change.
     await page.locator('.back-btn').click();
     await page.waitForURL(/\/$/);
-    const wf = await getWorkflowViaApi(request, createdId);
-    expect(wf.graph.connections.length).toBeGreaterThanOrEqual(1);
+    await expect.poll(async () => {
+      const wf = await getWorkflowViaApi(request, createdId);
+      return wf.graph.connections.length;
+    }, { timeout: 5_000 }).toBeGreaterThanOrEqual(1);
   });
 
   test('clicking an edge selects it and the 🗑 button deletes it', async ({ page }) => {
