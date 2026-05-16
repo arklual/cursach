@@ -79,7 +79,7 @@ export class WorkflowService {
       label: template.label,
       color: template.color,
       successProb: template.success,
-      variants: type === 'ab' ? JSON.parse(JSON.stringify(this.defaultVariants)) : [],
+      variants: type === 'ab' ? this.defaultVariants.map(v => ({ ...v })) : [],
       randomization: 'simple',
       metrics: this.createDefaultMetrics(),
     };

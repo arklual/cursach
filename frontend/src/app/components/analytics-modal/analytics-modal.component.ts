@@ -1,8 +1,8 @@
-import { Component, input, output, ElementRef, viewChild, effect, inject, PLATFORM_ID } from '@angular/core';
+import { Component, OnDestroy, input, output, ElementRef, viewChild, effect, inject, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { ModalComponent } from '../modal/modal.component';
 import { WorkflowNode } from '../../models/workflow.model';
-import { Chart, ChartConfiguration } from 'chart.js/auto';
+import { Chart } from 'chart.js/auto';
 
 @Component({
   selector: 'app-analytics-modal',
@@ -124,7 +124,7 @@ import { Chart, ChartConfiguration } from 'chart.js/auto';
     }
   `]
 })
-export class AnalyticsModalComponent {
+export class AnalyticsModalComponent implements OnDestroy {
   private platformId = inject(PLATFORM_ID);
 
   node = input<WorkflowNode | null>(null);
@@ -137,14 +137,40 @@ export class AnalyticsModalComponent {
   private funnelChart: Chart | null = null;
   private cumulativeChart: Chart | null = null;
   private latencyChart: Chart | null = null;
+  private pendingTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
-    effect(() => {
+    effect((onCleanup) => {
       const n = this.node();
-      if (n && isPlatformBrowser(this.platformId)) {
-        setTimeout(() => this.initCharts(n), 0);
+      if (this.pendingTimer !== null) {
+        clearTimeout(this.pendingTimer);
+        this.pendingTimer = null;
+      }
+      if (!n) {
+        this.destroyCharts();
+        return;
+      }
+      if (isPlatformBrowser(this.platformId)) {
+        this.pendingTimer = setTimeout(() => {
+          this.pendingTimer = null;
+          this.initCharts(n);
+        }, 0);
+        onCleanup(() => {
+          if (this.pendingTimer !== null) {
+            clearTimeout(this.pendingTimer);
+            this.pendingTimer = null;
+          }
+        });
       }
     });
+  }
+
+  ngOnDestroy(): void {
+    if (this.pendingTimer !== null) {
+      clearTimeout(this.pendingTimer);
+      this.pendingTimer = null;
+    }
+    this.destroyCharts();
   }
 
   private initCharts(n: WorkflowNode): void {
@@ -167,14 +193,14 @@ export class AnalyticsModalComponent {
 
     const cumulativeEl = this.cumulativeCanvas()?.nativeElement;
     if (cumulativeEl) {
-      const points = n.data.metrics.users || [];
+      const cumulative = this.buildCumulativeSeries(n);
       this.cumulativeChart = new Chart(cumulativeEl, {
         type: 'line',
         data: {
-          labels: points.map((_, idx) => idx + 1),
+          labels: cumulative.map((_, idx) => idx + 1),
           datasets: [{
             label: 'p̂(t)',
-            data: points.map((_, idx) => Math.min(1, n.data.metrics.converted / (idx + 1))),
+            data: cumulative,
             borderColor: '#6366f1'
           }]
         },
@@ -192,13 +218,47 @@ export class AnalyticsModalComponent {
         data: {
           labels: ['0-50', '50-100', '100-150', '150+'],
           datasets: [{
-            data: [4, 6, 3, 1].map(v => v * Math.random()),
+            data: this.buildLatencyHistogram(n),
             backgroundColor: '#f97316'
           }]
         },
         options: { plugins: { legend: { display: false } } }
       });
     }
+  }
+
+  private buildCumulativeSeries(n: WorkflowNode): number[] {
+    const users = n.data.metrics.users ?? [];
+    if (users.length === 0) {
+      return [];
+    }
+    const reached = n.data.metrics.reached || users.length;
+    const totalConverted = n.data.metrics.converted;
+    const out: number[] = [];
+    let convertedSoFar = 0;
+    for (let i = 0; i < users.length; i++) {
+      const seen = i + 1;
+      const expectedConverted = (totalConverted * seen) / reached;
+      convertedSoFar = Math.min(totalConverted, expectedConverted);
+      out.push(Math.min(1, convertedSoFar / seen));
+    }
+    return out;
+  }
+
+  private buildLatencyHistogram(n: WorkflowNode): number[] {
+    const events = (n.data.metrics.events ?? []) as Array<{ latencyMs?: number; payload_summary?: { latencyMs?: number } }>;
+    const buckets = [0, 0, 0, 0];
+    for (const ev of events) {
+      const ms = ev.latencyMs ?? ev.payload_summary?.latencyMs;
+      if (typeof ms !== 'number') {
+        continue;
+      }
+      if (ms < 50) buckets[0]++;
+      else if (ms < 100) buckets[1]++;
+      else if (ms < 150) buckets[2]++;
+      else buckets[3]++;
+    }
+    return buckets;
   }
 
   private destroyCharts(): void {

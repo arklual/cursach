@@ -1,5 +1,5 @@
 import { Injectable, NgZone, inject } from '@angular/core';
-import { Subject, Subscription } from 'rxjs';
+import { Subject } from 'rxjs';
 import { Client, IMessage, StompSubscription } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { environment } from '../../../environments/environment';
@@ -16,6 +16,8 @@ export class WorkflowWsService {
 
     private client: Client | null = null;
     private subscriptions: StompSubscription[] = [];
+    /** Подписки, которые надо переподнять при каждом успешном (re)connect. */
+    private resubscribers = new Set<() => void>();
     private readonly graph$ = new Subject<{ workflowId: string; graph: WorkflowGraph }>();
 
     /** Один глобальный поток обновлений графа. Каждое событие — `{ workflowId, graph }`. */
@@ -32,6 +34,18 @@ export class WorkflowWsService {
             heartbeatIncoming: 10_000,
             heartbeatOutgoing: 10_000,
         });
+        this.client.onConnect = () => {
+            // При каждом подключении (включая reconnect) переподнимаем активные подписки.
+            this.resubscribers.forEach(fn => {
+                try { fn(); } catch (err) { console.error('WS resubscribe failed', err); }
+            });
+        };
+        this.client.onStompError = frame => {
+            console.error('STOMP broker error', frame.headers['message'], frame.body);
+        };
+        this.client.onWebSocketError = evt => {
+            console.warn('WebSocket error', evt);
+        };
         this.client.activate();
     }
 
@@ -39,16 +53,15 @@ export class WorkflowWsService {
     subscribeToWorkflow(workflowId: string): () => void {
         this.connect();
         let stompSub: StompSubscription | null = null;
+        const topic = `/topic/workflows/${workflowId}/graph`;
 
-        const tryAttach = () => {
+        const attach = () => {
             if (!this.client?.connected) {
                 return;
             }
-            const topic = `/topic/workflows/${workflowId}/graph`;
             stompSub = this.client.subscribe(topic, (msg: IMessage) => {
                 try {
                     const payload = JSON.parse(msg.body) as WorkflowGraph;
-                    // Маршалинг STOMP происходит вне Angular Zone — возвращаемся внутрь для change detection.
                     this.zone.run(() => this.graph$.next({ workflowId, graph: payload }));
                 } catch (err) {
                     console.warn('WS: failed to parse message', err);
@@ -59,25 +72,21 @@ export class WorkflowWsService {
             }
         };
 
-        if (this.client?.connected) {
-            tryAttach();
-        } else if (this.client) {
-            const prevConnect = this.client.onConnect;
-            this.client.onConnect = frame => {
-                prevConnect?.(frame);
-                tryAttach();
-            };
-        }
+        this.resubscribers.add(attach);
+        attach();
 
         return () => {
+            this.resubscribers.delete(attach);
             if (stompSub) {
                 stompSub.unsubscribe();
                 this.subscriptions = this.subscriptions.filter(s => s !== stompSub);
+                stompSub = null;
             }
         };
     }
 
     disconnect(): void {
+        this.resubscribers.clear();
         this.subscriptions.forEach(s => s.unsubscribe());
         this.subscriptions = [];
         this.client?.deactivate();

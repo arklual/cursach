@@ -1,16 +1,17 @@
 import {
     ChangeDetectionStrategy,
     Component,
-    OnDestroy,
+    DestroyRef,
     OnInit,
-    computed,
+    PLATFORM_ID,
     inject,
     input,
     signal,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subscription, interval } from 'rxjs';
+import { interval } from 'rxjs';
 import { TriggerApiService } from '../../core/api/trigger.api';
 import type { Trigger, TriggerCreateRequest } from '../../core/api/api.models';
 import { environment } from '../../../environments/environment';
@@ -26,6 +27,9 @@ type TriggerType = 'webhook' | 'cron' | 'interval';
         <div class="triggers-panel">
             @if (errorMessage()) {
                 <div class="error">{{ errorMessage() }}</div>
+            }
+            @if (statusMessage()) {
+                <div class="status">{{ statusMessage() }}</div>
             }
 
             <div class="trigger-form">
@@ -94,6 +98,7 @@ type TriggerType = 'webhook' | 'cron' | 'interval';
     styles: [`
         .triggers-panel { display: flex; flex-direction: column; gap: 16px; padding: 12px; height: 100%; overflow-y: auto; }
         .error { background: #fee2e2; color: #b91c1c; padding: 8px; border-radius: 6px; font-size: 12px; }
+        .status { background: #dcfce7; color: #15803d; padding: 6px 8px; border-radius: 6px; font-size: 12px; }
         h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; color: #475569; }
         .trigger-form { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
         .form-row { display: flex; align-items: center; gap: 8px; }
@@ -117,53 +122,56 @@ type TriggerType = 'webhook' | 'cron' | 'interval';
         .empty { color: #94a3b8; font-size: 13px; padding: 8px; }
     `]
 })
-export class TriggersPanelComponent implements OnInit, OnDestroy {
+export class TriggersPanelComponent implements OnInit {
     private readonly triggerApi = inject(TriggerApiService);
+    private readonly destroyRef = inject(DestroyRef);
+    private readonly platformId = inject(PLATFORM_ID);
 
     readonly workflowId = input.required<string>();
 
     readonly triggers = signal<Trigger[]>([]);
     readonly errorMessage = signal<string | null>(null);
+    readonly statusMessage = signal<string | null>(null);
 
     readonly newType = signal<TriggerType>('webhook');
     readonly cronExpression = signal<string>('0 */5 * * * *');
     readonly intervalValue = signal<number>(30);
     readonly intervalUnit = signal<'seconds' | 'minutes' | 'hours'>('seconds');
 
-    private listSub?: Subscription;
-
     ngOnInit(): void {
         this.refresh();
-        this.listSub = interval(10000).subscribe(() => this.refresh());
-    }
-
-    ngOnDestroy(): void {
-        this.listSub?.unsubscribe();
+        interval(10000)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(() => this.refresh());
     }
 
     createTrigger(): void {
         this.errorMessage.set(null);
         const req = this.buildRequest();
-        this.triggerApi.create(this.workflowId(), req).subscribe({
-            next: () => this.refresh(),
-            error: err => {
-                console.error('create trigger failed', err);
-                this.errorMessage.set('Не удалось создать триггер.');
-            },
-        });
+        this.triggerApi.create(this.workflowId(), req)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: () => this.refresh(),
+                error: err => {
+                    console.error('create trigger failed', err);
+                    this.errorMessage.set('Не удалось создать триггер.');
+                },
+            });
     }
 
     removeTrigger(triggerId: string): void {
         if (!confirm('Удалить триггер?')) {
             return;
         }
-        this.triggerApi.delete(triggerId).subscribe({
-            next: () => this.refresh(),
-            error: err => {
-                console.error('delete trigger failed', err);
-                this.errorMessage.set('Не удалось удалить триггер.');
-            },
-        });
+        this.triggerApi.delete(triggerId)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: () => this.refresh(),
+                error: err => {
+                    console.error('delete trigger failed', err);
+                    this.errorMessage.set('Не удалось удалить триггер.');
+                },
+            });
     }
 
     private buildRequest(): TriggerCreateRequest {
@@ -189,27 +197,45 @@ export class TriggersPanelComponent implements OnInit, OnDestroy {
     }
 
     private refresh(): void {
-        this.triggerApi.list(this.workflowId()).subscribe({
-            next: list => this.triggers.set(list),
-            error: err => {
-                console.error('list triggers failed', err);
-                this.errorMessage.set('Не удалось загрузить триггеры.');
-            },
-        });
+        this.triggerApi.list(this.workflowId())
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: list => this.triggers.set(list),
+                error: err => {
+                    console.error('list triggers failed', err);
+                    this.errorMessage.set('Не удалось загрузить триггеры.');
+                },
+            });
     }
 
     webhookUrl(trigger: Trigger): string {
         const token = (trigger.config as { token?: string } | undefined)?.token ?? '';
-        const base = environment.apiBaseUrl.startsWith('http')
-            ? environment.apiBaseUrl
-            : `${window.location.origin}${environment.apiBaseUrl}`;
-        return `${base}/webhook/${token}`;
+        const apiBase = environment.apiBaseUrl;
+        if (apiBase.startsWith('http')) {
+            return `${apiBase}/webhook/${token}`;
+        }
+        const origin = isPlatformBrowser(this.platformId) && typeof window !== 'undefined'
+            ? window.location.origin
+            : '';
+        return `${origin}${apiBase}/webhook/${token}`;
     }
 
     copyToClipboard(text: string): void {
-        navigator.clipboard.writeText(text).catch(() => {
-            // ignore — большинство браузеров требуют user-gesture, это и есть click
-        });
+        if (!isPlatformBrowser(this.platformId)
+            || typeof navigator === 'undefined'
+            || !navigator.clipboard) {
+            this.errorMessage.set('Копирование недоступно в этом окружении.');
+            return;
+        }
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                this.statusMessage.set('Скопировано');
+                setTimeout(() => this.statusMessage.set(null), 1500);
+            })
+            .catch(err => {
+                console.error('clipboard write failed', err);
+                this.errorMessage.set('Не удалось скопировать.');
+            });
     }
 
     shortId(id: string | undefined): string {

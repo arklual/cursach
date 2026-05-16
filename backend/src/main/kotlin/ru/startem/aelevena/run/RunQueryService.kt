@@ -3,6 +3,7 @@ package ru.startem.aelevena.run
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import ru.startem.aelevena.api.NotFoundException
 import ru.startem.aelevena.api.dto.NodeRun
 import ru.startem.aelevena.api.dto.WorkflowRun
@@ -10,6 +11,7 @@ import ru.startem.aelevena.workflow.persistence.WorkflowsRepository
 import java.util.UUID
 
 @Service
+@Transactional(readOnly = true)
 class RunQueryService(
     private val workflows: WorkflowsRepository,
     private val workflowRuns: WorkflowRunRepository,
