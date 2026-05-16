@@ -1,5 +1,6 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy, HostListener, effect } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, signal, computed, OnInit, OnDestroy, HostListener, DestroyRef, PLATFORM_ID, effect } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -51,11 +52,28 @@ import { ExperimentConfig } from '../../models/workflow.model';
           </div>
         </div>
         <div class="header-actions">
-          <button class="ghost" (click)="openModal('experiment')">Результаты эксперимента</button>
-          <button class="ghost" (click)="openModal('schema')">Схема событий</button>
-          <button class="ghost" (click)="openModal('qa')">QA сценарии</button>
-          <button class="primary" (click)="simulateRun(500)">Simulate 500 users</button>
-          <button class="secondary" (click)="simulateRun(1, 'sample')">Run sample payload</button>
+          <div class="action-group">
+            <button class="ghost guide-btn" (click)="openModal('guide')" title="Пошаговая инструкция">
+              <span class="q-mark">?</span> Гайд
+            </button>
+            <button class="ghost" (click)="openModal('experiment')" title="Сводка по A/B-эксперименту: метрики, CI, p-value">
+              Результаты A/B
+            </button>
+            <button class="ghost" (click)="openModal('schema')" title="JSON-схема событий, отправляемых нодами">
+              События
+            </button>
+            <button class="ghost" (click)="openModal('qa')" title="Чек-лист ручных проверок">
+              QA-чеклист
+            </button>
+          </div>
+          <div class="action-group action-group-primary">
+            <button class="secondary" (click)="simulateRun(1, 'sample')" title="Прогнать пайплайн с одним тестовым событием">
+              Тест-запуск
+            </button>
+            <button class="primary" (click)="simulateRun(500)" title="Сгенерировать трафик из 500 «пользователей» и собрать метрики">
+              ▶ Симуляция (500)
+            </button>
+          </div>
         </div>
       </header>
 
@@ -282,6 +300,88 @@ import { ExperimentConfig } from '../../models/workflow.model';
         (close)="closeModal('qa')">
         <pre>{{ qaText() }}</pre>
       </app-modal>
+
+      <!-- Quick-start Guide Modal -->
+      <app-modal
+        [open]="modals().guide"
+        [title]="'Как пользоваться редактором'"
+        [wide]="true"
+        (close)="closeModal('guide')">
+        <div class="guide">
+          <p class="guide-lead">
+            Этот редактор позволяет собрать пайплайн обработки событий, провести по нему симуляцию
+            пользователей и оценить A/B-эксперимент. Ниже — пять шагов от пустого холста до результата.
+          </p>
+
+          <ol class="guide-steps">
+            <li>
+              <span class="guide-step-num">1</span>
+              <div>
+                <h4>Перетащите ноду из палитры</h4>
+                <p>
+                  Слева — палитра типов нод (HTTP, A/B Fork, Code, Wait и т.д.).
+                  Зажмите элемент и перетащите на холст в центре — нода появится в месте, куда вы её отпустили.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="guide-step-num">2</span>
+              <div>
+                <h4>Соедините ноды</h4>
+                <p>
+                  У каждой ноды есть точки-«хэндлы» по бокам: левая — вход, правая — выход.
+                  Нажмите на правый хэндл и протяните линию к левому хэндлу следующей ноды.
+                  Чтобы удалить связь — кликните по линии и нажмите 🗑.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="guide-step-num">3</span>
+              <div>
+                <h4>Настройте параметры</h4>
+                <p>
+                  Кликните по ноде — справа откроется Inspector с её настройками
+                  (URL, метод, payload, тело кода и т.д.).
+                  Для A/B Fork отдельно укажите конфиг эксперимента: «Результаты A/B» в шапке.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="guide-step-num">4</span>
+              <div>
+                <h4>Запустите</h4>
+                <p>
+                  В шапке справа:
+                  <b>Тест-запуск</b> — один пробный прогон,
+                  <b>Симуляция (500)</b> — нагрузка 500 «пользователей» с распределением по веткам.
+                  Прогресс и логи отображаются в нижней панели на вкладке <b>Execution log</b>.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span class="guide-step-num">5</span>
+              <div>
+                <h4>Смотрите результаты</h4>
+                <p>
+                  Вкладка <b>Запуски</b> внизу — история запусков с бэкенда.
+                  Вкладка <b>Триггеры</b> — webhook/cron/interval, которые запускают пайплайн автоматически.
+                  Двойной клик по ноде — детальная аналитика метрик (конверсии, CI, гистограмма задержек).
+                </p>
+              </div>
+            </li>
+          </ol>
+
+          <div class="guide-tips">
+            <h4>Полезное</h4>
+            <ul>
+              <li><b>⌘ / Ctrl + Scroll</b> — зум холста; <b>Drag по пустому месту</b> — pan.</li>
+              <li>Боковые панели сворачиваются стрелочками на границах.</li>
+              <li>Граф сохраняется автоматически каждые ~0.5 секунды после правки.</li>
+              <li>Имя workflow меняется кликом по заголовку в шапке.</li>
+            </ul>
+          </div>
+        </div>
+      </app-modal>
     </div>
   `,
   styles: [`
@@ -380,9 +480,34 @@ import { ExperimentConfig } from '../../models/workflow.model';
 
     .header-actions {
       display: flex;
-      gap: 12px;
+      gap: 16px;
       flex-wrap: wrap;
       justify-content: flex-end;
+      align-items: center;
+    }
+
+    .action-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .action-group-primary {
+      padding-left: 16px;
+      border-left: 1px solid var(--border);
+    }
+
+    .guide-btn .q-mark {
+      display: inline-grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 12px;
+      margin-right: 4px;
     }
 
     main {
@@ -705,6 +830,89 @@ import { ExperimentConfig } from '../../models/workflow.model';
       color: var(--muted);
       font-size: 11px;
     }
+
+    .guide {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      color: #0f172a;
+    }
+
+    .guide-lead {
+      margin: 0;
+      font-size: 14px;
+      color: #475569;
+      line-height: 1.55;
+    }
+
+    .guide-steps {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .guide-steps > li {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 14px 16px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .guide-step-num {
+      flex: 0 0 28px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .guide-steps h4 {
+      margin: 0 0 4px;
+      font-size: 14px;
+    }
+
+    .guide-steps p {
+      margin: 0;
+      font-size: 13px;
+      color: #475569;
+      line-height: 1.55;
+    }
+
+    .guide-tips {
+      padding: 14px 16px;
+      background: #eef2ff;
+      border-radius: 12px;
+    }
+
+    .guide-tips h4 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: #3730a3;
+    }
+
+    .guide-tips ul {
+      margin: 0;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .guide-tips li {
+      font-size: 13px;
+      color: #1e293b;
+    }
   `]
 })
 export class WorkflowEditorComponent implements OnInit, OnDestroy {
@@ -715,6 +923,9 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private destroyRef = inject(DestroyRef);
+  private platformId = inject(PLATFORM_ID);
+  private readonly guideStorageKey = 'fluxpilot.guideSeen';
 
   private wsUnsubscribe: (() => void) | null = null;
   private wsGraphSub: import('rxjs').Subscription | null = null;
@@ -766,7 +977,8 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     abConfig: false,
     experiment: false,
     schema: false,
-    qa: false
+    qa: false,
+    guide: false,
   });
 
   // Panel state
@@ -842,45 +1054,53 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    this.maybeShowGuide();
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
       this.currentWorkflowId.set(id);
-      this.facade.loadWorkflow(id).subscribe({
-        next: loaded => {
-          this.currentVersionId.set(loaded.versionId);
-          this.currentMeta.set(loaded.meta);
-          // applyingWsUpdate=true на время инициальной заливки, чтобы effect не запустил
-          // save сразу после загрузки (нет смысла слать на бэк то, что мы только что прочитали).
-          this.applyingWsUpdate = true;
-          this.workflowService.setNodes(loaded.nodes);
-          this.workflowService.setEdges(loaded.edges);
-          this.workflowService.setActiveNode(loaded.nodes[0]?.id ?? null);
-          this.workflowService.clearLogs();
-          this.workflowService.log(`Загружен workflow: ${loaded.meta.name}`);
-          this.subscribeWs(id);
-          this.graphLoaded.set(true);
-          setTimeout(() => { this.applyingWsUpdate = false; }, 0);
-        },
-        error: err => {
-          console.error('Failed to load workflow', err);
-          this.loadError.set('Не удалось загрузить workflow с бэкенда.');
-        },
-      });
+      this.facade.loadWorkflow(id)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: loaded => {
+            this.currentVersionId.set(loaded.versionId);
+            this.currentMeta.set(loaded.meta);
+            this.applyingWsUpdate = true;
+            this.workflowService.setNodes(loaded.nodes);
+            this.workflowService.setEdges(loaded.edges);
+            this.workflowService.setActiveNode(loaded.nodes[0]?.id ?? null);
+            this.workflowService.clearLogs();
+            this.workflowService.log(`Загружен workflow: ${loaded.meta.name}`);
+            this.subscribeWs(id);
+            this.graphLoaded.set(true);
+            setTimeout(() => { this.applyingWsUpdate = false; }, 0);
+            this.startAutoSave();
+          },
+          error: err => {
+            console.error('Failed to load workflow', err);
+            this.loadError.set('Не удалось загрузить workflow с бэкенда.');
+          },
+        });
     }
 
     this.http.get('docs/event_schemas.json', { responseType: 'text' })
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: data => this.schemas.set(data),
         error: () => {}
       });
 
     this.http.get('docs/qa_scenarios.md', { responseType: 'text' })
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: data => this.qaText.set(data),
         error: () => {}
       });
+  }
 
-    // Авто-сохранение графа в бэк раз в 30 секунд
+  private startAutoSave(): void {
+    if (this.autoSaveInterval) {
+      return;
+    }
     this.autoSaveInterval = setInterval(() => {
       this.saveGraphToBackend();
     }, 30000);
@@ -889,15 +1109,14 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.autoSaveInterval) {
       clearInterval(this.autoSaveInterval);
+      this.autoSaveInterval = null;
     }
-    // Если debounce ещё не отстрелял — форсируем save сейчас. ngOnDestroy не может ждать
-    // ответ (метод синхронный), но как минимум отправляем тело через sendBeacon,
-    // чтобы запрос пережил unload вкладки.
     if (this.saveDebounceTimer) {
       clearTimeout(this.saveDebounceTimer);
       this.saveDebounceTimer = null;
       this.flushSaveOnUnload();
     }
+    this.resizing = null;
     this.wsUnsubscribe?.();
     this.wsGraphSub?.unsubscribe();
   }
@@ -999,12 +1218,26 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     }
   }
 
-  openModal(key: 'analytics' | 'abConfig' | 'experiment' | 'schema' | 'qa'): void {
+  openModal(key: 'analytics' | 'abConfig' | 'experiment' | 'schema' | 'qa' | 'guide'): void {
     this.modals.update(m => ({ ...m, [key]: true }));
   }
 
   closeModal(key: string): void {
     this.modals.update(m => ({ ...m, [key]: false }));
+    if (key === 'guide' && isPlatformBrowser(this.platformId)) {
+      try { localStorage.setItem(this.guideStorageKey, '1'); } catch { /* ignore */ }
+    }
+  }
+
+  private maybeShowGuide(): void {
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+    let seen: string | null = null;
+    try { seen = localStorage.getItem(this.guideStorageKey); } catch { /* ignore */ }
+    if (seen !== '1') {
+      this.openModal('guide');
+    }
   }
 
   handleOpenAnalytics(nodeId: string): void {

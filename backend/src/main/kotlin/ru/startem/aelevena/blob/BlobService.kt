@@ -1,6 +1,7 @@
 package ru.startem.aelevena.blob
 
 import com.fasterxml.jackson.databind.JsonNode
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import ru.startem.aelevena.config.S3Properties
 import ru.startem.aelevena.util.CanonicalJson
@@ -16,6 +17,8 @@ class BlobService(
     private val props: S3Properties,
     private val index: BlobIndexRepository,
     private val canonicalJson: CanonicalJson,
+    @Value("\${app.blob.max-size-bytes:104857600}")
+    private val maxSizeBytes: Long,
 ) {
     fun putJsonIfMissing(value: Any): String =
         putBytesIfMissing(
@@ -24,6 +27,9 @@ class BlobService(
         )
 
     fun putBytesIfMissing(bytes: ByteArray, contentType: String? = null): String {
+        require(bytes.size.toLong() <= maxSizeBytes) {
+            "Blob size ${bytes.size} exceeds limit $maxSizeBytes bytes"
+        }
         val hash = Hashing.sha256Hex(bytes)
         if (index.exists(hash)) {
             return hash
