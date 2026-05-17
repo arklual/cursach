@@ -15,6 +15,18 @@ import type { Trigger } from '../../core/api/trigger.api';
       <h2>Inspector</h2>
       @if (activeNode(); as node) {
         <div class="inspector-content">
+          @if (node.data.purpose) {
+            <section class="doc-section">
+              <header class="doc-header">Что эта нода делает</header>
+              <p class="doc-body">{{ node.data.purpose }}</p>
+            </section>
+          }
+          @if (node.data.inputsHint) {
+            <section class="doc-section">
+              <header class="doc-header">Что принимает на вход</header>
+              <pre class="doc-body inputs">{{ node.data.inputsHint }}</pre>
+            </section>
+          }
           <label>
             Название
             <input type="text" [ngModel]="node.data.label" (ngModelChange)="updateLabel($event)">
@@ -329,6 +341,38 @@ import type { Trigger } from '../../core/api/trigger.api';
       flex-direction: column;
       gap: 8px;
       margin: 0;
+    }
+
+    .doc-section {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .doc-header {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--fg-muted);
+      font-weight: 600;
+    }
+
+    .doc-body {
+      margin: 0;
+      font-size: 12px;
+      color: var(--fg-secondary);
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .doc-body.inputs {
+      font-family: var(--font-mono);
+      font-size: 11px;
     }
 
     .config-section legend {

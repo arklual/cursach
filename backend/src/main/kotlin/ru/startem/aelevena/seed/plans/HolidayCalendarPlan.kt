@@ -20,15 +20,54 @@ class HolidayCalendarPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
             "Полезно при планировании рассылок, поставок, дежурств и SLA-окон через границы юрисдикций."
 
     override fun buildGraph(): WorkflowGraph {
-        val trigger = b.node("start", "trigger.manual", 80.0, 320.0, "Manual run")
-        val de = b.node("h-de", "http", 380.0, 80.0, "Holidays: DE", b.httpConfig("https://date.nager.at/api/v3/PublicHolidays/2026/DE"))
-        val us = b.node("h-us", "http", 380.0, 200.0, "Holidays: US", b.httpConfig("https://date.nager.at/api/v3/PublicHolidays/2026/US"))
-        val jp = b.node("h-jp", "http", 380.0, 320.0, "Holidays: JP", b.httpConfig("https://date.nager.at/api/v3/PublicHolidays/2026/JP"))
-        val gb = b.node("h-gb", "http", 380.0, 440.0, "Holidays: GB", b.httpConfig("https://date.nager.at/api/v3/PublicHolidays/2026/GB"))
-        val br = b.node("h-br", "http", 380.0, 560.0, "Holidays: BR", b.httpConfig("https://date.nager.at/api/v3/PublicHolidays/2026/BR"))
+        val trigger = b.node(
+            id = "start", type = "trigger.manual",
+            x = 80.0, y = 320.0, label = "Manual run",
+            purpose = "Кнопка «Запустить» — собирает следующие 60 дней по 5 рынкам.",
+        )
+        val de = b.node(
+            id = "h-de", type = "http",
+            x = 380.0, y = 80.0, label = "Holidays: Germany",
+            purpose = "Список гос-праздников Германии за 2026 год.",
+            inputsHint = "Не зависит от других нод — фиксированный URL Nager.Date /PublicHolidays/2026/DE.",
+            config = b.httpConfig("https://date.nager.at/api/v3/PublicHolidays/2026/DE"),
+        )
+        val us = b.node(
+            id = "h-us", type = "http",
+            x = 380.0, y = 200.0, label = "Holidays: United States",
+            purpose = "Список гос-праздников США за 2026 год.",
+            inputsHint = "Не зависит от других нод — фиксированный URL Nager.Date /PublicHolidays/2026/US.",
+            config = b.httpConfig("https://date.nager.at/api/v3/PublicHolidays/2026/US"),
+        )
+        val jp = b.node(
+            id = "h-jp", type = "http",
+            x = 380.0, y = 320.0, label = "Holidays: Japan",
+            purpose = "Список гос-праздников Японии за 2026 год.",
+            inputsHint = "Не зависит от других нод — фиксированный URL Nager.Date /PublicHolidays/2026/JP.",
+            config = b.httpConfig("https://date.nager.at/api/v3/PublicHolidays/2026/JP"),
+        )
+        val gb = b.node(
+            id = "h-gb", type = "http",
+            x = 380.0, y = 440.0, label = "Holidays: United Kingdom",
+            purpose = "Список гос-праздников Великобритании за 2026 год.",
+            inputsHint = "Не зависит от других нод — фиксированный URL Nager.Date /PublicHolidays/2026/GB.",
+            config = b.httpConfig("https://date.nager.at/api/v3/PublicHolidays/2026/GB"),
+        )
+        val br = b.node(
+            id = "h-br", type = "http",
+            x = 380.0, y = 560.0, label = "Holidays: Brazil",
+            purpose = "Список гос-праздников Бразилии за 2026 год.",
+            inputsHint = "Не зависит от других нод — фиксированный URL Nager.Date /PublicHolidays/2026/BR.",
+            config = b.httpConfig("https://date.nager.at/api/v3/PublicHolidays/2026/BR"),
+        )
         val consolidate = b.node(
-            "consolidate", "javascript", 720.0, 320.0, "Next-60-days digest",
-            b.jsConfig(CONSOLIDATE_JS),
+            id = "consolidate", type = "javascript",
+            x = 720.0, y = 320.0, label = "Next-60-days digest → PM brief",
+            purpose = "Сводит праздники 5 стран, фильтрует ближайшие 60 дней и оформляет PM-сводку.",
+            inputsHint = "Из каждой страновой ноды берёт inputs['h-<cc>'].body — массив объектов " +
+                "{ date, name, localName, countryCode, types[], global }.\n" +
+                "Источники: h-de, h-us, h-jp, h-gb, h-br.",
+            config = b.jsConfig(CONSOLIDATE_JS),
         )
 
         return b.graph(
@@ -50,13 +89,16 @@ class HolidayCalendarPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
 
     companion object {
         private val CONSOLIDATE_JS = """
+            // Inputs:
+            //   inputs['h-<cc>'].body: [{ date, name, localName, types[], global, ... }]
+            // Output: PM brief { headline, summary, keyInsights, actionItems, report, details }
             async function run(input) {
                 const sources = [
-                    { key: 'h-de', country: 'DE' },
-                    { key: 'h-us', country: 'US' },
-                    { key: 'h-jp', country: 'JP' },
-                    { key: 'h-gb', country: 'GB' },
-                    { key: 'h-br', country: 'BR' },
+                    { key: 'h-de', country: 'DE', label: 'Germany' },
+                    { key: 'h-us', country: 'US', label: 'United States' },
+                    { key: 'h-jp', country: 'JP', label: 'Japan' },
+                    { key: 'h-gb', country: 'GB', label: 'United Kingdom' },
+                    { key: 'h-br', country: 'BR', label: 'Brazil' },
                 ];
                 const today = new Date();
                 today.setUTCHours(0, 0, 0, 0);
@@ -73,6 +115,7 @@ class HolidayCalendarPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
                                 name: h.name,
                                 localName: h.localName,
                                 country: s.country,
+                                countryLabel: s.label,
                                 types: h.types || [],
                                 global: h.global === true,
                             });
@@ -95,14 +138,73 @@ class HolidayCalendarPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
                 const collisions = Object.keys(byDate)
                     .filter(function (d) { return byDate[d].length > 1; })
                     .map(function (d) { return { date: d, countries: byDate[d] }; });
+                const next5 = upcoming.slice(0, 5);
+
+                const headline = upcoming.length === 0
+                    ? '✅ No public holidays in the next 60 days across DE / US / JP / GB / BR'
+                    : (collisions.length > 0
+                        ? '⚠️ ' + collisions.length + ' day(s) hit multiple markets — plan SLA windows and dispatches'
+                        : '📅 ' + upcoming.length + ' public holiday(s) coming up — review staffing and shipping calendar');
+
+                const summary = 'Window: next 60 days from ' + today.toISOString().slice(0, 10) + '. '
+                    + 'Total upcoming: ' + upcoming.length + '. '
+                    + 'Multi-country dates: ' + collisions.length + '. '
+                    + 'By country: ' + Object.keys(byCountry).map(function (c) { return c + '=' + byCountry[c]; }).join(', ') + '.';
+
+                const keyInsights = next5.map(function (h) {
+                    return h.date + ' — ' + h.name + ' (' + h.countryLabel + ')';
+                });
+                if (next5.length === 0) {
+                    keyInsights.push('No upcoming holidays in window');
+                }
+
+                const actionItems = [];
+                collisions.slice(0, 5).forEach(function (c) {
+                    actionItems.push('Plan around ' + c.date + ' — shared holiday in ' + c.countries.join(', '));
+                });
+                if (actionItems.length === 0) {
+                    actionItems.push('No multi-country collisions — usual scheduling rules apply');
+                }
+
+                const reportLines = [
+                    '## Holiday Calendar — next 60 days',
+                    '',
+                    headline,
+                    '',
+                    '**Summary.** ' + summary,
+                    '',
+                    '### Next 5 holidays',
+                    '| Date | Holiday | Country |',
+                    '|---|---|---|',
+                ];
+                next5.forEach(function (h) {
+                    reportLines.push('| ' + h.date + ' | ' + h.name + ' | ' + h.countryLabel + ' |');
+                });
+                if (collisions.length > 0) {
+                    reportLines.push('');
+                    reportLines.push('### Multi-country dates');
+                    collisions.forEach(function (c) {
+                        reportLines.push('- ' + c.date + ' — ' + c.countries.join(', '));
+                    });
+                }
+                reportLines.push('');
+                reportLines.push('### Action items');
+                actionItems.forEach(function (a) { reportLines.push('- ' + a); });
 
                 return {
-                    horizonDays: 60,
-                    totalUpcoming: upcoming.length,
-                    byCountry: byCountry,
-                    multiCountryDates: collisions,
-                    next5: upcoming.slice(0, 5),
-                    upcoming: upcoming,
+                    headline: headline,
+                    summary: summary,
+                    keyInsights: keyInsights,
+                    actionItems: actionItems,
+                    report: reportLines.join('\n'),
+                    details: {
+                        horizonDays: 60,
+                        totalUpcoming: upcoming.length,
+                        byCountry: byCountry,
+                        multiCountryDates: collisions,
+                        next5: next5,
+                        upcoming: upcoming,
+                    },
                 };
             }
         """.trimIndent()

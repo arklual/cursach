@@ -20,7 +20,7 @@ import type {
 } from '../../models/workflow.model';
 import { uuid } from '../uuid';
 
-const META_KEYS = ['__variants', '__randomization', '__metrics', '__successProb', '__color', '__subtype', '__originalKind'] as const;
+const META_KEYS = ['__variants', '__randomization', '__metrics', '__successProb', '__color', '__subtype', '__originalKind', '__purpose', '__inputsHint'] as const;
 
 const DATAFLOW_SUBTYPES = ['filter', 'map', 'reduce', 'foreach', 'flatmap'] as const;
 type DataflowSubtype = typeof DATAFLOW_SUBTYPES[number];
@@ -102,6 +102,12 @@ export function frontNodeToBackend(node: FrontNode): BackendNode {
         __subtype: subtype,
         __originalKind: node.data.kind,
     };
+    if (node.data.purpose) {
+        config['__purpose'] = node.data.purpose;
+    }
+    if (node.data.inputsHint) {
+        config['__inputsHint'] = node.data.inputsHint;
+    }
 
     return {
         id: node.id,
@@ -143,6 +149,14 @@ export function backendNodeToFront(backend: BackendNode): FrontNode {
     };
     if (subtype) {
         front.__subtype = subtype;
+    }
+    const purpose = config['__purpose'];
+    if (typeof purpose === 'string' && purpose.length > 0) {
+        front.purpose = purpose;
+    }
+    const inputsHint = config['__inputsHint'];
+    if (typeof inputsHint === 'string' && inputsHint.length > 0) {
+        front.inputsHint = inputsHint;
     }
 
     return {

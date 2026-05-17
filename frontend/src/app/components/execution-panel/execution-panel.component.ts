@@ -79,7 +79,46 @@ import { prettyOutput } from '../../core/pretty-output';
                     @if ((exec.outputData?.length ?? 0) > 1) {
                       <div class="io-item-idx">#{{ $index }}</div>
                     }
-                    <pre class="io-json">{{ pretty(item.json) }}</pre>
+                    @if (asBrief(item.json); as brief) {
+                      <article class="pm-brief">
+                        <h4 class="pm-brief-headline">{{ brief.headline }}</h4>
+                        @if (brief.summary) {
+                          <p class="pm-brief-summary">{{ brief.summary }}</p>
+                        }
+                        @if (brief.keyInsights?.length) {
+                          <section class="pm-brief-section">
+                            <h5>Key insights</h5>
+                            <ul>
+                              @for (k of brief.keyInsights; track $index) {
+                                <li>{{ k }}</li>
+                              }
+                            </ul>
+                          </section>
+                        }
+                        @if (brief.actionItems?.length) {
+                          <section class="pm-brief-section">
+                            <h5>Action items</h5>
+                            <ul>
+                              @for (a of brief.actionItems; track $index) {
+                                <li>{{ a }}</li>
+                              }
+                            </ul>
+                          </section>
+                        }
+                        @if (brief.report) {
+                          <details class="pm-brief-report">
+                            <summary>Full markdown report</summary>
+                            <pre>{{ brief.report }}</pre>
+                          </details>
+                        }
+                        <details class="pm-brief-raw">
+                          <summary>Raw JSON</summary>
+                          <pre class="io-json">{{ pretty(item.json) }}</pre>
+                        </details>
+                      </article>
+                    } @else {
+                      <pre class="io-json">{{ pretty(item.json) }}</pre>
+                    }
                   </div>
                 }
               } @else if (exec.status === 'pending' || exec.status === 'running') {
@@ -301,6 +340,74 @@ import { prettyOutput } from '../../core/pretty-output';
       font-size: 12px;
     }
 
+    .pm-brief {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .pm-brief-headline {
+      margin: 0;
+      font-size: 14px;
+      color: var(--fg-primary);
+      line-height: 1.4;
+    }
+
+    .pm-brief-summary {
+      margin: 0;
+      font-size: 12px;
+      color: var(--fg-secondary);
+      line-height: 1.5;
+    }
+
+    .pm-brief-section h5 {
+      margin: 0 0 4px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--fg-muted);
+    }
+
+    .pm-brief-section ul {
+      margin: 0;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .pm-brief-section li {
+      font-size: 12px;
+      color: var(--fg-secondary);
+      line-height: 1.45;
+    }
+
+    .pm-brief-report summary,
+    .pm-brief-raw summary {
+      cursor: pointer;
+      font-size: 11px;
+      color: var(--fg-muted);
+      padding: 2px 0;
+    }
+
+    .pm-brief-report pre {
+      margin: 6px 0 0;
+      padding: 10px 12px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--fg-secondary);
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.5;
+    }
+
     .error-card {
       display: flex;
       flex-direction: column;
@@ -412,6 +519,48 @@ export class ExecutionPanelComponent {
 
   pretty(data: unknown): string {
     return prettyOutput(data);
+  }
+
+  /**
+   * Распознаёт "PM brief"-shape — { headline (string, required), summary?, keyInsights?[], actionItems?[], report? }.
+   * Если выход финального JS/Python узла сделан по этому контракту (как в seed-демках), панель
+   * рендерит его как читаемую карточку вместо сырого JSON. Иначе возвращает null → JSON-режим.
+   */
+  asBrief(data: unknown): null | {
+    headline: string;
+    summary?: string;
+    keyInsights?: string[];
+    actionItems?: string[];
+    report?: string;
+  } {
+    if (data == null || typeof data !== 'object' || Array.isArray(data)) {
+      return null;
+    }
+    const obj = data as Record<string, unknown>;
+    const headline = obj['headline'];
+    if (typeof headline !== 'string' || headline.length === 0) {
+      return null;
+    }
+    return {
+      headline,
+      summary: typeof obj['summary'] === 'string' ? (obj['summary'] as string) : undefined,
+      keyInsights: this.asStringArray(obj['keyInsights']),
+      actionItems: this.asStringArray(obj['actionItems']),
+      report: typeof obj['report'] === 'string' ? (obj['report'] as string) : undefined,
+    };
+  }
+
+  private asStringArray(v: unknown): string[] | undefined {
+    if (!Array.isArray(v)) {
+      return undefined;
+    }
+    const out: string[] = [];
+    for (const item of v) {
+      if (typeof item === 'string') {
+        out.push(item);
+      }
+    }
+    return out.length > 0 ? out : undefined;
   }
 
   statusLabel(status: string): string {

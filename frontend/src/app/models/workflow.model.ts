@@ -51,6 +51,16 @@ export interface NodeData {
   config?: Record<string, unknown>;
   /** Служебное: подтип dataflow-ноды (filter/map/reduce/foreach/flatmap). */
   __subtype?: string;
+  /**
+   * Короткое (1–2 предложения) описание «что эта нода делает». Рендерится в теле карточки.
+   * Хранится на бэке как config.__purpose; mapper'ом раскладывается сюда.
+   */
+  purpose?: string;
+  /**
+   * Развёрнутое описание «какие данные и из каких предыдущих нод эта нода принимает».
+   * Рендерится в инспекторе read-only. Хранится на бэке как config.__inputsHint.
+   */
+  inputsHint?: string;
 }
 
 export interface WorkflowNode {

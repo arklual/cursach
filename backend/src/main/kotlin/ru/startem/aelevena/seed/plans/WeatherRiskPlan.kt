@@ -21,26 +21,48 @@ class WeatherRiskPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
             "и сортирует хабы по рискам — готовая утренняя сводка для диспетчера."
 
     override fun buildGraph(): WorkflowGraph {
-        val trigger = b.node("start", "trigger.manual", 80.0, 280.0, "Manual run")
+        val trigger = b.node(
+            id = "start", type = "trigger.manual",
+            x = 80.0, y = 280.0, label = "Manual run",
+            purpose = "Запускает утренний прогон сводки по всем хабам.",
+        )
         val moscow = b.node(
-            "w-moscow", "http", 380.0, 80.0, "Weather: Moscow",
-            b.httpConfig("https://wttr.in/Moscow?format=j1"),
+            id = "w-moscow", type = "http",
+            x = 380.0, y = 80.0, label = "Weather: Moscow",
+            purpose = "Тянет текущую погоду + прогноз на сегодня по Москве.",
+            inputsHint = "Не зависит от других нод — фиксированный URL wttr.in/Moscow.",
+            config = b.httpConfig("https://wttr.in/Moscow?format=j1"),
         )
         val spb = b.node(
-            "w-spb", "http", 380.0, 220.0, "Weather: SPb",
-            b.httpConfig("https://wttr.in/Saint+Petersburg?format=j1"),
+            id = "w-spb", type = "http",
+            x = 380.0, y = 220.0, label = "Weather: Saint Petersburg",
+            purpose = "Тянет погоду по СПб (тот же формат wttr.in).",
+            inputsHint = "Не зависит от других нод — фиксированный URL wttr.in/Saint+Petersburg.",
+            config = b.httpConfig("https://wttr.in/Saint+Petersburg?format=j1"),
         )
         val kazan = b.node(
-            "w-kazan", "http", 380.0, 360.0, "Weather: Kazan",
-            b.httpConfig("https://wttr.in/Kazan?format=j1"),
+            id = "w-kazan", type = "http",
+            x = 380.0, y = 360.0, label = "Weather: Kazan",
+            purpose = "Тянет погоду по Казани.",
+            inputsHint = "Не зависит от других нод — фиксированный URL wttr.in/Kazan.",
+            config = b.httpConfig("https://wttr.in/Kazan?format=j1"),
         )
         val nsk = b.node(
-            "w-novosibirsk", "http", 380.0, 500.0, "Weather: Novosibirsk",
-            b.httpConfig("https://wttr.in/Novosibirsk?format=j1"),
+            id = "w-novosibirsk", type = "http",
+            x = 380.0, y = 500.0, label = "Weather: Novosibirsk",
+            purpose = "Тянет погоду по Новосибирску.",
+            inputsHint = "Не зависит от других нод — фиксированный URL wttr.in/Novosibirsk.",
+            config = b.httpConfig("https://wttr.in/Novosibirsk?format=j1"),
         )
         val score = b.node(
-            "score", "javascript", 720.0, 280.0, "Risk scoring",
-            b.jsConfig(SCORE_JS),
+            id = "score", type = "javascript",
+            x = 720.0, y = 280.0, label = "Risk score → dispatcher brief",
+            purpose = "Считает risk-score по каждому городу и собирает утреннюю сводку для диспетчера.",
+            inputsHint = "Для каждого города берёт:\n" +
+                "• inputs['w-<city>'].body.current_condition[0].temp_C / windspeedKmph / weatherDesc[0].value\n" +
+                "• inputs['w-<city>'].body.weather[0].hourly[0].precipMM\n" +
+                "Города: w-moscow, w-spb, w-kazan, w-novosibirsk.",
+            config = b.jsConfig(SCORE_JS),
         )
 
         return b.graph(
@@ -60,6 +82,9 @@ class WeatherRiskPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
 
     companion object {
         private val SCORE_JS = """
+            // Inputs:
+            //   inputs['w-<city>'].body.current_condition[0] / .weather[0] (wttr.in j1 schema)
+            // Output: dispatcher brief { headline, summary, keyInsights, actionItems, report, details }
             async function run(input) {
                 const sources = [
                     { key: 'w-moscow', city: 'Moscow' },
@@ -68,7 +93,7 @@ class WeatherRiskPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
                     { key: 'w-novosibirsk', city: 'Novosibirsk' },
                 ];
                 function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
-                const result = sources.map(function (s) {
+                const cities = sources.map(function (s) {
                     const body = (input.inputs[s.key] || {}).body || {};
                     const cur = (body.current_condition || [])[0] || {};
                     const today = (body.weather || [])[0] || {};
@@ -84,17 +109,71 @@ class WeatherRiskPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
                         city: s.city,
                         temp_c: temp,
                         wind_kmph: wind,
-                        precipitation_mm: precip,
+                        precipitation_mm: Math.round(precip * 100) / 100,
                         score: Math.round(score * 100) / 100,
                         level: level,
-                        headline: (cur.weatherDesc || [{}])[0].value || null,
+                        headline: ((cur.weatherDesc || [{}])[0] || {}).value || null,
                     };
                 });
-                result.sort(function (a, b) { return b.score - a.score; });
+                cities.sort(function (a, b) { return b.score - a.score; });
+                const high = cities.filter(function (c) { return c.level === 'high'; });
+                const medium = cities.filter(function (c) { return c.level === 'medium'; });
+
+                const headline = high.length > 0
+                    ? '🚨 ' + high.length + ' hub(s) at HIGH weather risk — escalate dispatch plan'
+                    : (medium.length > 0
+                        ? '⚠️ ' + medium.length + ' hub(s) at MEDIUM weather risk — keep ops on watch'
+                        : '✅ All hubs in LOW-risk band — normal dispatch');
+
+                const summary = 'Risk profile across ' + cities.length + ' hubs: '
+                    + high.length + ' high, '
+                    + medium.length + ' medium, '
+                    + (cities.length - high.length - medium.length) + ' low. '
+                    + 'Worst hub: ' + cities[0].city + ' (score ' + cities[0].score + ').';
+
+                const keyInsights = cities.map(function (c) {
+                    return c.city + ': ' + c.level.toUpperCase() + ' — ' + c.headline
+                        + ' (' + c.temp_c + '°C, wind ' + c.wind_kmph + ' km/h, precip ' + c.precipitation_mm + ' mm)';
+                });
+
+                const actionItems = high.map(function (c) { return 'Escalate dispatch for ' + c.city + ' — consider rescheduling or extra vehicles'; })
+                    .concat(medium.map(function (c) { return 'Watch ' + c.city + ' through the day'; }));
+                if (actionItems.length === 0) {
+                    actionItems.push('No mitigation required — proceed with standard schedule');
+                }
+
+                const reportLines = [
+                    '## Logistics Weather Risk — morning brief',
+                    '',
+                    headline,
+                    '',
+                    '**Summary.** ' + summary,
+                    '',
+                    '### Hubs ranked by risk',
+                    '| Hub | Level | Score | Temp | Wind | Precip | Conditions |',
+                    '|---|---|---:|---:|---:|---:|---|',
+                ];
+                cities.forEach(function (c) {
+                    reportLines.push('| ' + c.city + ' | ' + c.level + ' | ' + c.score + ' | '
+                        + c.temp_c + '°C | ' + c.wind_kmph + ' km/h | ' + c.precipitation_mm + ' mm | '
+                        + (c.headline || '') + ' |');
+                });
+                reportLines.push('');
+                reportLines.push('### Action items');
+                actionItems.forEach(function (a) { reportLines.push('- ' + a); });
+
                 return {
-                    evaluatedAt: new Date().toISOString(),
-                    highRiskCount: result.filter(function (r) { return r.level === 'high'; }).length,
-                    cities: result,
+                    headline: headline,
+                    summary: summary,
+                    keyInsights: keyInsights,
+                    actionItems: actionItems,
+                    report: reportLines.join('\n'),
+                    details: {
+                        evaluatedAt: new Date().toISOString(),
+                        highRiskCount: high.length,
+                        mediumRiskCount: medium.length,
+                        cities: cities,
+                    },
                 };
             }
         """.trimIndent()

@@ -25,7 +25,11 @@ type ExecutionStatus = 'pending' | 'running' | 'success' | 'error' | 'skipped';
         <span class="label">{{ data().label }}</span>
       </header>
       <div class="body">
-        <span class="hint">Click to inspect</span>
+        @if (data().purpose) {
+          <span class="purpose">{{ data().purpose }}</span>
+        } @else {
+          <span class="hint">Click to inspect</span>
+        }
       </div>
       <div class="handle handle-right"
            (mousedown)="onHandleMouseDownEvent.emit({ event: $event, type: 'source' })"></div>
@@ -94,6 +98,15 @@ type ExecutionStatus = 'pending' | 'running' | 'success' | 'error' | 'skipped';
       padding: 8px 12px;
       color: var(--fg-muted);
       font-size: 11px;
+    }
+
+    .purpose {
+      display: block;
+      color: var(--fg-secondary);
+      font-size: 11px;
+      line-height: 1.4;
+      white-space: normal;
+      max-width: 240px;
     }
 
     .handle {
