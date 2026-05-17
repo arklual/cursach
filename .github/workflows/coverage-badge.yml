@@ -1,0 +1,58 @@
+name: backend / coverage badge
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'scripts/jacoco-badge.sh'
+      - '.github/workflows/coverage-badge.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-badge
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  badge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 24
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '24'
+          cache: maven
+
+      - name: Run backend tests with JaCoCo
+        working-directory: ./backend
+        run: mvn -B verify
+
+      - name: Generate coverage badge
+        run: bash scripts/jacoco-badge.sh
+
+      - name: Commit badge if changed
+        run: |
+          if [ -n "$(git status --porcelain .github/badges/jacoco.svg)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .github/badges/jacoco.svg
+            git commit -m "ci(coverage): refresh JaCoCo badge [skip ci]"
+            git push
+          else
+            echo "Coverage badge unchanged — no commit"
+          fi
+
+      - name: Upload JaCoCo HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: backend/target/site/jacoco/
+          retention-days: 14

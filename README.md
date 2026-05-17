@@ -2,7 +2,8 @@
 
 **Визуальный конструктор пайплайнов с акцентом на продуктовые эксперименты и статистику.**
 
-[![Build](https://github.com/yourusername/kursach/workflows/CI/badge.svg)](https://github.com/yourusername/kursach/actions)
+[![Build](https://github.com/arklual/kursach/workflows/CI/badge.svg)](https://github.com/yourusername/kursach/actions)
+[![Coverage](.github/badges/jacoco.svg)](backend/target/site/jacoco/index.html)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## 🎯 Возможности
