@@ -20,7 +20,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-    # Намеренно НЕ публикуем порт наружу — БД доступна только внутри сети.
+    ports:
+      - "5432:5432"
 
   minio:
     image: minio/minio:latest
