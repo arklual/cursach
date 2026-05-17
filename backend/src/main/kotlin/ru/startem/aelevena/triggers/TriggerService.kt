@@ -56,7 +56,10 @@ class TriggerService(
      */
     @Transactional
     fun syncFromGraph(workflowId: UUID, graph: WorkflowGraph) {
-        val triggerNodes = graph.nodes.filter { it.type?.startsWith(TRIGGER_TYPE_PREFIX) == true }
+        // Manual triggers fire on user click only — no row in `triggers`, no token, no schedule.
+        val triggerNodes = graph.nodes.filter {
+            it.type?.startsWith(TRIGGER_TYPE_PREFIX) == true && it.type != "trigger.manual"
+        }
         val keepNodeIds = triggerNodes.map { it.id }
 
         val staleIds = triggers.deleteByWorkflowIdAndNodeIdNotIn(workflowId, keepNodeIds)

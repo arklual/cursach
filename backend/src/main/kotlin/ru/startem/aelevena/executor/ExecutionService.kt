@@ -242,44 +242,99 @@ class ExecutionService(
         inputData: Map<String, JsonNode>?
     ) {
         val mapper = executorRegistry.getObjectMapper()
-        var currentInput: ObjectNode
-        if (inputData != null) {
+        val workflow = workflowService.getWorkflow(execution.workflowId)
+        val connections = workflow.graph.connections
+
+        // runInput — payload пользователя; ноды без incoming connections получают его в input.runInput.
+        val runInput: JsonNode = if (inputData != null) {
             val objNode: ObjectNode = mapper.createObjectNode()
             for ((key, value) in inputData) {
                 objNode.set<JsonNode>(key, value)
             }
-            currentInput = objNode
+            objNode
         } else {
-            currentInput = mapper.createObjectNode()
+            mapper.createObjectNode()
         }
-        
-        val startIndex = if (fromNodeId != null) {
-            nodes.indexOfFirst { it.id == fromNodeId }
-        } else 0
-        
-        for (i in startIndex until nodes.size) {
-            val node = nodes[i]
-            val nodeStatus = execution.nodes.find { it.nodeId == node.id }!!
-            
+
+        val allNodeIds = nodes.map { it.id }.toSet()
+        val incoming = mutableMapOf<String, MutableList<String>>()
+        val outgoing = mutableMapOf<String, MutableList<String>>()
+        nodes.forEach { incoming[it.id] = mutableListOf(); outgoing[it.id] = mutableListOf() }
+        connections.forEach { c ->
+            if (allNodeIds.contains(c.source) && allNodeIds.contains(c.target)) {
+                outgoing.getValue(c.source).add(c.target)
+                incoming.getValue(c.target).add(c.source)
+            }
+        }
+
+        // Если задан fromNodeId — исполняем только subgraph, достижимый из него.
+        val reachable: Set<String> = if (fromNodeId != null && allNodeIds.contains(fromNodeId)) {
+            val visited = mutableSetOf(fromNodeId)
+            val queue = ArrayDeque<String>().apply { add(fromNodeId) }
+            while (queue.isNotEmpty()) {
+                val cur = queue.removeFirst()
+                outgoing[cur].orEmpty().forEach { nxt ->
+                    if (visited.add(nxt)) queue.add(nxt)
+                }
+            }
+            visited
+        } else {
+            allNodeIds
+        }
+
+        // Топологический порядок по reachable subgraph.
+        val inDegree = reachable.associateWith { id -> incoming[id]?.count { reachable.contains(it) } ?: 0 }.toMutableMap()
+        val ready = ArrayDeque<String>().apply { inDegree.forEach { (id, d) -> if (d == 0) add(id) } }
+        val topo = mutableListOf<String>()
+        while (ready.isNotEmpty()) {
+            val n = ready.removeFirst()
+            topo.add(n)
+            outgoing[n].orEmpty().forEach { m ->
+                if (!reachable.contains(m)) return@forEach
+                val nd = (inDegree[m] ?: 0) - 1
+                inDegree[m] = nd
+                if (nd == 0) ready.add(m)
+            }
+        }
+        if (topo.size != reachable.size) {
+            throw IllegalStateException("Workflow graph has a cycle")
+        }
+
+        // Ноды вне reachable — помечаем skipped (не оставляем "pending" в UI).
+        execution.nodes.filter { !reachable.contains(it.nodeId) }.forEach { ns ->
+            if (ns.status == "pending") ns.status = "skipped"
+        }
+
+        val outputs = mutableMapOf<String, JsonNode>()
+        val nodeById = nodes.associateBy { it.id }
+
+        for (nodeId in topo) {
+            val node = nodeById.getValue(nodeId)
+            val nodeStatus = execution.nodes.find { it.nodeId == nodeId }!!
+
+            val nodeInput = mapper.createObjectNode()
+            nodeInput.set<JsonNode>("runInput", runInput)
+            val inputsNode = mapper.createObjectNode()
+            incoming[nodeId].orEmpty().forEach { depId ->
+                inputsNode.set<JsonNode>(depId, outputs[depId] ?: mapper.nullNode())
+            }
+            nodeInput.set<JsonNode>("inputs", inputsNode)
+
             nodeStatus.status = "running"
             nodeStatus.startTime = Instant.now().toString()
-            nodeStatus.inputData = listOf(ExecutionData(json = currentInput))
-            
+            nodeStatus.inputData = listOf(ExecutionData(json = nodeInput))
+
             try {
                 val executor = executorRegistry.getExecutor(node.type)
-                val output = executor.execute(node.id, node.data?.config, currentInput)
-                
+                val output = executor.execute(node.id, node.data?.config, nodeInput)
+                outputs[nodeId] = output
+
                 nodeStatus.status = "success"
                 nodeStatus.endTime = Instant.now().toString()
                 val start = Instant.parse(nodeStatus.startTime!!)
                 nodeStatus.duration = java.time.Duration.between(start, Instant.now()).toMillis()
                 nodeStatus.outputData = listOf(ExecutionData(json = output))
                 nodeStatus.itemsCount = 1
-                
-                // Передаём output следующей ноде
-                if (output is ObjectNode) {
-                    currentInput = output
-                }
             } catch (e: Exception) {
                 nodeStatus.status = "error"
                 nodeStatus.endTime = Instant.now().toString()
@@ -288,7 +343,21 @@ class ExecutionService(
                     details = e.cause?.message,
                     stack = e.stackTraceToString()
                 )
-                throw e // Прерываем исполнение workflow
+                // Помечаем всё, что зависит от упавшей ноды, как skipped — иначе UI залипает на "pending".
+                val failed = mutableSetOf(nodeId)
+                val q = ArrayDeque<String>().apply { add(nodeId) }
+                while (q.isNotEmpty()) {
+                    val cur = q.removeFirst()
+                    outgoing[cur].orEmpty().forEach { nxt ->
+                        if (reachable.contains(nxt) && failed.add(nxt)) q.add(nxt)
+                    }
+                }
+                execution.nodes.forEach { ns ->
+                    if (ns.nodeId != nodeId && failed.contains(ns.nodeId) && ns.status == "pending") {
+                        ns.status = "skipped"
+                    }
+                }
+                throw e // прерываем — остальные topo-узлы не нужны
             }
         }
     }
