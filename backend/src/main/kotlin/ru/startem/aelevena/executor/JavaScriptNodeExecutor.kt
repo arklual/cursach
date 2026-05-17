@@ -3,12 +3,11 @@ package ru.startem.aelevena.executor
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Component
-import java.nio.charset.StandardCharsets
-import java.util.concurrent.TimeUnit
 
 @Component
 class JavaScriptNodeExecutor(
     private val objectMapper: ObjectMapper,
+    private val sandbox: ContainerSandboxRunner,
 ) : NodeExecutor {
     override val type: String = "javascript"
 
@@ -17,53 +16,25 @@ class JavaScriptNodeExecutor(
             ?: throw IllegalArgumentException("javascript node requires config.code")
 
         val timeoutSeconds = config.get("timeoutSeconds")?.asLong() ?: 5L
-        val image = config.get("image")?.asText()?.takeIf { it.isNotBlank() } ?: "node:20-alpine"
+        val image = config.get("image")?.asText()?.takeIf { it.isNotBlank() } ?: DEFAULT_IMAGE
 
         val payload = objectMapper.createObjectNode().apply {
             put("code", code)
             set<JsonNode>("input", input)
         }
 
-        val cmd = listOf(
-            "docker", "run", "--rm", "-i",
-            "--network", "none",
-            "--read-only",
-            "--tmpfs", "/tmp:rw,size=16m",
-            "--cap-drop", "ALL",
-            "--security-opt", "no-new-privileges",
-            "--memory", "256m",
-            "--cpus", "1",
-            "--pids-limit", "64",
-            image,
-            "node", "-e", RUNNER,
+        return sandbox.run(
+            label = "javascript node",
+            image = image,
+            runtimeCommand = listOf("node", "-e", RUNNER),
+            payload = payload,
+            codeTimeoutSeconds = timeoutSeconds,
         )
-
-        val process = ProcessBuilder(cmd).redirectErrorStream(true).start()
-
-        process.outputStream.use { stdin ->
-            stdin.write(objectMapper.writeValueAsBytes(payload))
-            stdin.flush()
-        }
-
-        val finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
-        if (!finished) {
-            process.destroyForcibly()
-            throw RuntimeException("javascript node timed out after ${timeoutSeconds}s")
-        }
-
-        val stdout = process.inputStream.readAllBytes().toString(StandardCharsets.UTF_8)
-        if (process.exitValue() != 0) {
-            throw RuntimeException("javascript node failed: $stdout")
-        }
-
-        return try {
-            objectMapper.readTree(stdout)
-        } catch (_: Exception) {
-            objectMapper.createObjectNode().put("raw", stdout)
-        }
     }
 
     companion object {
+        const val DEFAULT_IMAGE: String = "node:20-alpine"
+
         private val RUNNER = """
             let raw = '';
             process.stdin.on('data', c => raw += c);
