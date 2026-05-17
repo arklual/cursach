@@ -57,6 +57,7 @@ services:
       DOCKER_HOST: tcp://docker-proxy:2375
     ports:
       - "8080:8080"
+      - "5432:5432"
 
   minio:
     image: minio/minio:latest
