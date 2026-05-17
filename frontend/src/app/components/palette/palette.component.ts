@@ -66,7 +66,13 @@ interface NodeCategory {
 
       @if (filteredCategories().length === 0) {
         <div class="empty-state">
-          <span class="empty-icon">🔍</span>
+          <span class="empty-icon" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="10.5" cy="10.5" r="6.5"/>
+              <path d="m20 20-4.8-4.8"/>
+            </svg>
+          </span>
           <p>Ноды не найдены</p>
         </div>
       }
@@ -289,14 +295,18 @@ interface NodeCategory {
     }
 
     .empty-icon {
-      font-size: 32px;
-      margin-bottom: 8px;
-      opacity: 0.5;
+      display: inline-flex;
+      margin-bottom: 12px;
+      color: var(--fg-muted);
+      opacity: 0.6;
     }
 
     .empty-state p {
       margin: 0;
-      font-size: 13px;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: 17px;
+      color: var(--fg-secondary);
     }
   `]
 })

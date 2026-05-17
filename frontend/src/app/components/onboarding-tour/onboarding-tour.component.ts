@@ -138,10 +138,27 @@ const TOUR_STEPS: TourStep[] = [
               }
             </div>
             
-            <button 
-              class="primary" 
+            <button
+              class="primary"
               (click)="next()">
-              {{ currentStepIndex() === steps().length - 1 ? 'Завершить 🎉' : 'Далее' }}
+              @if (currentStepIndex() === steps().length - 1) {
+                <span>Завершить</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2.5"
+                     stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              } @else {
+                <span>Далее</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round"
+                     aria-hidden="true">
+                  <path d="M5 12h14"/>
+                  <path d="m12 5 7 7-7 7"/>
+                </svg>
+              }
             </button>
           </div>
         }

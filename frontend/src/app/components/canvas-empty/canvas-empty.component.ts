@@ -65,7 +65,15 @@ import { NodeKind } from '../../models/workflow.model';
       </div>
       
       <div class="empty-hint">
-        <p>💡 Совет: Нажмите на кнопку, чтобы добавить ноду в центр холста</p>
+        <svg class="hint-icon" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.5"
+             stroke-linecap="round" stroke-linejoin="round"
+             width="16" height="16" aria-hidden="true">
+          <path d="M9 18h6"/>
+          <path d="M10 22h4"/>
+          <path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2v1.3h6V16.7c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z"/>
+        </svg>
+        <p>Совет: нажмите на кнопку, чтобы добавить ноду в центр холста</p>
       </div>
     </div>
   `,
@@ -169,16 +177,27 @@ import { NodeKind } from '../../models/workflow.model';
 
     .empty-hint {
       margin-top: 16px;
-      padding: 12px 20px;
-      background: var(--accent-glow);
-      border: 1px solid var(--accent);
-      border-radius: 8px;
+      padding: 10px 16px;
+      background: rgba(255, 122, 26, 0.12);
+      border: 1px solid rgba(255, 122, 26, 0.4);
+      border-radius: 999px;
       pointer-events: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--accent);
+    }
+
+    .hint-icon {
+      flex-shrink: 0;
     }
 
     .empty-hint p {
       margin: 0;
-      font-size: 13px;
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      font-weight: 500;
+      letter-spacing: -0.003em;
       color: var(--accent);
     }
   `]

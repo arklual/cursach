@@ -116,37 +116,56 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 24px 48px;
-      background: var(--panel);
+      padding: 32px 48px 28px;
+      background: linear-gradient(180deg, rgba(36, 29, 23, 0.92) 0%, rgba(22, 18, 14, 0.6) 100%);
       border-bottom: 1px solid var(--border);
     }
 
     .brand {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 18px;
     }
 
     .brand .logo {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      background: var(--accent);
-      color: white;
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background:
+        radial-gradient(circle at 30% 22%, #ffd6a3 0%, transparent 55%),
+        linear-gradient(135deg, #ff7a1a 0%, #a8300a 100%);
+      color: #1a0e05;
       display: grid;
       place-items: center;
-      font-weight: 700;
-      font-size: 24px;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 30px;
+      line-height: 1;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+        0 10px 26px rgba(255, 122, 26, 0.32);
     }
 
     .page-header h1 {
-      margin: 0;
-      font-size: 24px;
+      margin: 0 0 4px;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 42px;
+      line-height: 1.02;
+      letter-spacing: -0.028em;
       color: var(--fg-primary);
     }
 
     .page-header p {
       margin: 0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
       color: var(--fg-muted);
     }
 

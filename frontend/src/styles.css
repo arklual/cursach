@@ -5,8 +5,8 @@
 
 :root {
   /* Typography */
-  --font-display: 'Fraunces', ui-serif, Georgia, serif;
-  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Instrument Serif', ui-serif, Georgia, 'Times New Roman', serif;
+  --font-sans: 'Hanken Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 
   /* Colors — Warm Carbon palette */
@@ -91,8 +91,11 @@ body {
   margin: 0;
   font-family: var(--font-sans);
   font-size: 14px;
-  line-height: 1.6;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: -0.005em;
   color: var(--fg-primary);
+  font-feature-settings: "ss01", "cv11";
   background:
     radial-gradient(1200px 600px at 12% -10%, rgba(255, 122, 26, 0.07), transparent 60%),
     radial-gradient(900px 500px at 110% 110%, rgba(132, 204, 22, 0.05), transparent 65%),
@@ -119,7 +122,8 @@ body::before {
   top: -40px;
   left: 0;
   background: var(--accent);
-  color: white;
+  color: #1a0e05;
+  font-weight: 600;
   padding: 8px 16px;
   z-index: 1000;
   transition: top var(--transition-fast);
@@ -135,24 +139,29 @@ body::before {
 
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
-  font-weight: 500;
-  line-height: 1.15;
-  letter-spacing: -0.025em;
   color: var(--fg-primary);
 }
 
 h1, h2 {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 400;
   font-style: italic;
-  letter-spacing: -0.035em;
-  font-variation-settings: "opsz" 144;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
 }
 
-h1 { font-size: 34px; }
-h2 { font-size: 24px; }
-h3 { font-size: 18px; font-weight: 600; }
-h4 { font-size: 16px; font-weight: 600; }
+h1 { font-size: 48px; }
+h2 { font-size: 30px; }
+
+h3, h4, h5, h6 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.012em;
+}
+
+h3 { font-size: 18px; }
+h4 { font-size: 15px; }
 
 p {
   margin: 0;
@@ -180,8 +189,9 @@ code, pre, kbd {
 
 button {
   font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
   border: none;
   border-radius: var(--radius-md);
   padding: 10px 16px;
@@ -213,12 +223,13 @@ button:active {
 
 button.primary {
   background: var(--accent);
-  color: white;
+  color: #1a0e05;
   box-shadow: var(--shadow-md), var(--shadow-glow);
 }
 
 button.primary:hover {
   background: var(--accent-hover);
+  color: #1a0e05;
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg), var(--shadow-glow);
 }
@@ -254,9 +265,12 @@ button.guide-btn .q-mark {
   height: 18px;
   border-radius: 50%;
   background: var(--accent);
-  color: white;
-  font-weight: 700;
-  font-size: 12px;
+  color: #1a0e05;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1;
 }
 
 button.btn-icon {
@@ -304,23 +318,26 @@ button.btn-small {
 }
 
 .brand .logo {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-md);
   background:
-    radial-gradient(circle at 30% 25%, #ffd29a 0%, transparent 55%),
-    linear-gradient(135deg, #ff7a1a 0%, #b8350a 100%);
+    radial-gradient(circle at 30% 22%, #ffd6a3 0%, transparent 55%),
+    linear-gradient(135deg, #ff7a1a 0%, #a8300a 100%);
   color: #1a0e05;
   display: grid;
   place-items: center;
   font-family: var(--font-display);
-  font-weight: 600;
   font-style: italic;
-  font-size: 22px;
+  font-weight: 400;
+  font-size: 28px;
   letter-spacing: -0.04em;
+  line-height: 1;
+  padding-bottom: 2px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.35),
-    0 6px 18px rgba(255, 122, 26, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    0 8px 22px rgba(255, 122, 26, 0.38),
     var(--shadow-md);
 }
 
@@ -334,13 +351,11 @@ button.btn-small {
   background: transparent;
   border: none;
   color: var(--fg-primary);
-  font-size: 22px;
-  font-weight: 500;
-  font-style: italic;
-  letter-spacing: -0.03em;
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.018em;
   padding: 4px 0;
-  font-family: var(--font-display);
-  font-variation-settings: "opsz" 144;
 }
 
 .workflow-info input:focus {
@@ -349,9 +364,13 @@ button.btn-small {
 }
 
 .workflow-info p {
-  font-size: 12px;
-  color: var(--fg-muted);
   margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
 }
 
 .header-actions {
@@ -754,8 +773,11 @@ main {
   border: none;
   border-radius: var(--radius-sm);
   color: var(--fg-muted);
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 11px;
   font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   transition: all var(--transition-fast);
 }
 
@@ -866,9 +888,12 @@ label {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
-  font-size: 12px;
-  color: var(--fg-secondary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
 }
 
 input,
@@ -877,10 +902,12 @@ textarea {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 8px 12px;
+  padding: 9px 12px;
   color: var(--fg-primary);
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
   transition: all var(--transition-fast);
 }
 
@@ -906,8 +933,11 @@ input::placeholder {
   gap: 4px;
   padding: 3px 8px;
   border-radius: 6px;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   background: var(--accent-glow);
   color: var(--accent);
 }
