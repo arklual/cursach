@@ -64,14 +64,16 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
                 @for (run of runs(); track run.id) {
                     <div class="run-card" [class.selected]="selectedRunId() === run.id" (click)="selectRun(run.id!)">
                         <div class="run-line">
-                            <span class="run-id">{{ shortId(run.id) }}</span>
-                            <span class="status" [class]="normalise(run.status)">{{ run.status ?? '?' }}</span>
+                            <span class="run-title">{{ formatRunTitle(run) }}</span>
+                            <span class="status" [class]="normalise(run.status)">{{ statusLabel(run.status) }}</span>
                         </div>
                         <div class="run-meta">
-                            <span>started: {{ formatTime(run.startedAt) }}</span>
-                            @if (run.finishedAt) {
-                                <span>· finished: {{ formatTime(run.finishedAt) }}</span>
+                            <span>{{ formatDuration(run) }}</span>
+                            @if (hasInputPreview(run)) {
+                                <span class="dot">·</span>
+                                <span class="input-preview" [title]="formatJson(run.input)">{{ inputPreview(run) }}</span>
                             }
+                            <span class="run-id-ref" title="ID запуска">#{{ run.id }}</span>
                         </div>
                     </div>
                 } @empty {
@@ -120,15 +122,18 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
         .runs-list { display: flex; flex-direction: column; gap: 6px; }
         .run-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
         .run-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
-        .run-line { display: flex; justify-content: space-between; align-items: center; }
-        .run-id { font-family: var(--font-mono); font-size: 12px; color: var(--fg-secondary); }
-        .status { font-size: 11px; padding: 2px 8px; border-radius: 999px; text-transform: lowercase; }
+        .run-line { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .run-title { font-size: 13px; font-weight: 500; color: var(--fg-primary); }
+        .run-meta { font-size: 11px; color: var(--fg-muted); margin-top: 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .run-meta .dot { color: var(--fg-muted); }
+        .run-meta .input-preview { font-family: var(--font-mono); color: var(--fg-secondary); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .run-meta .run-id-ref { margin-left: auto; font-family: var(--font-mono); color: var(--fg-muted); font-size: 10px; }
+        .status { font-size: 11px; padding: 2px 8px; border-radius: 999px; text-transform: none; }
         .status.queued { background: var(--warning-bg); color: var(--warning); }
         .status.running { background: var(--accent-glow); color: var(--accent); }
         .status.success { background: var(--success-bg); color: var(--success); }
         .status.failed { background: var(--danger-bg); color: var(--danger); }
         .status.unknown { background: var(--bg-tertiary); color: var(--fg-muted); }
-        .run-meta { font-size: 11px; color: var(--fg-muted); margin-top: 4px; }
         .empty { color: var(--fg-muted); font-size: 13px; padding: 8px; }
         .node-runs h4 { margin: 8px 0 6px; font-size: 12px; color: var(--fg-secondary); text-transform: uppercase; }
         .node-run { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin-bottom: 4px; }
@@ -246,16 +251,60 @@ export class RunsPanelComponent implements OnInit {
 
     normalise = (s: string | undefined): RunStatus => normaliseStatus(s);
 
-    shortId(id: string | undefined): string {
-        return (id ?? '').slice(0, 8);
+    statusLabel(s: string | undefined): string {
+        switch (normaliseStatus(s)) {
+            case 'queued': return 'В очереди';
+            case 'running': return 'Выполняется';
+            case 'success': return 'Успех';
+            case 'failed': return 'Ошибка';
+            default: return s ?? '—';
+        }
     }
 
-    formatTime(iso: string | undefined): string {
-        if (!iso) {
+    /**
+     * Заголовок карточки: дата+время старта в локальной TZ. Если запуск ещё в очереди и не стартовал,
+     * показываем «В очереди» (бейдж справа уже расскажет про статус, но без даты ID было бы немо).
+     */
+    formatRunTitle(run: WorkflowRun): string {
+        if (!run.startedAt) {
+            return 'Ожидает запуска';
+        }
+        const date = new Date(run.startedAt);
+        return new Intl.DateTimeFormat('ru-RU', {
+            day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit',
+        }).format(date);
+    }
+
+    /** «3 мс», «1.2 с», «Выполняется…», «—» для очереди. */
+    formatDuration(run: WorkflowRun): string {
+        const status = normaliseStatus(run.status);
+        if (!run.startedAt) {
             return '—';
         }
-        const date = new Date(iso);
-        return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(date);
+        if (!run.finishedAt) {
+            return status === 'running' ? 'Выполняется…' : '—';
+        }
+        const ms = new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime();
+        if (ms < 0) return '—';
+        if (ms < 1000) return `${ms} мс`;
+        if (ms < 60_000) return `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)} с`;
+        return `${Math.floor(ms / 60_000)} мин ${Math.floor((ms % 60_000) / 1000)} с`;
+    }
+
+    hasInputPreview(run: WorkflowRun): boolean {
+        const input = run.input;
+        if (input == null) return false;
+        if (typeof input === 'object' && Object.keys(input as object).length === 0) return false;
+        return true;
+    }
+
+    inputPreview(run: WorkflowRun): string {
+        try {
+            const s = JSON.stringify(run.input);
+            return s.length > 60 ? s.slice(0, 57) + '…' : s;
+        } catch {
+            return '';
+        }
     }
 
     formatJson(obj: unknown): string {
