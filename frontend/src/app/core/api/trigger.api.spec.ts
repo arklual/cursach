@@ -8,9 +8,8 @@ import {
     provideHttpClientTesting,
 } from '@angular/common/http/testing';
 
-import { TriggerApiService } from './trigger.api';
+import { TriggerApiService, Trigger } from './trigger.api';
 import { environment } from '../../../environments/environment';
-import type { Trigger } from './api.models';
 
 describe('TriggerApiService', () => {
     let service: TriggerApiService;
@@ -32,8 +31,8 @@ describe('TriggerApiService', () => {
     afterEach(() => httpMock.verify());
 
     it('list() выполняет GET /workflows/{id}/triggers', () => {
-        const fixture = [
-            { id: 't1', workflowId: 'wf-1', type: 'webhook', config: {} } as unknown as Trigger,
+        const fixture: Trigger[] = [
+            { id: 't1', workflowId: 'wf-1', nodeId: 'trigger-webhook-abc', type: 'webhook', config: {}, token: 'tok_abc' },
         ];
 
         let result: Trigger[] | undefined;
@@ -44,26 +43,6 @@ describe('TriggerApiService', () => {
         req.flush(fixture);
 
         expect(result).toEqual(fixture);
-    });
-
-    it('create() выполняет POST /workflows/{id}/triggers с телом', () => {
-        const body = { type: 'cron', config: { expression: '*/30 * * * * *' } };
-        const fixture = { id: 't2', workflowId: 'wf-1', type: 'cron', config: body.config } as unknown as Trigger;
-
-        service.create('wf-1', body as never).subscribe();
-
-        const req = httpMock.expectOne(`${base}/workflows/wf-1/triggers`);
-        expect(req.request.method).toBe('POST');
-        expect(req.request.body).toEqual(body);
-        req.flush(fixture, { status: 201, statusText: 'Created' });
-    });
-
-    it('delete() выполняет DELETE /triggers/{id}', () => {
-        service.delete('t1').subscribe();
-
-        const req = httpMock.expectOne(`${base}/triggers/t1`);
-        expect(req.request.method).toBe('DELETE');
-        req.flush(null, { status: 204, statusText: 'No Content' });
     });
 
     it('invokeWebhook() выполняет POST /webhook/{token} с произвольным JSON', () => {

@@ -76,21 +76,3 @@ export interface NodeTemplate {
   color: string;
   success: number;
 }
-
-export interface ExperimentConfig {
-  primaryMetric: string;
-  secondaryMetrics: string;
-  period: number;
-  minSample: number;
-  alpha: number;
-  power: number;
-  variants: Variant[];
-  randomization: 'simple' | 'hashed' | 'stratified';
-  seed: string;
-}
-
-export interface ExperimentVariant extends Variant {
-  reached: number;
-  converted: number;
-  pHat: number;
-}

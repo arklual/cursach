@@ -34,16 +34,6 @@ import { NodeKind } from '../../models/workflow.model';
 
           <button
             class="quick-node-btn"
-            (click)="addQuickNode('ab')"
-            title="Разделение трафика на варианты">
-            <svg class="node-icon" viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
-              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-            </svg>
-            <span class="node-label">A/B Fork</span>
-          </button>
-
-          <button
-            class="quick-node-btn"
             (click)="addQuickNode('http')"
             title="HTTP запрос к API">
             <svg class="node-icon" viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
@@ -54,12 +44,22 @@ import { NodeKind } from '../../models/workflow.model';
 
           <button
             class="quick-node-btn"
+            (click)="addQuickNode('dataflow', 'filter')"
+            title="Фильтрация элементов">
+            <svg class="node-icon" viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
+              <path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/>
+            </svg>
+            <span class="node-label">Filter</span>
+          </button>
+
+          <button
+            class="quick-node-btn"
             (click)="addQuickNode('code')"
             title="Python код для обработки">
             <svg class="node-icon" viewBox="0 0 24 24" fill="currentColor" width="32" height="32">
               <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>
             </svg>
-            <span class="node-label">Code</span>
+            <span class="node-label">Python</span>
           </button>
         </div>
       </div>
@@ -188,10 +188,9 @@ export class CanvasEmptyComponent {
 
   nodeAdded = output<NodeKind>();
 
-  addQuickNode(type: NodeKind): void {
-    // Добавляем ноду в центр холста (примерные координаты)
+  addQuickNode(type: NodeKind, subtype?: string): void {
     const position = { x: 400, y: 300 };
-    this.workflowService.addNode(type, position);
+    this.workflowService.addNode(type, position, subtype);
     this.nodeAdded.emit(type);
   }
 }

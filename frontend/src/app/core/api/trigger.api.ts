@@ -2,10 +2,20 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import type { Trigger, TriggerCreateRequest } from './api.models';
+
+export interface Trigger {
+    id: string;
+    workflowId: string;
+    nodeId: string;
+    type: 'webhook' | 'cron' | 'interval';
+    config?: Record<string, unknown> | null;
+    token?: string | null;
+}
 
 /**
- * REST-обёртка над /workflows/{id}/triggers, /triggers/{id} и /webhook/{token}.
+ * REST-обёртка над /workflows/{id}/triggers и /webhook/{token}.
+ * Триггеры синхронизируются из графа на бэке (см. TriggerService.syncFromGraph),
+ * так что фронт только читает список и опционально дёргает webhook.
  */
 @Injectable({ providedIn: 'root' })
 export class TriggerApiService {
@@ -14,14 +24,6 @@ export class TriggerApiService {
 
     list(workflowId: string): Observable<Trigger[]> {
         return this.http.get<Trigger[]>(`${this.base}/workflows/${workflowId}/triggers`);
-    }
-
-    create(workflowId: string, req: TriggerCreateRequest): Observable<Trigger> {
-        return this.http.post<Trigger>(`${this.base}/workflows/${workflowId}/triggers`, req);
-    }
-
-    delete(triggerId: string): Observable<void> {
-        return this.http.delete<void>(`${this.base}/triggers/${triggerId}`);
     }
 
     invokeWebhook(token: string, payload: unknown): Observable<void> {

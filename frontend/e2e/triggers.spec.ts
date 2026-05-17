@@ -1,11 +1,14 @@
 import { test, expect } from '@playwright/test';
 import {
   API_BASE,
-  createTriggerViaApi,
+  connectNodes,
   createWorkflowViaApi,
   deleteWorkflowsByPrefix,
+  dragPaletteNode,
+  listRunsViaApi,
   listTriggersViaApi,
   suppressFirstVisitHints,
+  waitForTriggers,
 } from './helpers';
 
 test.beforeAll(async ({ request }) => {
@@ -15,87 +18,146 @@ test.afterAll(async ({ request }) => {
   await deleteWorkflowsByPrefix(request, 'E2E-');
 });
 
-test.describe('Triggers — API', () => {
-  let createdId: string;
+test.describe('Triggers — graph-driven sync', () => {
+  let workflowId: string;
+
+  test.beforeEach(async ({ page, request }) => {
+    await deleteWorkflowsByPrefix(request, 'E2E-');
+    const wf = await createWorkflowViaApi(request, `E2E-Triggers-${Date.now()}`);
+    workflowId = wf.meta.id;
+    await suppressFirstVisitHints(page);
+  });
+
+  test('dropping a Webhook node syncs a webhook trigger with token after save', async ({ page, request }) => {
+    await page.goto(`/workflow/${workflowId}`);
+    await dragPaletteNode(page, 'trigger:webhook', { x: 220, y: 220 });
+    await expect(page.locator('.node-wrap')).toHaveCount(1);
+
+    const list = await waitForTriggers(
+      request,
+      workflowId,
+      ts => ts.some(t => t.type === 'webhook' && !!t.token),
+      12_000,
+    );
+    const webhook = list.find(t => t.type === 'webhook');
+    expect(webhook).toBeTruthy();
+    expect(webhook!.token).toBeTruthy();
+    expect(webhook!.nodeId).toBeTruthy();
+  });
+
+  test('dropping a Cron node + editing expression persists cron config', async ({ page, request }) => {
+    await page.goto(`/workflow/${workflowId}`);
+    await dragPaletteNode(page, 'trigger:cron', { x: 220, y: 220 });
+    await expect(page.locator('.node-wrap')).toHaveCount(1);
+    await page.locator('.node-wrap').first().click();
+
+    const inspector = page.locator('app-inspector');
+    await expect(inspector).toBeVisible();
+    const cronInput = inspector.locator('input[placeholder*="* * * * *"]');
+    await cronInput.fill('0 */5 * * * *');
+    await cronInput.blur();
+
+    const list = await waitForTriggers(
+      request,
+      workflowId,
+      ts => ts.some(t => t.type === 'cron' && (t.config as { expression?: string } | undefined)?.expression === '0 */5 * * * *'),
+      12_000,
+    );
+    expect(list.find(t => t.type === 'cron')).toBeTruthy();
+  });
+
+  test('dropping an Interval node + setting seconds persists interval config', async ({ page, request }) => {
+    await page.goto(`/workflow/${workflowId}`);
+    await dragPaletteNode(page, 'trigger:interval', { x: 220, y: 220 });
+    await expect(page.locator('.node-wrap')).toHaveCount(1);
+    await page.locator('.node-wrap').first().click();
+
+    const inspector = page.locator('app-inspector');
+    await expect(inspector).toBeVisible();
+    const numericInput = inspector.locator('input[type="number"]').last();
+    await numericInput.fill('7');
+    await numericInput.blur();
+
+    const list = await waitForTriggers(
+      request,
+      workflowId,
+      ts => ts.some(t => t.type === 'interval' && Number((t.config as { periodSeconds?: number } | undefined)?.periodSeconds) === 7),
+      12_000,
+    );
+    expect(list.find(t => t.type === 'interval')).toBeTruthy();
+  });
+
+  test('removing a trigger node removes the row on next save', async ({ page, request }) => {
+    await page.goto(`/workflow/${workflowId}`);
+    await dragPaletteNode(page, 'trigger:webhook', { x: 220, y: 220 });
+    await expect(page.locator('.node-wrap')).toHaveCount(1);
+    await waitForTriggers(request, workflowId, ts => ts.length === 1, 12_000);
+
+    // Delete via inspector
+    await page.locator('.node-wrap').first().click();
+    page.once('dialog', d => d.accept());
+    await page.getByRole('button', { name: 'Удалить ноду' }).click();
+    await expect(page.locator('.node-wrap')).toHaveCount(0);
+
+    await waitForTriggers(request, workflowId, ts => ts.length === 0, 12_000);
+  });
+
+  test('webhook end-to-end: POST /webhook/{token} enqueues a run', async ({ page, request }) => {
+    await page.goto(`/workflow/${workflowId}`);
+    await dragPaletteNode(page, 'trigger:webhook', { x: 200, y: 220 });
+    await dragPaletteNode(page, 'http', { x: 480, y: 220 });
+    await expect(page.locator('.node-wrap')).toHaveCount(2);
+    await connectNodes(page, 0, 1);
+    await expect(page.locator('.edge-group')).toHaveCount(1);
+
+    const list = await waitForTriggers(
+      request,
+      workflowId,
+      ts => ts.some(t => t.type === 'webhook' && !!t.token),
+      12_000,
+    );
+    const token = list.find(t => t.type === 'webhook')!.token!;
+
+    const res = await request.post(`${API_BASE}/webhook/${token}`, { data: { event: 'e2e' } });
+    expect([200, 202]).toContain(res.status());
+
+    await expect.poll(async () => (await listRunsViaApi(request, workflowId)).length, { timeout: 6_000 })
+      .toBeGreaterThanOrEqual(1);
+  });
+});
+
+test.describe('Triggers — removed REST surface', () => {
+  let workflowId: string;
 
   test.beforeEach(async ({ request }) => {
     await deleteWorkflowsByPrefix(request, 'E2E-');
-    const wf = await createWorkflowViaApi(request, `E2E-Triggers-${Date.now()}`);
-    createdId = wf.meta.id;
+    const wf = await createWorkflowViaApi(request, `E2E-Triggers-API-${Date.now()}`);
+    workflowId = wf.meta.id;
   });
 
-  test('create webhook trigger and find it in list', async ({ request }) => {
-    const created = await createTriggerViaApi(request, createdId, { type: 'webhook' });
-    expect(created.id).toBeTruthy();
-    expect(created.type).toBe('webhook');
-
-    const list = await listTriggersViaApi(request, createdId);
-    const found = list.find(t => t.id === created.id);
-    expect(found).toBeTruthy();
-    expect(found?.type).toBe('webhook');
-  });
-
-  test('create cron trigger with config and persist it', async ({ request }) => {
-    const created = await createTriggerViaApi(request, createdId, {
-      type: 'cron',
-      config: { cron: '0 */5 * * * *' },
+  test('POST /workflows/{id}/triggers is no longer routed', async ({ request }) => {
+    const res = await request.post(`${API_BASE}/workflows/${workflowId}/triggers`, {
+      data: { type: 'webhook' },
     });
-    expect(created.id).toBeTruthy();
-    expect(created.type).toBe('cron');
-
-    const list = await listTriggersViaApi(request, createdId);
-    expect(list.some(t => t.id === created.id)).toBe(true);
+    // 404 (route gone) or 405 (method-not-allowed) — both indicate the create endpoint was removed.
+    expect([404, 405]).toContain(res.status());
   });
 
-  test('delete trigger removes it from list', async ({ request }) => {
-    const created = await createTriggerViaApi(request, createdId, { type: 'webhook' });
-    const del = await request.delete(`${API_BASE}/triggers/${created.id}`);
-    expect(del.status()).toBe(204);
-
-    const list = await listTriggersViaApi(request, createdId);
-    expect(list.some(t => t.id === created.id)).toBe(false);
+  test('DELETE /triggers/{id} is no longer routed', async ({ request }) => {
+    const res = await request.delete(`${API_BASE}/triggers/does-not-matter`);
+    expect([404, 405]).toContain(res.status());
   });
 
-  test('POST to webhook endpoint with valid token returns 2xx', async ({ request }) => {
-    const created = await createTriggerViaApi(request, createdId, { type: 'webhook' });
-    // The webhook token is typically embedded in config — fall back to id if not present.
-    const token = (created.config as { token?: string } | null)?.token ?? created.id;
-    const res = await request.post(`${API_BASE}/webhook/${token}`, { data: { event: 'e2e' } });
-    // We accept either 202 (enqueued) or 404 (token format mismatch) — main goal is the route exists.
-    expect([202, 404]).toContain(res.status());
-  });
-
-  test('POST to webhook with unknown token returns 4xx', async ({ request }) => {
+  test('POST /webhook with unknown token returns 4xx', async ({ request }) => {
     const res = await request.post(`${API_BASE}/webhook/definitely-not-a-token-${Date.now()}`, {
       data: {},
     });
     expect(res.status()).toBeGreaterThanOrEqual(400);
   });
-});
 
-test.describe('Triggers — UI', () => {
-  let createdId: string;
-
-  test.beforeEach(async ({ page, request }) => {
-    await deleteWorkflowsByPrefix(request, 'E2E-');
-    const wf = await createWorkflowViaApi(request, `E2E-Triggers-UI-${Date.now()}`);
-    createdId = wf.meta.id;
-    await suppressFirstVisitHints(page);
-  });
-
-  test('Triggers tab renders the panel without errors', async ({ page }) => {
-    await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'Триггеры' }).click();
-    await expect(page.locator('app-triggers-panel')).toBeVisible({ timeout: 5_000 });
-  });
-
-  test('seed a trigger via API, switch to Triggers tab, see it listed', async ({ page, request }) => {
-    await createTriggerViaApi(request, createdId, { type: 'webhook' });
-    await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'Триггеры' }).click();
-    const panel = page.locator('app-triggers-panel');
-    await expect(panel).toBeVisible();
-    // The panel should render at least one trigger card.
-    await expect(panel.locator('.trigger-card')).toHaveCount(1, { timeout: 5_000 });
+  test('GET /workflows/{id}/triggers returns empty array initially', async ({ request }) => {
+    const list = await listTriggersViaApi(request, workflowId);
+    expect(Array.isArray(list)).toBe(true);
+    expect(list.length).toBe(0);
   });
 });

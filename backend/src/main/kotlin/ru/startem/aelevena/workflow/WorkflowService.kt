@@ -17,6 +17,7 @@ import ru.startem.aelevena.api.dto.WorkflowMeta
 import ru.startem.aelevena.api.dto.WorkflowMetaUpdate
 import ru.startem.aelevena.api.dto.WorkflowVersion
 import ru.startem.aelevena.blob.BlobService
+import ru.startem.aelevena.triggers.TriggerService
 import ru.startem.aelevena.util.CanonicalJson
 import ru.startem.aelevena.workflow.model.ConnectionSkeleton
 import ru.startem.aelevena.workflow.model.GraphSkeleton
@@ -40,6 +41,7 @@ class WorkflowService(
     private val canonicalJson: CanonicalJson,
     private val objectMapper: ObjectMapper,
     private val events: ApplicationEventPublisher,
+    private val triggerService: TriggerService,
 ) {
 
     @Transactional
@@ -144,6 +146,7 @@ class WorkflowService(
         workflows.touchUpdatedAt(version.workflowId)
 
         val materialized = materializeGraph(versionId, skeleton)
+        triggerService.syncFromGraph(version.workflowId, materialized)
         events.publishEvent(GraphUpdatedEvent(version.workflowId, materialized))
         return materialized
     }
