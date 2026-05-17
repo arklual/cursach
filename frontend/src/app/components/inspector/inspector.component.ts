@@ -1,4 +1,4 @@
-import { Component, input, inject, computed, PLATFORM_ID } from '@angular/core';
+import { Component, input, output, inject, computed, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WorkflowService } from '../../services/workflow.service';
@@ -196,6 +196,12 @@ import type { Trigger } from '../../core/api/trigger.api';
           @if (node.data.kind === 'trigger') {
             <fieldset class="config-section">
               <legend>{{ triggerLegend(node) }}</legend>
+              @if (getSubtype(node) === 'manual') {
+                <p class="hint">Запускает workflow только с этой ноды по нажатию кнопки. Без расписания и токена.</p>
+                <div class="actions-row">
+                  <button class="primary" (click)="runFromNode.emit(node.id)">Запустить отсюда</button>
+                </div>
+              }
               @if (getSubtype(node) === 'webhook') {
                 @if (webhookUrl(node); as url) {
                   <label>
@@ -361,6 +367,16 @@ import type { Trigger } from '../../core/api/trigger.api';
       background: var(--danger-bg);
     }
 
+    button.primary {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    button.primary:hover {
+      filter: brightness(1.05);
+    }
+
     .hint {
       color: var(--fg-muted);
       font-size: 12px;
@@ -391,6 +407,7 @@ export class InspectorComponent {
 
   activeNode = input<WorkflowNode | null>(null);
   triggers = input<Trigger[]>([]);
+  readonly runFromNode = output<string>();
 
   private readonly triggerByNodeId = computed(() => {
     const map = new Map<string, Trigger>();
@@ -404,6 +421,7 @@ export class InspectorComponent {
 
   triggerLegend(node: WorkflowNode): string {
     const sub = this.getSubtype(node);
+    if (sub === 'manual') return 'Manual';
     if (sub === 'webhook') return 'Webhook';
     if (sub === 'cron') return 'Cron';
     if (sub === 'interval') return 'Interval';

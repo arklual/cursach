@@ -134,7 +134,8 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
               } @else {
                 <app-inspector
                   [activeNode]="workflowService.activeNode()"
-                  [triggers]="triggers()">
+                  [triggers]="triggers()"
+                  (runFromNode)="executeFromNode($event)">
                 </app-inspector>
               }
             </div>
@@ -1203,6 +1204,15 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   }
 
   executeWorkflow(): void {
+    this.runWorkflow();
+  }
+
+  /** Manual-trigger node "Запустить отсюда" — стартует только subgraph от данной ноды. */
+  executeFromNode(nodeId: string): void {
+    this.runWorkflow(nodeId);
+  }
+
+  private runWorkflow(fromNodeId?: string): void {
     const workflowId = this.currentWorkflowId();
     if (!workflowId) {
       console.warn('No workflow ID selected');
@@ -1216,7 +1226,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     this.executionProgress.set(0);
     this.isExecuting.set(true);
 
-    this.executionService.executeWorkflow(workflowId).subscribe({
+    this.executionService.executeWorkflow(workflowId, fromNodeId).subscribe({
       error: (err) => {
         console.error('Execution error:', err);
         this.isExecuting.set(false);

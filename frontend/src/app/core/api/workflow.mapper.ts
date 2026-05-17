@@ -25,7 +25,7 @@ const META_KEYS = ['__variants', '__randomization', '__metrics', '__successProb'
 const DATAFLOW_SUBTYPES = ['filter', 'map', 'reduce', 'foreach', 'flatmap'] as const;
 type DataflowSubtype = typeof DATAFLOW_SUBTYPES[number];
 
-const TRIGGER_SUBTYPES = ['webhook', 'cron', 'interval'] as const;
+const TRIGGER_SUBTYPES = ['manual', 'webhook', 'cron', 'interval'] as const;
 type TriggerSubtype = typeof TRIGGER_SUBTYPES[number];
 
 function defaultMetrics(): NodeMetrics {

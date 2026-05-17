@@ -12,7 +12,7 @@ interface PaletteItem {
   /** Underlying NodeKind for the workflow service. */
   kind: NodeKind;
   /** Optional subtype (dataflow operation, code language, or trigger flavour). */
-  subtype?: 'filter' | 'map' | 'reduce' | 'foreach' | 'flatmap' | 'js' | 'webhook' | 'cron' | 'interval';
+  subtype?: 'filter' | 'map' | 'reduce' | 'foreach' | 'flatmap' | 'js' | 'webhook' | 'cron' | 'interval' | 'manual';
   iconPath: string;
 }
 
@@ -305,6 +305,7 @@ export class PaletteComponent {
 
   private readonly icons = {
     webhook: 'M10 4a4 4 0 0 0-3.83 5.14l-2.6 4.5A3.5 3.5 0 1 0 7 16h7.46a3 3 0 1 0 0-2H7a1.5 1.5 0 1 1-1.5-1.5c.06 0 .12 0 .18.01l3.45-5.97A2 2 0 1 1 11.4 7.7L9.62 10.8a4 4 0 1 0 6.96 0L14.9 7.85A4 4 0 0 0 10 4zm6 9a1 1 0 1 1 0 2 1 1 0 0 1 0-2zM5.5 16a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z',
+    manual: 'M8 5v14l11-7z',
     cron: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z',
     interval: 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z',
     http: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z',
@@ -323,6 +324,7 @@ export class PaletteComponent {
       name: 'Триггеры',
       color: 'var(--success-500, #22c55e)',
       items: [
+        { id: 'trigger:manual', label: 'Manual', kind: 'trigger', subtype: 'manual', iconPath: this.icons.manual },
         { id: 'trigger:webhook', label: 'Webhook', kind: 'trigger', subtype: 'webhook', iconPath: this.icons.webhook },
         { id: 'trigger:cron', label: 'Cron', kind: 'trigger', subtype: 'cron', iconPath: this.icons.cron },
         { id: 'trigger:interval', label: 'Interval', kind: 'trigger', subtype: 'interval', iconPath: this.icons.interval },

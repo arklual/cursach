@@ -29,3 +29,9 @@ class TriggerIntervalExecutor : NodeExecutor {
     override val type: String = "trigger.interval"
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode = passthrough(input)
 }
+
+@Component
+class TriggerManualExecutor : NodeExecutor {
+    override val type: String = "trigger.manual"
+    override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode = passthrough(input)
+}
