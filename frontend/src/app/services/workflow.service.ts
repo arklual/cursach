@@ -51,6 +51,7 @@ export class WorkflowService {
   };
 
   private readonly triggerSubtypeLabels: Record<string, string> = {
+    manual: 'Manual',
     webhook: 'Webhook',
     cron: 'Cron',
     interval: 'Interval',
