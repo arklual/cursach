@@ -22,6 +22,8 @@ FROM eclipse-temurin:24-jre
 
 WORKDIR /app
 
+COPY --from=docker:27-cli /usr/local/bin/docker /usr/local/bin/docker
+
 COPY --from=build /workspace/target/*SNAPSHOT.jar /app/app.jar
 
 EXPOSE 8080
