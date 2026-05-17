@@ -1,9 +1,6 @@
-import { Component, input, output, inject, signal, computed } from '@angular/core';
+import { Component, input, output, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ExecutionService } from '../../services/execution.service';
-import { NodeExecutionData } from '../../models/execution.model';
-
-type TabType = 'input' | 'output' | 'json' | 'error';
 
 @Component({
   selector: 'app-execution-panel',
@@ -11,128 +8,111 @@ type TabType = 'input' | 'output' | 'json' | 'error';
   imports: [CommonModule],
   template: `
     <div class="execution-panel">
-      @if (nodeExecution()) {
+      @if (nodeExecution(); as exec) {
         <div class="panel-header">
           <div class="header-title">
-            <span class="title-label">Execution Details</span>
-            <h3>{{ nodeExecution()!.nodeName }}</h3>
+            <span class="title-label">Node</span>
+            <h3>{{ exec.nodeName }}</h3>
+            <span class="node-type">{{ exec.nodeType }}</span>
           </div>
           <div class="header-actions">
-            <div class="status-badge" [class]="'status-' + nodeExecution()!.status">
-              {{ getStatusText(nodeExecution()!.status) }}
+            <div class="status-badge" [class]="'status-' + exec.status">
+              {{ statusLabel(exec.status) }}
             </div>
-            <button class="reset-btn" (click)="resetExecution()" title="Reset execution">
-              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <button class="reset-btn" (click)="reset.emit()" title="Reset">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
                 <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
               </svg>
             </button>
           </div>
         </div>
 
-        <div class="tabs">
-          @if (nodeExecution()!.inputData?.length) {
-            <button 
-              class="tab" 
-              [class.active]="activeTab() === 'input'"
-              (click)="activeTab.set('input')">
-              Input ({{ nodeExecution()!.inputData!.length }})
-            </button>
-          }
-          @if (nodeExecution()!.outputData?.length) {
-            <button 
-              class="tab" 
-              [class.active]="activeTab() === 'output'"
-              (click)="activeTab.set('output')">
-              Output ({{ nodeExecution()!.outputData!.length }})
-            </button>
-          }
-          <button 
-            class="tab" 
-            [class.active]="activeTab() === 'json'"
-            (click)="activeTab.set('json')">
-            JSON
-          </button>
-          @if (nodeExecution()!.error) {
-            <button 
-              class="tab error-tab" 
-              [class.active]="activeTab() === 'error'"
-              (click)="activeTab.set('error')">
-              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="14" height="14" style="display:inline-block;vertical-align:middle;margin-right:4px;">
-                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-              </svg>
-              Error
-            </button>
-          }
-        </div>
-
-        <div class="panel-content">
-          @switch (activeTab()) {
-            @case ('input') {
-              <div class="data-viewer">
-                <div class="data-header">
-                  <span>Input Data</span>
-                  <span class="badge">{{ nodeExecution()!.inputData!.length }} items</span>
-                </div>
-                @for (item of nodeExecution()!.inputData; track $index) {
-                  <div class="data-item">
-                    <div class="item-index">#{{ $index }}</div>
-                    <pre class="json-data">{{ formatJson(item.json) }}</pre>
+        <div class="io-grid">
+          <section class="io-pane">
+            <header class="io-header in">
+              <span class="io-dot"></span>
+              <span class="io-title">Input</span>
+              <span class="io-count">{{ exec.inputData?.length ?? 0 }} item(s)</span>
+            </header>
+            <div class="io-body">
+              @if (exec.inputData?.length) {
+                @for (item of exec.inputData; track $index) {
+                  <div class="io-item">
+                    @if ((exec.inputData?.length ?? 0) > 1) {
+                      <div class="io-item-idx">#{{ $index }}</div>
+                    }
+                    <pre class="io-json">{{ pretty(item.json) }}</pre>
                   </div>
                 }
-              </div>
-            }
-            @case ('output') {
-              <div class="data-viewer">
-                <div class="data-header">
-                  <span>Output Data</span>
-                  <span class="badge">{{ nodeExecution()!.outputData!.length }} items</span>
+              } @else {
+                <div class="io-empty">No input data</div>
+              }
+            </div>
+          </section>
+
+          <section class="io-pane">
+            <header class="io-header out" [class.error]="exec.status === 'error'">
+              <span class="io-dot"></span>
+              <span class="io-title">{{ exec.status === 'error' ? 'Error' : 'Output' }}</span>
+              @if (exec.status !== 'error') {
+                <span class="io-count">{{ exec.outputData?.length ?? 0 }} item(s)</span>
+              }
+            </header>
+            <div class="io-body">
+              @if (exec.status === 'error' && exec.error) {
+                <div class="error-card">
+                  <div class="error-message">{{ exec.error.message }}</div>
+                  @if (exec.error.details) {
+                    <pre class="error-details">{{ exec.error.details }}</pre>
+                  }
+                  @if (exec.error.stack) {
+                    <details>
+                      <summary>Stack trace</summary>
+                      <pre class="error-stack">{{ exec.error.stack }}</pre>
+                    </details>
+                  }
                 </div>
-                @for (item of nodeExecution()!.outputData; track $index) {
-                  <div class="data-item">
-                    <div class="item-index">#{{ $index }}</div>
-                    <pre class="json-data">{{ formatJson(item.json) }}</pre>
+              } @else if (exec.outputData?.length) {
+                @for (item of exec.outputData; track $index) {
+                  <div class="io-item">
+                    @if ((exec.outputData?.length ?? 0) > 1) {
+                      <div class="io-item-idx">#{{ $index }}</div>
+                    }
+                    <pre class="io-json">{{ pretty(item.json) }}</pre>
                   </div>
                 }
-              </div>
-            }
-            @case ('json') {
-              <div class="data-viewer">
-                <div class="data-header">
-                  <span>Full Execution JSON</span>
-                </div>
-                <pre class="json-data full-json">{{ formatFullJson() }}</pre>
-              </div>
-            }
-            @case ('error') {
-              <div class="error-viewer">
-                <div class="error-message">
-                  <strong>Error:</strong> {{ nodeExecution()!.error?.message }}
-                </div>
-                @if (nodeExecution()!.error?.details) {
-                  <div class="error-details">{{ nodeExecution()!.error!.details }}</div>
-                }
-                @if (nodeExecution()!.error?.stack) {
-                  <pre class="error-stack">{{ nodeExecution()!.error!.stack }}</pre>
-                }
-              </div>
-            }
-          }
+              } @else if (exec.status === 'pending' || exec.status === 'running') {
+                <div class="io-empty">Waiting for execution…</div>
+              } @else {
+                <div class="io-empty">No output</div>
+              }
+            </div>
+          </section>
         </div>
 
-        @if (nodeExecution()!.duration) {
-          <div class="panel-footer">
-            <span>⏱ Duration: <strong>{{ nodeExecution()!.duration | number:'1.0-0' }}ms</strong></span>
-            @if (nodeExecution()!.startTime) {
-              <span>🕐 Started: <strong>{{ formatTime(nodeExecution()!.startTime!) }}</strong></span>
+        @if (exec.duration != null || exec.startTime) {
+          <footer class="panel-footer">
+            @if (exec.duration != null) {
+              <span>Duration: <strong>{{ exec.duration | number:'1.0-0' }} ms</strong></span>
             }
-          </div>
+            @if (exec.startTime) {
+              <span>Started: <strong>{{ formatTime(exec.startTime) }}</strong></span>
+            }
+            @if (exec.itemsCount != null) {
+              <span>Items: <strong>{{ exec.itemsCount }}</strong></span>
+            }
+          </footer>
         }
       } @else {
         <div class="empty-state">
-          <div class="empty-icon">⚡</div>
-          <h3>No execution data</h3>
-          <p>Select a node to view execution details</p>
-          <p class="hint">Run the workflow to see execution results</p>
+          <div class="empty-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="48" height="48">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          </div>
+          <h3>Нет данных о запуске</h3>
+          <p>Нажмите <b>Execute</b>, чтобы запустить workflow.</p>
+          <p class="hint">Затем кликните по ноде, чтобы увидеть её входной и выходной JSON.</p>
         </div>
       }
     </div>
@@ -159,6 +139,7 @@ type TabType = 'input' | 'output' | 'json' | 'error';
       display: flex;
       flex-direction: column;
       gap: 2px;
+      min-width: 0;
     }
 
     .title-label {
@@ -173,6 +154,15 @@ type TabType = 'input' | 'output' | 'json' | 'error';
       margin: 0;
       font-size: 14px;
       color: var(--fg-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .node-type {
+      font-size: 11px;
+      color: var(--fg-muted);
+      font-family: var(--font-mono);
     }
 
     .header-actions {
@@ -181,33 +171,8 @@ type TabType = 'input' | 'output' | 'json' | 'error';
       gap: 8px;
     }
 
-    .reset-btn {
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
-      background: var(--bg-tertiary);
-      border: 1px solid var(--border);
-      color: var(--fg-secondary);
-      font-size: 16px;
-      cursor: pointer;
-      display: grid;
-      place-items: center;
-    }
-
-    .reset-btn:hover {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: white;
-    }
-
-    .icon {
-      display: block;
-      color: inherit;
-      vertical-align: middle;
-    }
-
     .status-badge {
-      padding: 4px 12px;
+      padding: 4px 10px;
       border-radius: 12px;
       font-size: 11px;
       font-weight: 600;
@@ -220,176 +185,168 @@ type TabType = 'input' | 'output' | 'json' | 'error';
     .status-badge.status-error { background: var(--danger-bg); color: var(--danger); }
     .status-badge.status-skipped { background: var(--bg-tertiary); color: var(--fg-muted); }
 
-    .close-btn {
-      background: transparent;
-      border: none;
-      color: var(--fg-muted);
-      font-size: 18px;
+    .reset-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--fg-secondary);
       cursor: pointer;
-      padding: 4px;
       display: grid;
       place-items: center;
     }
 
-    .close-btn:hover {
-      color: var(--fg-primary);
-      background: var(--bg-tertiary);
-      border-radius: 4px;
-    }
-
-    .tabs {
-      display: flex;
-      gap: 4px;
-      padding: 8px 16px;
-      border-bottom: 1px solid var(--border);
-      background: var(--bg-secondary);
-    }
-
-    .tab {
-      padding: 8px 16px;
-      background: transparent;
-      border: none;
-      border-radius: 6px;
-      font-size: 13px;
-      color: var(--fg-secondary);
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-
-    .tab:hover {
-      background: var(--bg-tertiary);
-      color: var(--fg-primary);
-    }
-
-    .tab.active {
+    .reset-btn:hover {
       background: var(--accent);
+      border-color: var(--accent);
       color: white;
     }
 
-    .tab.error-tab.active {
-      background: var(--danger);
-    }
-
-    .panel-content {
+    .io-grid {
       flex: 1;
-      overflow: auto;
-      padding: 16px;
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      gap: 0;
+      overflow: hidden;
+      min-height: 0;
     }
 
-    .data-viewer {
+    .io-pane {
       display: flex;
       flex-direction: column;
-      gap: 12px;
-    }
-
-    .data-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 8px;
+      min-height: 0;
       border-bottom: 1px solid var(--border);
     }
 
-    .data-header span:first-child {
-      font-weight: 600;
-      color: var(--fg-primary);
-      font-size: 13px;
+    .io-pane:last-child {
+      border-bottom: none;
     }
 
-    .badge {
+    .io-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .io-header .io-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .io-header.in .io-dot { background: var(--accent); }
+    .io-header.out .io-dot { background: var(--success); }
+    .io-header.out.error .io-dot { background: var(--danger); }
+    .io-header.out.error { color: var(--danger); }
+
+    .io-title {
+      color: var(--fg-primary);
+      flex: 1;
+    }
+
+    .io-header.out.error .io-title { color: var(--danger); }
+
+    .io-count {
+      font-size: 11px;
+      color: var(--fg-muted);
+      font-weight: 500;
       background: var(--bg-tertiary);
-      color: var(--fg-secondary);
       padding: 2px 8px;
       border-radius: 10px;
-      font-size: 11px;
     }
 
-    .data-item {
+    .io-body {
+      flex: 1;
+      overflow: auto;
+      padding: 12px;
+      background: var(--bg-primary);
+    }
+
+    .io-item + .io-item {
+      margin-top: 8px;
+    }
+
+    .io-item-idx {
+      font-size: 10px;
+      color: var(--fg-muted);
+      font-family: var(--font-mono);
+      margin-bottom: 4px;
+    }
+
+    .io-json {
+      margin: 0;
+      padding: 10px 12px;
       background: var(--bg-secondary);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 12px;
-    }
-
-    .item-index {
-      font-size: 11px;
-      color: var(--fg-muted);
-      margin-bottom: 8px;
-      font-weight: 600;
-    }
-
-    .json-data {
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 12px;
       font-family: var(--font-mono);
       font-size: 11px;
       color: var(--fg-secondary);
       white-space: pre-wrap;
       word-break: break-word;
-      margin: 0;
-      max-height: 400px;
-      overflow: auto;
       line-height: 1.5;
     }
 
-    .full-json {
-      max-height: none;
+    .io-empty {
+      padding: 24px 0;
+      text-align: center;
+      color: var(--fg-muted);
+      font-size: 12px;
     }
 
-    .error-viewer {
+    .error-card {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 8px;
     }
 
     .error-message {
       background: var(--danger-bg);
       border: 1px solid var(--danger);
       border-radius: 8px;
-      padding: 12px;
+      padding: 10px 12px;
       color: var(--danger);
       font-size: 13px;
+      font-weight: 600;
     }
 
-    .error-message strong {
-      display: block;
-      margin-bottom: 4px;
-    }
-
-    .error-details {
+    .error-details, .error-stack {
+      margin: 0;
+      padding: 10px 12px;
       background: var(--bg-secondary);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 12px;
-      font-size: 12px;
-      color: var(--fg-secondary);
-    }
-
-    .error-stack {
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
       font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--fg-muted);
+      font-size: 11px;
+      color: var(--fg-secondary);
       white-space: pre-wrap;
       word-break: break-word;
-      margin: 0;
-      max-height: 300px;
+      max-height: 240px;
       overflow: auto;
     }
 
+    details summary {
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--fg-muted);
+      padding: 4px 0;
+    }
+
     .panel-footer {
-      padding: 12px 16px;
+      padding: 8px 16px;
       border-top: 1px solid var(--border);
       background: var(--bg-secondary);
       display: flex;
-      gap: 24px;
-      font-size: 12px;
+      gap: 16px;
+      font-size: 11px;
       color: var(--fg-muted);
+      flex-wrap: wrap;
     }
 
     .panel-footer strong {
@@ -402,14 +359,24 @@ type TabType = 'input' | 'output' | 'json' | 'error';
       align-items: center;
       justify-content: center;
       height: 100%;
-      padding: 40px;
+      padding: 40px 20px;
       text-align: center;
       color: var(--fg-muted);
     }
 
     .empty-icon {
-      font-size: 48px;
+      display: grid;
+      place-items: center;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: var(--accent-glow);
+      color: var(--accent);
       margin-bottom: 16px;
+    }
+
+    .empty-icon svg {
+      display: block;
     }
 
     .empty-state h3 {
@@ -419,12 +386,11 @@ type TabType = 'input' | 'output' | 'json' | 'error';
     }
 
     .empty-state p {
-      margin: 0;
+      margin: 4px 0;
       font-size: 13px;
     }
 
     .empty-state .hint {
-      margin-top: 8px;
       font-size: 12px;
       color: var(--fg-muted);
     }
@@ -437,52 +403,36 @@ export class ExecutionPanelComponent {
   close = output<void>();
   reset = output<void>();
 
-  activeTab = signal<TabType>('output');
-
   nodeExecution = computed(() => {
-    const nodeId = this.nodeId();
-    if (!nodeId) return null;
-    return this.executionService.getNodeExecutionData(nodeId);
+    const id = this.nodeId();
+    if (!id) return null;
+    return this.executionService.getNodeExecutionData(id);
   });
 
-  resetExecution(): void {
-    this.reset.emit();
+  pretty(data: unknown): string {
+    try {
+      return JSON.stringify(data, null, 2);
+    } catch {
+      return String(data);
+    }
   }
 
-  formatJson(data: Record<string, unknown>): string {
-    return JSON.stringify(data, null, 2);
-  }
-
-  formatFullJson(): string {
-    const exec = this.nodeExecution();
-    if (!exec) return '{}';
-    
-    return JSON.stringify({
-      nodeId: exec.nodeId,
-      nodeName: exec.nodeName,
-      nodeType: exec.nodeType,
-      status: exec.status,
-      startTime: exec.startTime,
-      endTime: exec.endTime,
-      duration: exec.duration,
-      inputData: exec.inputData,
-      outputData: exec.outputData,
-      error: exec.error
-    }, null, 2);
-  }
-
-  getStatusText(status: string): string {
-    const map: Record<string, string> = {
-      'pending': 'Pending',
-      'running': 'Running',
-      'success': 'Success',
-      'error': 'Error',
-      'skipped': 'Skipped'
+  statusLabel(status: string): string {
+    const labels: Record<string, string> = {
+      pending: 'Pending',
+      running: 'Running',
+      success: 'Success',
+      error: 'Error',
+      skipped: 'Skipped',
     };
-    return map[status] || status;
+    return labels[status] ?? status;
   }
 
-  formatTime(timestamp: string): string {
-    return new Date(timestamp).toLocaleTimeString('ru-RU');
+  formatTime(ts: string): string {
+    try {
+      return new Date(ts).toLocaleTimeString();
+    } catch {
+      return ts;
+    }
   }
 }

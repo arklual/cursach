@@ -50,24 +50,48 @@ class WorkflowExecutionService(
         val revision = revisions.findById(run.workflowRevisionId) ?: throw NotFoundException("Revision not found")
         val skeleton = objectMapper.readValue(revision.graphSkeletonJson, GraphSkeleton::class.java)
 
-        val nodeById = skeleton.nodes.associateBy { it.id }
-        val incoming = mutableMapOf<String, MutableSet<String>>()
-        val outgoing = mutableMapOf<String, MutableSet<String>>()
-
-        skeleton.nodes.forEach { n ->
-            incoming[n.id] = mutableSetOf()
-            outgoing[n.id] = mutableSetOf()
-        }
-
+        val allNodeIds = skeleton.nodes.map { it.id }.toSet()
+        val outgoingAll = mutableMapOf<String, MutableSet<String>>()
+        allNodeIds.forEach { outgoingAll[it] = mutableSetOf() }
         skeleton.connections.forEach { c ->
-            val src = c.source
-            val dst = c.target
-            if (!incoming.containsKey(src) || !incoming.containsKey(dst)) {
+            if (!allNodeIds.contains(c.source) || !allNodeIds.contains(c.target)) {
                 workflowRuns.markFinished(runId, "failed", outputJson = null)
                 return
             }
-            outgoing.getValue(src).add(dst)
-            incoming.getValue(dst).add(src)
+            outgoingAll.getValue(c.source).add(c.target)
+        }
+
+        val reachableNodeIds: Set<String> = run.startNodeId?.let { startId ->
+            if (!allNodeIds.contains(startId)) {
+                workflowRuns.markFinished(runId, "failed", outputJson = null)
+                return
+            }
+            val visited = mutableSetOf<String>()
+            val queue = ArrayDeque<String>()
+            queue.add(startId)
+            visited.add(startId)
+            while (queue.isNotEmpty()) {
+                val cur = queue.removeFirst()
+                outgoingAll[cur].orEmpty().forEach { nxt ->
+                    if (visited.add(nxt)) queue.add(nxt)
+                }
+            }
+            visited
+        } ?: allNodeIds
+
+        val nodes = skeleton.nodes.filter { reachableNodeIds.contains(it.id) }
+        val nodeById = nodes.associateBy { it.id }
+        val incoming = mutableMapOf<String, MutableSet<String>>()
+        val outgoing = mutableMapOf<String, MutableSet<String>>()
+        nodes.forEach { n ->
+            incoming[n.id] = mutableSetOf()
+            outgoing[n.id] = mutableSetOf()
+        }
+        skeleton.connections.forEach { c ->
+            if (reachableNodeIds.contains(c.source) && reachableNodeIds.contains(c.target)) {
+                outgoing.getValue(c.source).add(c.target)
+                incoming.getValue(c.target).add(c.source)
+            }
         }
 
         val topo = topologicalOrder(incoming.mapValues { it.value.size }, outgoing)
@@ -77,7 +101,7 @@ class WorkflowExecutionService(
         }
 
         val nodeRunIds = mutableMapOf<String, Long>()
-        skeleton.nodes.forEach { node ->
+        nodes.forEach { node ->
             val nodeRunId = nodeRuns.insertQueued(
                 workflowRunId = runId,
                 nodeId = node.id,

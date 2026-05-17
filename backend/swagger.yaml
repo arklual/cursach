@@ -174,32 +174,12 @@ paths:
           description: Версия workflow не найдена.
 
   /workflows/{workflowId}/triggers:
-    post:
-      tags: [Triggers]
-      summary: Создать триггер
-      description: Добавляет новый триггер запуска для указанного workflow.
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-      requestBody:
-        required: true
-        description: Конфигурация триггера.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TriggerCreateRequest'
-      responses:
-        '201':
-          description: Триггер создан.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Trigger'
-        '404':
-          description: Workflow не найден.
     get:
       tags: [Triggers]
       summary: Список триггеров workflow
-      description: Возвращает все триггеры, относящиеся к указанному workflow.
+      description: >
+        Возвращает все триггеры workflow. Триггеры создаются/удаляются автоматически
+        при сохранении графа (по нодам с type trigger.webhook/cron/interval).
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
       responses:
@@ -214,19 +194,6 @@ paths:
                   $ref: '#/components/schemas/Trigger'
         '404':
           description: Workflow не найден.
-
-  /triggers/{triggerId}:
-    delete:
-      tags: [Triggers]
-      summary: Удалить триггер
-      description: Удаляет указанный триггер по ID.
-      parameters:
-        - $ref: '#/components/parameters/TriggerId'
-      responses:
-        '204':
-          description: Триггер удалён.
-        '404':
-          description: Триггер не найден.
 
   /webhook/{token}:
     post:
@@ -340,13 +307,6 @@ components:
       in: path
       required: true
       description: Идентификатор версии workflow.
-      schema:
-        type: string
-    TriggerId:
-      name: triggerId
-      in: path
-      required: true
-      description: Идентификатор триггера.
       schema:
         type: string
     Token:
@@ -503,21 +463,9 @@ components:
           description: Метка входящего порта.
       required: [id, source, target]
 
-    TriggerCreateRequest:
-      type: object
-      description: Тело запроса для создания триггера.
-      properties:
-        type:
-          type: string
-          description: Тип триггера (cron, webhook и т.п.).
-        config:
-          type: object
-          description: Конфигурация триггера.
-      required: [type]
-
     Trigger:
       type: object
-      description: Триггер запуска workflow.
+      description: Триггер запуска workflow, привязанный к ноде в графе.
       properties:
         id:
           type: string
@@ -525,12 +473,18 @@ components:
         workflowId:
           type: string
           description: Идентификатор workflow.
+        nodeId:
+          type: string
+          description: Идентификатор ноды в графе, к которой привязан триггер.
         type:
           type: string
-          description: Тип триггера.
+          description: Тип триггера (webhook, cron, interval).
         config:
           type: object
-          description: Конфигурация триггера.
+          description: Конфигурация триггера (например, cron-выражение, everySeconds).
+        token:
+          type: string
+          description: Публичный токен для webhook-триггера (генерируется на бэке).
 
     WorkflowRun:
       type: object

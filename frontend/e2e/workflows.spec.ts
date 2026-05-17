@@ -146,14 +146,12 @@ test.describe('Workflow editor page', () => {
     await expect(page.getByRole('heading', { name: 'FluxPilot Workflow Lab' })).toBeVisible();
   });
 
-  test('switching bottom tabs: Запуски / Триггеры loads without errors', async ({ page }) => {
+  test('switching bottom tabs: Запуски loads without errors', async ({ page }) => {
     const errs = attachConsoleSpy(page);
     await page.goto(`/workflow/${createdId}`);
     await expect(page.locator('.app-header')).toBeVisible();
     await page.getByRole('button', { name: 'Запуски' }).click();
     await expect(page.locator('app-runs-panel')).toBeVisible({ timeout: 5_000 });
-    await page.getByRole('button', { name: 'Триггеры' }).click();
-    await expect(page.locator('app-triggers-panel')).toBeVisible({ timeout: 5_000 });
     expect(errs.errors, JSON.stringify(errs.errors, null, 2)).toEqual([]);
   });
 

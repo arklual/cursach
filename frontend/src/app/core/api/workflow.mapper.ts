@@ -20,16 +20,19 @@ import type {
 } from '../../models/workflow.model';
 import { uuid } from '../uuid';
 
-const META_KEYS = ['__variants', '__randomization', '__metrics', '__successProb', '__color', '__subtype'] as const;
+const META_KEYS = ['__variants', '__randomization', '__metrics', '__successProb', '__color', '__subtype', '__originalKind'] as const;
 
 const DATAFLOW_SUBTYPES = ['filter', 'map', 'reduce', 'foreach', 'flatmap'] as const;
 type DataflowSubtype = typeof DATAFLOW_SUBTYPES[number];
+
+const TRIGGER_SUBTYPES = ['webhook', 'cron', 'interval'] as const;
+type TriggerSubtype = typeof TRIGGER_SUBTYPES[number];
 
 function defaultMetrics(): NodeMetrics {
     return { reached: 0, converted: 0, pHat: 0, variance: 0, ci: [0, 0], users: [], events: [] };
 }
 
-/** front-kind + subtype -> backend type. */
+/** front-kind + subtype -> backend type. Backend supports: http, python, javascript, dataflow.{...}, trigger.{webhook,cron,interval}. */
 function toBackendType(kind: NodeKind, subtype: string | undefined): string {
     if (kind === 'dataflow') {
         const sub = (DATAFLOW_SUBTYPES as readonly string[]).includes(subtype ?? '')
@@ -37,17 +40,50 @@ function toBackendType(kind: NodeKind, subtype: string | undefined): string {
             : 'filter';
         return `dataflow.${sub}`;
     }
-    return kind;
+    if (kind === 'code') {
+        return subtype === 'js' ? 'javascript' : 'python';
+    }
+    if (kind === 'http') {
+        return 'http';
+    }
+    if (kind === 'trigger') {
+        const sub = (TRIGGER_SUBTYPES as readonly string[]).includes(subtype ?? '')
+            ? subtype
+            : 'webhook';
+        return `trigger.${sub}`;
+    }
+    // ab / join: backend has no dedicated executor — map to passthrough so the run doesn't abort
+    return 'dataflow.foreach';
 }
 
 /** backend type -> { kind, subtype? }. */
-function fromBackendType(type: string | undefined): { kind: NodeKind; subtype?: DataflowSubtype } {
+function fromBackendType(type: string | undefined, originalKind?: NodeKind): { kind: NodeKind; subtype?: string } {
+    if (type && type.startsWith('trigger.')) {
+        const sub = type.substring('trigger.'.length) as TriggerSubtype;
+        if ((TRIGGER_SUBTYPES as readonly string[]).includes(sub)) {
+            return { kind: 'trigger', subtype: sub };
+        }
+        return { kind: 'trigger' };
+    }
     if (type && type.startsWith('dataflow.')) {
         const sub = type.substring('dataflow.'.length) as DataflowSubtype;
+        // If the node was originally ab/join (mapped to foreach passthrough on save), restore that kind.
+        if (sub === 'foreach' && originalKind && originalKind !== 'dataflow' && originalKind !== 'trigger') {
+            return { kind: originalKind };
+        }
         if ((DATAFLOW_SUBTYPES as readonly string[]).includes(sub)) {
             return { kind: 'dataflow', subtype: sub };
         }
         return { kind: 'dataflow' };
+    }
+    if (type === 'python') {
+        return { kind: 'code' };
+    }
+    if (type === 'javascript') {
+        return { kind: 'code', subtype: 'js' };
+    }
+    if (type === 'http') {
+        return { kind: 'http' };
     }
     return { kind: (type ?? 'http') as NodeKind };
 }
@@ -64,6 +100,7 @@ export function frontNodeToBackend(node: FrontNode): BackendNode {
         __successProb: node.data.successProb,
         __color: node.data.color,
         __subtype: subtype,
+        __originalKind: node.data.kind,
     };
 
     return {
@@ -80,9 +117,10 @@ export function frontNodeToBackend(node: FrontNode): BackendNode {
 
 export function backendNodeToFront(backend: BackendNode): FrontNode {
     const id = backend.id ?? uuid();
-    const { kind, subtype } = fromBackendType(backend.type);
     const data = backend.data ?? {};
     const config = (data.config ?? {}) as Record<string, unknown>;
+    const originalKind = config['__originalKind'] as NodeKind | undefined;
+    const { kind, subtype } = fromBackendType(backend.type, originalKind);
 
     // user-config = всё, что не начинается с __
     const userConfig: Record<string, unknown> = {};

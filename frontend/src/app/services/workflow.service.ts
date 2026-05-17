@@ -6,7 +6,6 @@ import {
   NodeTemplate,
   NodeMetrics,
   NodeData,
-  Variant,
 } from '../models/workflow.model';
 import { uuid } from '../core/uuid';
 
@@ -34,15 +33,28 @@ export class WorkflowService {
     trigger: { label: 'Trigger', color: '#38bdf8', success: 0.2 },
     http: { label: 'HTTP', color: '#f97316', success: 0.35 },
     dataflow: { label: 'Dataflow', color: '#14b8a6', success: 0.25 },
-    code: { label: 'Code (Python)', color: '#6366f1', success: 0.4 },
+    code: { label: 'Python', color: '#6366f1', success: 0.4 },
     ab: { label: 'A/B Fork', color: '#ec4899', success: 0.0 },
     join: { label: 'Join', color: '#0ea5e9', success: 0.5 },
   };
 
-  private readonly defaultVariants: Variant[] = [
-    { label: 'A', weight: 50 },
-    { label: 'B', weight: 50 },
-  ];
+  private readonly dataflowSubtypeLabels: Record<string, string> = {
+    filter: 'Filter',
+    map: 'Map',
+    reduce: 'Reduce',
+    foreach: 'ForEach',
+    flatmap: 'FlatMap',
+  };
+
+  private readonly codeSubtypeLabels: Record<string, string> = {
+    js: 'JavaScript',
+  };
+
+  private readonly triggerSubtypeLabels: Record<string, string> = {
+    webhook: 'Webhook',
+    cron: 'Cron',
+    interval: 'Interval',
+  };
 
   private nodesSignal = signal<WorkflowNode[]>([]);
   private edgesSignal = signal<WorkflowEdge[]>([]);
@@ -71,26 +83,38 @@ export class WorkflowService {
     };
   }
 
-  private createNodeData(id: string, type: NodeKind): NodeData {
+  private createNodeData(id: string, type: NodeKind, subtype?: string): NodeData {
     const template = this.nodeTemplates[type];
-    return {
+    let label = template.label;
+    if (type === 'dataflow' && subtype) {
+      label = this.dataflowSubtypeLabels[subtype] ?? template.label;
+    } else if (type === 'code' && subtype) {
+      label = this.codeSubtypeLabels[subtype] ?? template.label;
+    } else if (type === 'trigger' && subtype) {
+      label = this.triggerSubtypeLabels[subtype] ?? template.label;
+    }
+    const data: NodeData = {
       id,
       kind: type,
-      label: template.label,
+      label,
       color: template.color,
       successProb: template.success,
-      variants: type === 'ab' ? this.defaultVariants.map(v => ({ ...v })) : [],
+      variants: [],
       randomization: 'simple',
       metrics: this.createDefaultMetrics(),
     };
+    if (subtype) {
+      data.__subtype = subtype;
+    }
+    return data;
   }
 
-  makeNode(id: string, type: NodeKind, position: { x: number; y: number }): WorkflowNode {
+  makeNode(id: string, type: NodeKind, position: { x: number; y: number }, subtype?: string): WorkflowNode {
     return {
       id,
       type: 'workflowNode',
       position,
-      data: this.createNodeData(id, type),
+      data: this.createNodeData(id, type, subtype),
     };
   }
 
@@ -98,9 +122,10 @@ export class WorkflowService {
     this.activeNodeIdSignal.set(id);
   }
 
-  addNode(type: NodeKind, position: { x: number; y: number }): string {
-    const id = `${type}-${uuid().slice(0, 5)}`;
-    const newNode = this.makeNode(id, type, position);
+  addNode(type: NodeKind, position: { x: number; y: number }, subtype?: string): string {
+    const suffix = uuid().slice(0, 5);
+    const id = subtype ? `${type}-${subtype}-${suffix}` : `${type}-${suffix}`;
+    const newNode = this.makeNode(id, type, position, subtype);
     this.nodesSignal.update(nodes => [...nodes, newNode]);
     this.activeNodeIdSignal.set(id);
     this.log(`Добавлена нода ${newNode.data.label}`);

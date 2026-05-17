@@ -20,7 +20,7 @@ class RunEnqueueService(
     private val executionService: WorkflowExecutionService,
 ) {
     @Transactional
-    fun enqueue(workflowId: UUID, input: JsonNode?): Long {
+    fun enqueue(workflowId: UUID, input: JsonNode?, startNodeId: String? = null): Long {
         val workflow = workflows.findById(workflowId) ?: throw NotFoundException("Workflow not found")
         val versionId = workflow.currentVersionId
             ?: versions.listByWorkflow(workflowId).firstOrNull()?.id
@@ -32,6 +32,7 @@ class RunEnqueueService(
             workflowId = workflowId,
             workflowRevisionId = version.rootRevisionId,
             inputJson = inputJson,
+            startNodeId = startNodeId,
         )
 
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -47,4 +48,3 @@ class RunEnqueueService(
         return runId
     }
 }
-

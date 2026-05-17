@@ -10,12 +10,17 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import ru.startem.aelevena.api.BadRequestException
 import ru.startem.aelevena.api.NotFoundException
 import ru.startem.aelevena.api.dto.Trigger
-import ru.startem.aelevena.api.dto.TriggerCreateRequest
+import ru.startem.aelevena.api.dto.WorkflowGraph
 import ru.startem.aelevena.run.RunEnqueueService
 import ru.startem.aelevena.workflow.persistence.WorkflowsRepository
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.UUID
+
+/**
+ * Subtype prefix on the backend `node.type` string. e.g. `trigger.webhook`, `trigger.cron`, `trigger.interval`.
+ */
+private const val TRIGGER_TYPE_PREFIX = "trigger."
 
 @Service
 class TriggerService(
@@ -27,33 +32,76 @@ class TriggerService(
 ) {
     private val random = SecureRandom()
 
-    @Transactional
-    fun create(workflowId: UUID, req: TriggerCreateRequest): Trigger {
+    @Transactional(readOnly = true)
+    fun list(workflowId: UUID): List<Trigger> {
         if (workflows.findById(workflowId) == null) {
             throw NotFoundException("Workflow not found")
         }
+        return triggers.listByWorkflow(workflowId).map { it.toDto() }
+    }
 
-        val (token, configNode) = when (req.type) {
-            "webhook" -> {
-                val token = generateToken()
-                val cfg = mergeTokenIntoConfig(req.config, token)
-                token to cfg
+    @Transactional
+    fun handleWebhook(token: String, payload: JsonNode?): Long {
+        val trigger = triggers.findByToken(token) ?: throw NotFoundException("Webhook not found")
+        return runEnqueueService.enqueue(trigger.workflowId, payload, startNodeId = trigger.nodeId)
+    }
+
+    /**
+     * Reconcile the `triggers` table with the trigger nodes present in [graph].
+     *
+     * For every node whose backend type is `trigger.{webhook|cron|interval}` we upsert a row keyed on
+     * (workflow_id, node_id). Rows whose node disappeared from the graph are deleted. Webhook nodes
+     * without an existing row get a freshly generated token. Cron/interval rows are (re)scheduled
+     * post-commit. Must be invoked from within the graph-save transaction so it shares atomicity.
+     */
+    @Transactional
+    fun syncFromGraph(workflowId: UUID, graph: WorkflowGraph) {
+        val triggerNodes = graph.nodes.filter { it.type?.startsWith(TRIGGER_TYPE_PREFIX) == true }
+        val keepNodeIds = triggerNodes.map { it.id }
+
+        val staleIds = triggers.deleteByWorkflowIdAndNodeIdNotIn(workflowId, keepNodeIds)
+
+        val upserted = mutableListOf<TriggersRepository.TriggerRow>()
+        triggerNodes.forEach { node ->
+            val subtype = node.type!!.substring(TRIGGER_TYPE_PREFIX.length)
+            if (subtype !in setOf("webhook", "cron", "interval")) {
+                throw BadRequestException("Unknown trigger subtype: $subtype (node ${node.id})")
             }
+            val userConfig = stripMetaKeys(node.data?.config)
+            validateConfig(subtype, userConfig)
 
-            else -> null to req.config
+            val existing = triggers.findByWorkflowAndNode(workflowId, node.id)
+            val token = if (subtype == "webhook") {
+                existing?.token ?: generateToken()
+            } else null
+
+            val configJson = userConfig?.let { objectMapper.writeValueAsString(it) }
+            triggers.upsertByWorkflowAndNode(
+                workflowId = workflowId,
+                nodeId = node.id,
+                type = subtype,
+                configJson = configJson,
+                token = token,
+            )
+            triggers.findByWorkflowAndNode(workflowId, node.id)?.let { upserted.add(it) }
         }
 
-        validateConfig(req.type, configNode)
-
-        val configJson = configNode?.let { objectMapper.writeValueAsString(it) }
-        val triggerId = triggers.insert(workflowId = workflowId, type = req.type, configJson = configJson, token = token)
-        val row = triggers.findById(triggerId) ?: throw IllegalStateException("Just inserted trigger not found")
-
-        if (row.type == "cron" || row.type == "interval") {
-            registerAfterCommit { scheduler.schedule(row) }
+        registerAfterCommit {
+            staleIds.forEach { scheduler.cancel(it) }
+            upserted.forEach { row ->
+                if (row.type == "cron" || row.type == "interval") {
+                    scheduler.schedule(row)
+                }
+            }
         }
+    }
 
-        return row.toDto()
+    private fun stripMetaKeys(config: JsonNode?): ObjectNode? {
+        if (config == null || !config.isObject) return null
+        val copy = (config as ObjectNode).deepCopy() as ObjectNode
+        val fields = copy.fieldNames().asSequence().toList()
+        fields.forEach { name -> if (name.startsWith("__")) copy.remove(name) }
+        return if (copy.isEmpty) null else copy
     }
 
     private fun registerAfterCommit(action: () -> Unit) {
@@ -66,31 +114,8 @@ class TriggerService(
         }
     }
 
-    @Transactional(readOnly = true)
-    fun list(workflowId: UUID): List<Trigger> {
-        if (workflows.findById(workflowId) == null) {
-            throw NotFoundException("Workflow not found")
-        }
-        return triggers.listByWorkflow(workflowId).map { it.toDto() }
-    }
-
-    @Transactional
-    fun delete(triggerId: Long) {
-        triggers.findById(triggerId) ?: throw NotFoundException("Trigger not found")
-        if (!triggers.delete(triggerId)) {
-            throw NotFoundException("Trigger not found")
-        }
-        registerAfterCommit { scheduler.cancel(triggerId) }
-    }
-
-    @Transactional
-    fun handleWebhook(token: String, payload: JsonNode?): Long {
-        val trigger = triggers.findByToken(token) ?: throw NotFoundException("Webhook not found")
-        return runEnqueueService.enqueue(trigger.workflowId, payload)
-    }
-
-    private fun validateConfig(type: String, config: JsonNode?) {
-        when (type) {
+    private fun validateConfig(subtype: String, config: JsonNode?) {
+        when (subtype) {
             "cron" -> {
                 val cron = config?.get("cron")?.asText()
                 if (cron.isNullOrBlank()) throw BadRequestException("cron trigger requires config.cron")
@@ -103,18 +128,6 @@ class TriggerService(
         }
     }
 
-    private fun mergeTokenIntoConfig(config: JsonNode?, token: String): ObjectNode {
-        val obj = when (config) {
-            null -> objectMapper.createObjectNode()
-            is ObjectNode -> (config as ObjectNode).deepCopy()
-            else -> throw BadRequestException("webhook trigger config must be an object")
-        }
-        if (obj.get("token") == null) {
-            obj.put("token", token)
-        }
-        return obj
-    }
-
     private fun generateToken(): String {
         val bytes = ByteArray(24)
         random.nextBytes(bytes)
@@ -125,8 +138,9 @@ class TriggerService(
         Trigger(
             id = this.id.toString(),
             workflowId = this.workflowId.toString(),
+            nodeId = this.nodeId,
             type = this.type,
             config = this.configJson?.let { objectMapper.readTree(it) },
+            token = this.token,
         )
 }
-
