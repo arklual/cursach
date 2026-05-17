@@ -105,7 +105,10 @@ services:
       - backend
     ports:
       - "80:80"
-    # При появлении HTTPS — добавить 443 и volume для сертификатов.
+      - "443:443"
+    volumes:
+      - ${SSL_CERT_PATH:-/opt/kursach/ssl/tls.crt}:/etc/nginx/ssl/tls.crt:ro
+      - ${SSL_KEY_PATH:-/opt/kursach/ssl/tls.key}:/etc/nginx/ssl/tls.key:ro
 
 volumes:
   postgres-data:

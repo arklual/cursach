@@ -65,9 +65,10 @@ mkdir -p /opt/kursach
 chown deploy:deploy /opt/kursach
 
 if command -v ufw >/dev/null 2>&1; then
-    echo "[5/6] Настраиваю ufw (22, 80)"
+    echo "[5/6] Настраиваю ufw (22, 80, 443)"
     ufw allow OpenSSH || true
     ufw allow 80/tcp || true
+    ufw allow 443/tcp || true
     ufw --force enable || true
 fi
 
@@ -77,7 +78,11 @@ echo "  1. Положи публичный ключ деплоя в /home/deploy
 echo "     echo 'ssh-ed25519 AAAA... deploy@github-actions' >> /home/deploy/.ssh/authorized_keys"
 echo "  2. Скопируй deploy/docker-compose.prod.yml и deploy/.env.example в /opt/kursach/"
 echo "  3. Создай /opt/kursach/.env с реальными паролями (chmod 600)."
-echo "  4. Отключи парольный SSH-вход для безопасности:"
+echo "  4. Положи SSL-сертификат и ключ на сервер:"
+echo "     mkdir -p /opt/kursach/ssl"
+echo "     scp tls.crt tls.key server:/opt/kursach/ssl/"
+echo "     chmod 600 /opt/kursach/ssl/tls.key"
+echo "  5. Отключи парольный SSH-вход для безопасности:"
 echo "     sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config && systemctl reload sshd"
 echo ""
 echo "После этого CI/CD на push в main будет автоматически обновлять контейнеры."
