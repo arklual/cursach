@@ -350,6 +350,13 @@ export class PaletteComponent {
       color: 'var(--warning, #fbbf24)',
       items: [
         { id: 'http', label: 'HTTP', kind: 'http', iconPath: this.icons.http },
+      ],
+    },
+    {
+      id: 'code',
+      name: 'Код',
+      color: 'var(--info, #3b82f6)',
+      items: [
         { id: 'code', label: 'Python', kind: 'code', iconPath: this.icons.code },
         { id: 'code:js', label: 'JavaScript', kind: 'code', subtype: 'js', iconPath: this.icons.js },
       ],
