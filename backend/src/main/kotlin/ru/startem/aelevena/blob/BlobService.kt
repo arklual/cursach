@@ -31,11 +31,11 @@ class BlobService(
             "Blob size ${bytes.size} exceeds limit $maxSizeBytes bytes"
         }
         val hash = Hashing.sha256Hex(bytes)
-        if (index.exists(hash)) {
-            return hash
-        }
-
         val key = keyForHash(hash)
+
+        // Always upload: content-addressed PUT is idempotent and the index can be stale relative
+        // to the bucket (e.g. MinIO volume wiped while Postgres survives). Trusting the index alone
+        // makes a subsequent getBytes() fail with NoSuchKey.
         val request = PutObjectRequest.builder()
             .bucket(props.bucket)
             .key(key)
