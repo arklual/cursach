@@ -201,9 +201,9 @@ export class WorkflowValidatorService {
    */
   getStatusColor(status: 'ready' | 'warning' | 'error'): string {
     switch (status) {
-      case 'ready': return '#22c55e';
-      case 'warning': return '#f59e0b';
-      case 'error': return '#ef4444';
+      case 'ready': return '#84cc16';
+      case 'warning': return '#fbbf24';
+      case 'error': return '#e11d48';
     }
   }
 }

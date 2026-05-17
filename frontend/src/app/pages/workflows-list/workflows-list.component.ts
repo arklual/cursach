@@ -350,7 +350,7 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
     .intro-banner {
       margin: 16px 48px 0;
       padding: 24px;
-      background: linear-gradient(135deg, var(--accent-glow) 0%, rgba(236, 72, 153, 0.1) 100%);
+      background: linear-gradient(135deg, var(--accent-glow) 0%, rgba(132, 204, 22, 0.12) 100%);
       border: 1px solid var(--border-light);
       border-radius: 16px;
       display: grid;
@@ -501,10 +501,10 @@ export class WorkflowsListComponent implements OnInit {
 
   getStatusColor(status: string): string {
     switch (status) {
-      case 'running': return '#16a34a';
-      case 'completed': return '#2563eb';
-      case 'paused': return '#d97706';
-      default: return '#64748b';
+      case 'running': return '#84cc16';
+      case 'completed': return '#ff7a1a';
+      case 'paused': return '#fbbf24';
+      default: return '#8b7e6a';
     }
   }
 

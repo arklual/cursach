@@ -400,7 +400,7 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
     }
 
     .node-wrap.drop-target .node-content {
-      box-shadow: 0 0 0 3px var(--success), 0 8px 24px rgba(34, 197, 94, 0.25);
+      box-shadow: 0 0 0 3px var(--success), 0 8px 24px rgba(132, 204, 22, 0.28);
     }
 
     .node-wrap.executing .node-content {

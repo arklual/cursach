@@ -30,12 +30,12 @@ export interface WorkflowMeta {
 @Injectable({ providedIn: 'root' })
 export class WorkflowService {
   readonly nodeTemplates: Record<NodeKind, NodeTemplate> = {
-    trigger: { label: 'Trigger', color: '#38bdf8', success: 0.2 },
-    http: { label: 'HTTP', color: '#f97316', success: 0.35 },
-    dataflow: { label: 'Dataflow', color: '#14b8a6', success: 0.25 },
-    code: { label: 'Python', color: '#6366f1', success: 0.4 },
-    ab: { label: 'A/B Fork', color: '#ec4899', success: 0.0 },
-    join: { label: 'Join', color: '#0ea5e9', success: 0.5 },
+    trigger: { label: 'Trigger', color: '#facc15', success: 0.2 },
+    http: { label: 'HTTP', color: '#fb923c', success: 0.35 },
+    dataflow: { label: 'Dataflow', color: '#a3e635', success: 0.25 },
+    code: { label: 'Python', color: '#06b6d4', success: 0.4 },
+    ab: { label: 'A/B Fork', color: '#f472b6', success: 0.0 },
+    join: { label: 'Join', color: '#c084fc', success: 0.5 },
   };
 
   private readonly dataflowSubtypeLabels: Record<string, string> = {

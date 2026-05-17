@@ -76,7 +76,7 @@ interface NodeCategory {
   styles: [`
     .palette {
       background: var(--bg-primary);
-      border: 1px solid var(--border-default);
+      border: 1px solid var(--border);
       border-radius: var(--radius-xl);
       padding: 16px;
       display: flex;
@@ -92,35 +92,35 @@ interface NodeCategory {
       flex-direction: column;
       gap: 12px;
       padding-bottom: 12px;
-      border-bottom: 1px solid var(--border-default);
+      border-bottom: 1px solid var(--border);
     }
 
     .palette-header h2 {
       margin: 0;
       font-size: 16px;
       font-weight: 600;
-      color: var(--text-primary);
+      color: var(--fg-primary);
     }
 
     .search-input {
       width: 100%;
       padding: 8px 12px;
-      border: 1px solid var(--border-default);
+      border: 1px solid var(--border);
       border-radius: var(--radius-md);
       font-size: 13px;
       background: var(--bg-primary);
-      color: var(--text-primary);
+      color: var(--fg-primary);
       transition: all var(--transition-fast);
     }
 
     .search-input:hover {
-      border-color: var(--border-strong);
+      border-color: var(--border-light);
     }
 
     .search-input:focus {
       outline: none;
-      border-color: var(--primary-500);
-      box-shadow: var(--focus-ring);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
     }
 
     .category {
@@ -149,7 +149,7 @@ interface NodeCategory {
       margin: 0;
       font-size: 12px;
       font-weight: 600;
-      color: var(--text-secondary);
+      color: var(--fg-secondary);
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -157,7 +157,7 @@ interface NodeCategory {
     .category-count {
       font-size: 11px;
       font-weight: 600;
-      color: var(--text-tertiary);
+      color: var(--fg-muted);
       background: var(--bg-tertiary);
       padding: 2px 6px;
       border-radius: 10px;
@@ -175,7 +175,7 @@ interface NodeCategory {
       gap: 8px;
       padding: 10px 12px;
       background: var(--bg-secondary);
-      border: 1px solid var(--border-default);
+      border: 1px solid var(--border);
       border-radius: var(--radius-md);
       cursor: grab;
       font-size: 12px;
@@ -192,9 +192,9 @@ interface NodeCategory {
     }
 
     .palette-item:hover {
-      background: var(--bg-primary);
-      border-color: var(--primary-400);
-      box-shadow: var(--shadow-md);
+      background: var(--panel-hover);
+      border-color: var(--accent);
+      box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-glow);
       transform: translateY(-2px);
     }
 
@@ -216,10 +216,12 @@ interface NodeCategory {
     }
 
     .calc-card {
-      border: 1px solid var(--border-default);
+      border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       padding: 12px;
-      background: linear-gradient(135deg, var(--primary-50), var(--info-50));
+      background:
+        linear-gradient(135deg, rgba(255, 122, 26, 0.10) 0%, rgba(132, 204, 22, 0.06) 100%),
+        var(--bg-secondary);
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -235,7 +237,7 @@ interface NodeCategory {
       margin: 0;
       font-size: 13px;
       font-weight: 600;
-      color: var(--text-primary);
+      color: var(--fg-primary);
     }
 
     .calc-content {
@@ -247,28 +249,30 @@ interface NodeCategory {
     .calc-content p {
       margin: 0;
       font-size: 12px;
-      color: var(--text-secondary);
+      color: var(--fg-secondary);
     }
 
     .calc-content .result {
+      font-family: var(--font-mono);
       font-size: 14px;
-      color: var(--primary-700);
+      color: var(--accent);
       font-weight: 600;
     }
 
     .badge {
-      background: var(--primary-100);
-      color: var(--primary-700);
+      background: var(--accent-glow);
+      color: var(--accent);
       padding: 2px 8px;
       border-radius: 12px;
+      font-family: var(--font-mono);
       font-size: 10px;
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.12em;
     }
 
     .hint {
-      color: var(--text-tertiary);
+      color: var(--fg-muted);
       font-size: 10px;
       margin: 0;
       font-family: 'SF Mono', Menlo, Consolas, monospace;
@@ -281,7 +285,7 @@ interface NodeCategory {
       justify-content: center;
       padding: 32px 16px;
       text-align: center;
-      color: var(--text-tertiary);
+      color: var(--fg-muted);
     }
 
     .empty-icon {
@@ -322,7 +326,7 @@ export class PaletteComponent {
     {
       id: 'entry',
       name: 'Триггеры',
-      color: 'var(--success-500, #22c55e)',
+      color: 'var(--success, #84cc16)',
       items: [
         { id: 'trigger:manual', label: 'Manual', kind: 'trigger', subtype: 'manual', iconPath: this.icons.manual },
         { id: 'trigger:webhook', label: 'Webhook', kind: 'trigger', subtype: 'webhook', iconPath: this.icons.webhook },
@@ -333,7 +337,7 @@ export class PaletteComponent {
     {
       id: 'io',
       name: 'I/O',
-      color: 'var(--warning-500, #f59e0b)',
+      color: 'var(--warning, #fbbf24)',
       items: [
         { id: 'http', label: 'HTTP', kind: 'http', iconPath: this.icons.http },
         { id: 'code', label: 'Python', kind: 'code', iconPath: this.icons.code },
@@ -343,7 +347,7 @@ export class PaletteComponent {
     {
       id: 'dataflow',
       name: 'Dataflow',
-      color: 'var(--primary-500, #6366f1)',
+      color: 'var(--accent, #ff7a1a)',
       items: [
         { id: 'dataflow:filter', label: 'Filter', kind: 'dataflow', subtype: 'filter', iconPath: this.icons.filter },
         { id: 'dataflow:map', label: 'Map', kind: 'dataflow', subtype: 'map', iconPath: this.icons.map },

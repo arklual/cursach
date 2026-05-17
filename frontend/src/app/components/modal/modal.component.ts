@@ -33,7 +33,9 @@ import { CommonModule } from '@angular/common';
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(15, 23, 42, 0.45);
+      background: radial-gradient(ellipse at center, rgba(38, 24, 12, 0.55) 0%, rgba(8, 6, 4, 0.85) 75%);
+      backdrop-filter: blur(6px) saturate(120%);
+      -webkit-backdrop-filter: blur(6px) saturate(120%);
       display: grid;
       place-items: center;
       padding: 20px;

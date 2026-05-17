@@ -328,8 +328,9 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
       margin: 12px 24px 0;
       padding: 12px 16px;
       border-radius: 10px;
-      background: #fee2e2;
-      color: #b91c1c;
+      background: var(--danger-bg);
+      color: var(--danger);
+      border: 1px solid rgba(225, 29, 72, 0.35);
       font-size: 14px;
     }
 
@@ -763,7 +764,7 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
 
     button:hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
     }
 
     button.ghost {
@@ -810,11 +811,13 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
       height: 28px;
       border-radius: 50%;
       background: var(--accent);
-      color: #fff;
+      color: #1a0e05;
       display: grid;
       place-items: center;
-      font-weight: 700;
-      font-size: 14px;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 600;
+      font-size: 15px;
     }
 
     .guide-steps h4 {

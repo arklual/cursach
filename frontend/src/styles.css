@@ -1,53 +1,58 @@
 /* ============================================
-   FLUXPILOT DESIGN SYSTEM v2.0
-   Premium Dark Theme
+   FLUXPILOT DESIGN SYSTEM v3.0 — "FOUNDRY"
+   Warm carbon + molten amber + editorial serif
    ============================================ */
 
 :root {
   /* Typography */
-  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'Geist Mono', 'SF Mono', Consolas, monospace;
-  
-  /* Colors - Premium Dark Slate Palette */
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  
-  --fg-primary: #f1f5f9;
-  --fg-secondary: #cbd5e1;
-  --fg-muted: #64748b;
-  
-  --border: #334155;
-  --border-light: #475569;
-  
-  --panel: #1e293b;
-  --panel-hover: #334155;
-  
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --accent-glow: rgba(59, 130, 246, 0.3);
-  --accent-glow-strong: rgba(59, 130, 246, 0.5);
+  --font-display: 'Fraunces', ui-serif, Georgia, serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 
-  --success: #22c55e;
-  --success-bg: rgba(34, 197, 94, 0.1);
-  --success-glow: rgba(34, 197, 94, 0.3);
-  --success-glow-strong: rgba(34, 197, 94, 0.5);
-  
-  --warning: #f59e0b;
-  --warning-bg: rgba(245, 158, 11, 0.1);
-  --warning-glow: rgba(245, 158, 11, 0.3);
-  
-  --danger: #ef4444;
-  --danger-bg: rgba(239, 68, 68, 0.1);
-  --danger-glow: rgba(239, 68, 68, 0.3);
-  --danger-glow-strong: rgba(239, 68, 68, 0.5);
-  
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.7);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.7);
-  --shadow-glow: 0 0 40px rgba(59, 130, 246, 0.15);
+  /* Colors — Warm Carbon palette */
+  --bg-primary: #0d0b08;
+  --bg-secondary: #16120e;
+  --bg-tertiary: #241d17;
+
+  --fg-primary: #faf6ed;
+  --fg-secondary: #d4cab9;
+  --fg-muted: #8b7e6a;
+
+  --border: #2d251d;
+  --border-light: #4a3e30;
+
+  --panel: #16120e;
+  --panel-hover: #241d17;
+
+  /* Molten amber accent */
+  --accent: #ff7a1a;
+  --accent-hover: #e85d04;
+  --accent-glow: rgba(255, 122, 26, 0.3);
+  --accent-glow-strong: rgba(255, 122, 26, 0.55);
+
+  /* Cypress lime — harmonises with warm carbon */
+  --success: #84cc16;
+  --success-bg: rgba(132, 204, 22, 0.12);
+  --success-glow: rgba(132, 204, 22, 0.3);
+  --success-glow-strong: rgba(132, 204, 22, 0.5);
+
+  /* Marigold */
+  --warning: #fbbf24;
+  --warning-bg: rgba(251, 191, 36, 0.12);
+  --warning-glow: rgba(251, 191, 36, 0.3);
+
+  /* Garnet */
+  --danger: #e11d48;
+  --danger-bg: rgba(225, 29, 72, 0.12);
+  --danger-glow: rgba(225, 29, 72, 0.3);
+  --danger-glow-strong: rgba(225, 29, 72, 0.5);
+
+  /* Shadows — warmer, deeper */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.55);
+  --shadow-md: 0 4px 10px -2px rgba(0, 0, 0, 0.65);
+  --shadow-lg: 0 14px 28px -8px rgba(0, 0, 0, 0.75);
+  --shadow-xl: 0 28px 50px -12px rgba(0, 0, 0, 0.8);
+  --shadow-glow: 0 0 44px rgba(255, 122, 26, 0.18);
   
   /* Radius */
   --radius-sm: 6px;
@@ -88,8 +93,24 @@ body {
   font-size: 14px;
   line-height: 1.6;
   color: var(--fg-primary);
-  background: var(--bg-primary);
+  background:
+    radial-gradient(1200px 600px at 12% -10%, rgba(255, 122, 26, 0.07), transparent 60%),
+    radial-gradient(900px 500px at 110% 110%, rgba(132, 204, 22, 0.05), transparent 65%),
+    var(--bg-primary);
+  background-attachment: fixed;
   min-height: 100vh;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.95 0 0 0 0 0.85 0 0 0 0 0.6 0 0 0 0.9 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
 }
 
 /* Skip link */
@@ -114,16 +135,24 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
-  font-weight: 600;
-  line-height: 1.3;
-  letter-spacing: -0.02em;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
   color: var(--fg-primary);
 }
 
-h1 { font-size: 28px; }
-h2 { font-size: 22px; }
-h3 { font-size: 18px; }
-h4 { font-size: 16px; }
+h1, h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-style: italic;
+  letter-spacing: -0.035em;
+  font-variation-settings: "opsz" 144;
+}
+
+h1 { font-size: 34px; }
+h2 { font-size: 24px; }
+h3 { font-size: 18px; font-weight: 600; }
+h4 { font-size: 16px; font-weight: 600; }
 
 p {
   margin: 0;
@@ -258,12 +287,14 @@ button.btn-small {
   justify-content: space-between;
   align-items: center;
   padding: var(--space-lg) var(--space-2xl);
-  background: var(--panel);
+  background: linear-gradient(180deg, rgba(36, 29, 23, 0.92) 0%, rgba(22, 18, 14, 0.85) 100%);
   border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
   position: sticky;
   top: 0;
   z-index: 100;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
 }
 
 .brand {
@@ -273,16 +304,24 @@ button.btn-small {
 }
 
 .brand .logo {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--accent) 0%, #1d4ed8 100%);
-  color: white;
+  background:
+    radial-gradient(circle at 30% 25%, #ffd29a 0%, transparent 55%),
+    linear-gradient(135deg, #ff7a1a 0%, #b8350a 100%);
+  color: #1a0e05;
   display: grid;
   place-items: center;
-  font-weight: 700;
-  font-size: 18px;
-  box-shadow: var(--shadow-md), var(--shadow-glow);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-style: italic;
+  font-size: 22px;
+  letter-spacing: -0.04em;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 6px 18px rgba(255, 122, 26, 0.35),
+    var(--shadow-md);
 }
 
 .workflow-info {
@@ -295,10 +334,13 @@ button.btn-small {
   background: transparent;
   border: none;
   color: var(--fg-primary);
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 500;
+  font-style: italic;
+  letter-spacing: -0.03em;
   padding: 4px 0;
-  font-family: var(--font-sans);
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 144;
 }
 
 .workflow-info input:focus {
@@ -368,11 +410,13 @@ main {
 .inspector-panel h2 {
   padding: var(--space-lg);
   border-bottom: 1px solid var(--border);
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--fg-secondary);
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.18em;
   margin: 0;
 }
 
@@ -469,9 +513,9 @@ main {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0);
-  background-size: 24px 24px;
-  opacity: 0.5;
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 122, 26, 0.18) 1px, transparent 0);
+  background-size: 28px 28px;
+  opacity: 0.55;
   pointer-events: none;
 }
 
@@ -750,8 +794,9 @@ main {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
+  background: radial-gradient(ellipse at center, rgba(38, 24, 12, 0.55) 0%, rgba(8, 6, 4, 0.85) 75%);
+  backdrop-filter: blur(6px) saturate(120%);
+  -webkit-backdrop-filter: blur(6px) saturate(120%);
   display: grid;
   place-items: center;
   padding: var(--space-2xl);
