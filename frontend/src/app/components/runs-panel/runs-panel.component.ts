@@ -14,6 +14,7 @@ import { Subscription, forkJoin, interval, of, switchMap, takeWhile } from 'rxjs
 import { catchError, finalize } from 'rxjs/operators';
 import { RunApiService } from '../../core/api/run.api';
 import type { NodeRun, WorkflowRun } from '../../core/api/api.models';
+import { prettyOutput } from '../../core/pretty-output';
 
 type RunStatus = 'queued' | 'running' | 'success' | 'failed' | 'unknown';
 
@@ -258,10 +259,6 @@ export class RunsPanelComponent implements OnInit {
     }
 
     formatJson(obj: unknown): string {
-        try {
-            return JSON.stringify(obj, null, 2);
-        } catch {
-            return String(obj);
-        }
+        return prettyOutput(obj);
     }
 }

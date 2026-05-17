@@ -51,16 +51,43 @@ class HttpNodeExecutor(
         val request = requestBuilder.method(method, bodyPublisher).build()
 
         val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        val out = objectMapper.createObjectNode()
-            .put("statusCode", response.statusCode())
-            .put("body", response.body())
+        val rawBody = response.body()
 
         val outHeaders = objectMapper.createObjectNode()
         response.headers().map().forEach { (k, v) ->
             outHeaders.put(k, v.joinToString(","))
         }
+
+        // Parse the body as JSON when the response declares it OR when the bytes look
+        // structurally JSON-ish. Otherwise the body is stored as a raw string and the
+        // frontend renders escape sequences (\n, \") literally — see pretty-output.ts.
+        val responseBody: JsonNode = parseBodyAsJsonOrNull(rawBody, response.headers())
+            ?: objectMapper.getNodeFactory().textNode(rawBody)
+
+        val out = objectMapper.createObjectNode()
+            .put("statusCode", response.statusCode())
+        out.set<JsonNode>("body", responseBody)
         out.set<JsonNode>("headers", outHeaders)
         return out
+    }
+
+    private fun parseBodyAsJsonOrNull(body: String, headers: java.net.http.HttpHeaders): JsonNode? {
+        if (body.isEmpty()) {
+            return null
+        }
+        val contentType = headers.firstValue("content-type").orElse("").lowercase()
+        val declaredJson = contentType.contains("json")
+        if (!declaredJson) {
+            val trimmedFirst = body.trimStart().firstOrNull() ?: return null
+            if (trimmedFirst != '{' && trimmedFirst != '[') {
+                return null
+            }
+        }
+        return try {
+            objectMapper.readTree(body)
+        } catch (_: Exception) {
+            null
+        }
     }
 }
 

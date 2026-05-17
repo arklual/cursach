@@ -1,6 +1,7 @@
 import { Component, input, output, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ExecutionService } from '../../services/execution.service';
+import { prettyOutput } from '../../core/pretty-output';
 
 @Component({
   selector: 'app-execution-panel',
@@ -410,11 +411,7 @@ export class ExecutionPanelComponent {
   });
 
   pretty(data: unknown): string {
-    try {
-      return JSON.stringify(data, null, 2);
-    } catch {
-      return String(data);
-    }
+    return prettyOutput(data);
   }
 
   statusLabel(status: string): string {
