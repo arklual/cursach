@@ -31,8 +31,6 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
           }
         </div>
         <div class="toolbar-tools">
-          <button (click)="openAbConfig.emit()">A/B Config</button>
-          <button (click)="replayRun.emit()">Replay</button>
           <button (click)="centerView()">Center</button>
           <button (click)="resetView()">Reset</button>
           <span class="zoom-info">{{ (zoom() * 100).toFixed(0) }}%</span>
@@ -104,41 +102,23 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
                  [class.error]="executionStatus()[node.id] === 'error'"
                  [class.drop-target]="isDrawing() && dropTargetNodeId() === node.id"
                  (mousedown)="startDragNode($event, node)"
-                 (click)="selectNode($event, node.id)"
-                 (dblclick)="openAnalytics.emit(node.id)">
+                 (click)="selectNode($event, node.id)">
 
-              <div class="handle handle-in"
-                   (mousedown)="startDrawEdge($event, node, 'target')"></div>
+              @if (node.data.kind !== 'trigger') {
+                <div class="handle handle-in"
+                     (mousedown)="startDrawEdge($event, node, 'target')"></div>
+              }
 
               <div class="node-content" [style.borderColor]="node.data.color + '55'">
                 <div class="node-header" [style.background]="node.data.color + '20'">
+                  <span class="node-kind">{{ formatKind(node) }}</span>
                   <span class="node-label">{{ node.data.label }}</span>
-                  <div class="node-actions">
-                    <button (click)="openAnalytics.emit(node.id); $event.stopPropagation()" title="Analytics">
-                      <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
-                      </svg>
-                    </button>
-                    <button (click)="testNode.emit(node.id); $event.stopPropagation()" title="Test node">
-                      <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                        <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-                      </svg>
-                    </button>
-                  </div>
+                  @if (executionStatus()[node.id]; as st) {
+                    <span class="status-pill" [class]="'st-' + st">{{ st }}</span>
+                  }
                 </div>
                 <div class="node-body">
-                  <div class="metric"><span>Reached</span><b>{{ node.data.metrics.reached }}</b></div>
-                  <div class="metric"><span>Converted</span><b>{{ node.data.metrics.converted }}</b></div>
-                  <div class="metric"><span>p̂</span><b>{{ node.data.metrics.pHat.toFixed(2) }}</b></div>
-                  <div class="metric"><span>CI95%</span><b>{{ node.data.metrics.ci[0].toFixed(2) }}–{{ node.data.metrics.ci[1].toFixed(2) }}</b></div>
-                  @if (node.data.kind === 'ab') {
-                    <div class="variant-badge">
-                      {{ formatVariants(node.data.variants) }}
-                    </div>
-                  }
-                  @if (node.data.metrics.lastOutput) {
-                    <pre class="code-output">{{ node.data.metrics.lastOutput }}</pre>
-                  }
+                  <span class="node-hint">Click to inspect I/O</span>
                 </div>
               </div>
 
@@ -482,72 +462,49 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
       color: var(--fg-primary);
     }
 
-    .node-actions {
-      display: flex;
-      gap: 4px;
-    }
-
-    .node-actions button {
-      background: transparent;
-      border: none;
-      cursor: pointer;
-      padding: 2px;
-      font-size: 14px;
-      opacity: 0.7;
-      color: var(--fg-secondary);
-    }
-
-    .node-actions button:hover {
-      opacity: 1;
-      background: var(--bg-tertiary);
-      border-radius: 4px;
-    }
-
     .node-body {
       padding: 8px 10px;
       font-size: 12px;
     }
 
-    .metric {
-      display: flex;
-      justify-content: space-between;
-      padding: 2px 0;
-      color: var(--fg-muted);
-    }
-
-    .metric b {
-      color: var(--fg-primary);
-      font-family: var(--font-mono);
-    }
-
-    .variant-badge {
-      margin-top: 6px;
-      padding: 3px 6px;
-      background: var(--success-bg);
-      color: var(--success);
-      border-radius: 4px;
-      font-size: 11px;
-      text-align: center;
-    }
-
-    .code-output {
-      margin-top: 8px;
-      padding: 6px 8px;
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      font-family: var(--font-mono);
+    .node-kind {
       font-size: 10px;
-      color: var(--fg-secondary);
-      white-space: pre-wrap;
-      word-break: break-all;
-      max-height: 60px;
-      overflow: auto;
+      font-family: var(--font-mono);
+      color: var(--fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-right: 6px;
     }
 
     .node-label {
+      flex: 1;
       font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
+
+    .node-hint {
+      color: var(--fg-muted);
+      font-size: 11px;
+    }
+
+    .status-pill {
+      margin-left: 6px;
+      padding: 2px 6px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border-radius: 8px;
+      background: var(--bg-tertiary);
+      color: var(--fg-muted);
+    }
+
+    .status-pill.st-running { background: var(--accent-glow); color: var(--accent); }
+    .status-pill.st-success { background: var(--success-bg); color: var(--success); }
+    .status-pill.st-error { background: var(--danger-bg); color: var(--danger); }
+    .status-pill.st-skipped { background: var(--bg-tertiary); color: var(--fg-muted); }
 
     .handle {
       position: absolute;
@@ -650,13 +607,8 @@ export class WorkflowCanvasComponent implements AfterViewInit {
   isExecuting = input<boolean>(false);
   progress = input<number>(0);
 
-  openAnalytics = output<string>();
-  testNode = output<string>();
   nodeSelected = output<string>();
-  openAbConfig = output<void>();
-  replayRun = output<void>();
   executeWorkflow = output<void>();
-  executeFromNode = output<void>();
 
   canvasArea = viewChild<ElementRef<HTMLDivElement>>('canvasArea');
 
@@ -681,24 +633,16 @@ export class WorkflowCanvasComponent implements AfterViewInit {
   private drawType: 'source' | 'target' = 'source';
   private mousePos = signal({ x: 0, y: 0 });
 
-  // Константы размеров ноды
   private readonly NODE_W = 200;
-  private readonly NODE_H = 130; // Базовая высота
-  private readonly NODE_H_AB = 155; // Высота A/B Fork (с бейджем вариантов)
-  private readonly NODE_H_CODE = 210; // Высота Code/Python (с output блоком)
-  private readonly HANDLE_RADIUS = 14; // Радиус хендла для расширения зоны попадания
+  private readonly NODE_H = 70;
+  private readonly HANDLE_RADIUS = 14;
 
-  private getNodeHeight(node: WorkflowNode): number {
-    // Если есть output — нода выше (Code/Python)
-    if (node.data.metrics.lastOutput) {
-      return this.NODE_H_CODE;
-    }
-    // A/B нода с бейджем вариантов
-    if (node.data.kind === 'ab') {
-      return this.NODE_H_AB;
-    }
-    // Базовая высота
+  private getNodeHeight(_node: WorkflowNode): number {
     return this.NODE_H;
+  }
+
+  formatKind(node: WorkflowNode): string {
+    return node.data.__subtype ?? node.data.kind;
   }
 
   ngAfterViewInit() {
@@ -773,16 +717,6 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     }
   }
 
-  formatVariants(variants: { label: string; weight: number }[]): string {
-    return variants.map(v => `${v.label}:${v.weight}%`).join(' | ');
-  }
-
-  getMarker(edgeId: string): string {
-    if (edgeId === this.selectedEdgeId()) return 'url(#arrowhead-selected)';
-    if (edgeId === this.hoveredEdgeId()) return 'url(#arrowhead-hover)';
-    return 'url(#arrowhead)';
-  }
-
   getDeleteBtnPos(edgeId: string): { x: number; y: number } {
     const edge = this.edges().find(e => e.id === edgeId);
     if (!edge) return { x: 0, y: 0 };
@@ -797,19 +731,11 @@ export class WorkflowCanvasComponent implements AfterViewInit {
 
   // === Расчёт координат для стрелок ===
 
-  private getNodeCenter(node: WorkflowNode): { x: number; y: number } {
-    const h = this.getNodeHeight(node);
-    return {
-      x: node.position.x + this.NODE_W / 2,
-      y: node.position.y + h / 2
-    };
-  }
-
   private getOutPoint(node: WorkflowNode): { x: number; y: number } {
     const h = this.getNodeHeight(node);
     return {
       x: node.position.x + this.NODE_W,
-      y: node.position.y + h / 2 + 20
+      y: node.position.y + h / 2
     };
   }
 
@@ -817,7 +743,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     const h = this.getNodeHeight(node);
     return {
       x: node.position.x,
-      y: node.position.y + h / 2 + 20
+      y: node.position.y + h / 2
     };
   }
 
@@ -990,18 +916,24 @@ export class WorkflowCanvasComponent implements AfterViewInit {
         const target = this.findNodeAt(canvas.x, canvas.y);
 
         if (target && target.id !== this.drawSource.id) {
-          const exists = this.edges().some(ed =>
-            (ed.source === this.drawSource!.id && ed.target === target.id) ||
-            (ed.source === target.id && ed.target === this.drawSource!.id)
-          );
+          // Determine which node would be the edge target (incoming side)
+          const incoming = this.drawType === 'source' ? target : this.drawSource;
+          if (incoming.data.kind === 'trigger') {
+            this.ws.log('Trigger не может принимать входящие связи');
+          } else {
+            const exists = this.edges().some(ed =>
+              (ed.source === this.drawSource!.id && ed.target === target.id) ||
+              (ed.source === target.id && ed.target === this.drawSource!.id)
+            );
 
-          if (!exists) {
-            if (this.drawType === 'source') {
-              this.ws.addEdge(this.drawSource.id, target.id);
-            } else {
-              this.ws.addEdge(target.id, this.drawSource.id);
+            if (!exists) {
+              if (this.drawType === 'source') {
+                this.ws.addEdge(this.drawSource.id, target.id);
+              } else {
+                this.ws.addEdge(target.id, this.drawSource.id);
+              }
+              this.ws.log(`Связь: ${this.drawSource.data.label} → ${target.data.label}`);
             }
-            this.ws.log(`Связь: ${this.drawSource.data.label} → ${target.data.label}`);
           }
         }
       }
@@ -1100,8 +1032,12 @@ export class WorkflowCanvasComponent implements AfterViewInit {
 
   onDrop(e: DragEvent) {
     e.preventDefault();
-    const type = e.dataTransfer?.getData('application/workflow-node') as NodeKind;
-    if (!type) return;
+    const raw = e.dataTransfer?.getData('application/workflow-node');
+    if (!raw) return;
+
+    const [kindStr, subtype] = raw.split(':');
+    const kind = kindStr as NodeKind;
+    if (!kind) return;
 
     const rect = this.canvasArea()?.nativeElement.getBoundingClientRect();
     if (!rect) return;
@@ -1110,10 +1046,10 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     const viewY = e.clientY - rect.top;
     const canvas = this.viewToCanvas(viewX, viewY);
 
-    this.ws.addNode(type, {
+    this.ws.addNode(kind, {
       x: canvas.x - this.NODE_W / 2,
-      y: canvas.y - this.NODE_H / 2
-    });
+      y: canvas.y - this.NODE_H / 2,
+    }, subtype);
   }
 
   /** Обработчик добавления ноды из CanvasEmptyComponent */

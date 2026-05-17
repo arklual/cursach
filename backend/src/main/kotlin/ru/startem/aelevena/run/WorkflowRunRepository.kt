@@ -19,20 +19,37 @@ class WorkflowRunRepository(
         val finishedAt: OffsetDateTime?,
         val inputJson: String?,
         val outputJson: String?,
+        val startNodeId: String?,
         val createdAt: OffsetDateTime,
     )
 
-    fun insertQueued(workflowId: UUID, workflowRevisionId: Long, inputJson: String?): Long {
+    private val rowMapper: (java.sql.ResultSet, Int) -> WorkflowRunRow = { rs, _ ->
+        WorkflowRunRow(
+            id = rs.getLong("id"),
+            workflowId = rs.getObject("workflow_id", UUID::class.java),
+            workflowRevisionId = rs.getLong("workflow_revision_id"),
+            status = rs.getString("status"),
+            startedAt = rs.getObject("started_at", OffsetDateTime::class.java),
+            finishedAt = rs.getObject("finished_at", OffsetDateTime::class.java),
+            inputJson = rs.getString("input"),
+            outputJson = rs.getString("output"),
+            startNodeId = rs.getString("start_node_id"),
+            createdAt = rs.getObject("created_at", OffsetDateTime::class.java),
+        )
+    }
+
+    fun insertQueued(workflowId: UUID, workflowRevisionId: Long, inputJson: String?, startNodeId: String?): Long {
         val params = MapSqlParameterSource()
             .addValue("workflowId", workflowId)
             .addValue("workflowRevisionId", workflowRevisionId)
             .addValue("status", "queued")
             .addValue("input", inputJson)
+            .addValue("startNodeId", startNodeId)
 
         return jdbc.queryForObject(
             """
-            insert into workflow_run (workflow_id, workflow_revision_id, status, input)
-            values (:workflowId, :workflowRevisionId, :status, :input::jsonb)
+            insert into workflow_run (workflow_id, workflow_revision_id, status, input, start_node_id)
+            values (:workflowId, :workflowRevisionId, :status, :input::jsonb, :startNodeId)
             returning id
             """.trimIndent(),
             params,
@@ -44,24 +61,13 @@ class WorkflowRunRepository(
         val params = MapSqlParameterSource().addValue("runId", runId)
         val rows = jdbc.query(
             """
-            select id, workflow_id, workflow_revision_id, status, started_at, finished_at, input, output, created_at
+            select id, workflow_id, workflow_revision_id, status, started_at, finished_at, input, output, start_node_id, created_at
             from workflow_run
             where id = :runId
             """.trimIndent(),
             params,
-        ) { rs, _ ->
-            WorkflowRunRow(
-                id = rs.getLong("id"),
-                workflowId = rs.getObject("workflow_id", UUID::class.java),
-                workflowRevisionId = rs.getLong("workflow_revision_id"),
-                status = rs.getString("status"),
-                startedAt = rs.getObject("started_at", OffsetDateTime::class.java),
-                finishedAt = rs.getObject("finished_at", OffsetDateTime::class.java),
-                inputJson = rs.getString("input"),
-                outputJson = rs.getString("output"),
-                createdAt = rs.getObject("created_at", OffsetDateTime::class.java),
-            )
-        }
+            rowMapper,
+        )
         return rows.firstOrNull()
     }
 
@@ -69,25 +75,14 @@ class WorkflowRunRepository(
         val params = MapSqlParameterSource().addValue("workflowId", workflowId)
         return jdbc.query(
             """
-            select id, workflow_id, workflow_revision_id, status, started_at, finished_at, input, output, created_at
+            select id, workflow_id, workflow_revision_id, status, started_at, finished_at, input, output, start_node_id, created_at
             from workflow_run
             where workflow_id = :workflowId
             order by created_at desc
             """.trimIndent(),
             params,
-        ) { rs, _ ->
-            WorkflowRunRow(
-                id = rs.getLong("id"),
-                workflowId = rs.getObject("workflow_id", UUID::class.java),
-                workflowRevisionId = rs.getLong("workflow_revision_id"),
-                status = rs.getString("status"),
-                startedAt = rs.getObject("started_at", OffsetDateTime::class.java),
-                finishedAt = rs.getObject("finished_at", OffsetDateTime::class.java),
-                inputJson = rs.getString("input"),
-                outputJson = rs.getString("output"),
-                createdAt = rs.getObject("created_at", OffsetDateTime::class.java),
-            )
-        }
+            rowMapper,
+        )
     }
 
     fun markRunning(runId: Long) {

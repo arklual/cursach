@@ -1,8 +1,10 @@
-import { Component, input, output, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, input, inject, computed, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WorkflowService } from '../../services/workflow.service';
-import { WorkflowNode, Variant } from '../../models/workflow.model';
+import { WorkflowNode } from '../../models/workflow.model';
+import { environment } from '../../../environments/environment';
+import type { Trigger } from '../../core/api/trigger.api';
 
 @Component({
   selector: 'app-inspector',
@@ -16,12 +18,6 @@ import { WorkflowNode, Variant } from '../../models/workflow.model';
           <label>
             Название
             <input type="text" [ngModel]="node.data.label" (ngModelChange)="updateLabel($event)">
-          </label>
-          <label>
-            Метрика успеха p̂
-            <input type="number" step="0.05" min="0" max="1"
-                   [ngModel]="node.data.successProb"
-                   (ngModelChange)="updateSuccessProb($event)">
           </label>
           @if (node.data.kind === 'http') {
             <fieldset class="config-section">
@@ -67,17 +63,6 @@ import { WorkflowNode, Variant } from '../../models/workflow.model';
           }
 
           @if (node.data.kind === 'dataflow') {
-            <label>
-              Dataflow подтип
-              <select [ngModel]="getSubtype(node)" (ngModelChange)="updateSubtype($event)">
-                <option value="filter">filter</option>
-                <option value="map">map</option>
-                <option value="reduce">reduce</option>
-                <option value="foreach">foreach</option>
-                <option value="flatmap">flatmap</option>
-              </select>
-            </label>
-
             @if (getSubtype(node) === 'filter') {
               <fieldset class="config-section">
                 <legend>Filter</legend>
@@ -107,6 +92,7 @@ import { WorkflowNode, Variant } from '../../models/workflow.model';
                          (ngModelChange)="setCfgJson(node, 'value', $event)"
                          placeholder='100 или "pro"'>
                 </label>
+                <p class="hint">Если поле пустое — сравнивается сам элемент. Op gt/gte/lt/lte работают только для чисел.</p>
               </fieldset>
             }
 
@@ -114,27 +100,44 @@ import { WorkflowNode, Variant } from '../../models/workflow.model';
               <fieldset class="config-section">
                 <legend>Map</legend>
                 <label>
-                  Select fields (comma-separated)
-                  <input type="text"
-                         [ngModel]="cfgList(node, 'select')"
-                         (ngModelChange)="setCfgList(node, 'select', $event)"
-                         placeholder="id, amount">
+                  Режим
+                  <select [ngModel]="mapMode(node)" (ngModelChange)="setMapMode(node, $event)">
+                    <option value="select">Select fields</option>
+                    <option value="rename">Rename</option>
+                    <option value="wrap">Wrap</option>
+                  </select>
                 </label>
-                <label>
-                  Rename (JSON: new → old)
-                  <textarea rows="2" class="mono"
-                            [ngModel]="cfgJson(node, 'rename')"
-                            (ngModelChange)="setCfgJson(node, 'rename', $event)"
-                            placeholder='{"newName": "oldName"}'></textarea>
-                </label>
-                <label>
-                  Wrap field name
-                  <input type="text"
-                         [ngModel]="cfg(node, 'wrap', '')"
-                         (ngModelChange)="setCfg(node, 'wrap', $event)"
-                         placeholder="value">
-                </label>
-                <p class="hint">Использовать одно из трёх: select / rename / wrap.</p>
+
+                @if (mapMode(node) === 'select') {
+                  <label>
+                    Поля через запятую
+                    <input type="text"
+                           [ngModel]="cfgList(node, 'select')"
+                           (ngModelChange)="setCfgList(node, 'select', $event)"
+                           placeholder="id, amount">
+                  </label>
+                  <p class="hint">Оставляет только перечисленные ключи у каждого объекта.</p>
+                }
+                @if (mapMode(node) === 'rename') {
+                  <label>
+                    Rename (JSON: новое имя → старое)
+                    <textarea rows="3" class="mono"
+                              [ngModel]="cfgJson(node, 'rename')"
+                              (ngModelChange)="setCfgJson(node, 'rename', $event)"
+                              placeholder='{"newName": "oldName"}'></textarea>
+                  </label>
+                  <p class="hint">Переименовывает поля каждого объекта в массиве.</p>
+                }
+                @if (mapMode(node) === 'wrap') {
+                  <label>
+                    Имя поля-обёртки
+                    <input type="text"
+                           [ngModel]="cfg(node, 'wrap', '')"
+                           (ngModelChange)="setCfg(node, 'wrap', $event)"
+                           placeholder="value">
+                  </label>
+                  <p class="hint">Превращает каждый элемент x в &#123; "fieldName": x &#125;.</p>
+                }
               </fieldset>
             }
 
@@ -152,13 +155,19 @@ import { WorkflowNode, Variant } from '../../models/workflow.model';
                     <option value="avg">avg</option>
                   </select>
                 </label>
-                <label>
-                  Field (для sum/min/max/avg)
-                  <input type="text"
-                         [ngModel]="cfg(node, 'field', '')"
-                         (ngModelChange)="setCfg(node, 'field', $event)"
-                         placeholder="amount">
-                </label>
+                @if (cfg(node, 'op', 'count') !== 'count') {
+                  <label>
+                    Field
+                    <input type="text"
+                           [ngModel]="cfg(node, 'field', '')"
+                           (ngModelChange)="setCfg(node, 'field', $event)"
+                           placeholder="amount">
+                  </label>
+                  <p class="hint">Поле, по которому считается агрегат. Если пусто — берётся сам элемент.</p>
+                } @else {
+                  <p class="hint">Count возвращает длину входного массива. Поле не используется.</p>
+                }
+                <p class="hint">Возвращает &#123; "result": &lt;число&gt; &#125;.</p>
               </fieldset>
             }
 
@@ -166,30 +175,71 @@ import { WorkflowNode, Variant } from '../../models/workflow.model';
               <fieldset class="config-section">
                 <legend>FlatMap</legend>
                 <label>
-                  Field (массив для разворачивания)
+                  Поле-массив для разворачивания
                   <input type="text"
                          [ngModel]="cfg(node, 'field', '')"
                          (ngModelChange)="setCfg(node, 'field', $event)"
                          placeholder="items">
                 </label>
-                <p class="hint">Если пусто — ожидается массив массивов на входе.</p>
+                <p class="hint">Берёт массив из этого поля каждого элемента и склеивает всё в один плоский массив. Если пусто — на вход должен прийти массив массивов.</p>
               </fieldset>
             }
 
             @if (getSubtype(node) === 'foreach') {
-              <p class="hint">Foreach в MVP — passthrough (output = input как массив). Настоящий fan-out не реализован.</p>
+              <fieldset class="config-section">
+                <legend>ForEach</legend>
+                <p class="hint">Passthrough: output = input (как массив). Настоящий fan-out по нодам пока не реализован — используйте как маркер «итерация по элементам».</p>
+              </fieldset>
             }
+          }
+
+          @if (node.data.kind === 'trigger') {
+            <fieldset class="config-section">
+              <legend>{{ triggerLegend(node) }}</legend>
+              @if (getSubtype(node) === 'webhook') {
+                @if (webhookUrl(node); as url) {
+                  <label>
+                    Webhook URL
+                    <input type="text" class="mono" readonly [value]="url" (click)="$any($event.target).select()">
+                  </label>
+                  <div class="actions-row">
+                    <button class="ghost" (click)="copyToClipboard(url)">Скопировать URL</button>
+                  </div>
+                } @else {
+                  <p class="hint">URL появится после сохранения графа.</p>
+                }
+              }
+              @if (getSubtype(node) === 'cron') {
+                <label>
+                  Cron expression
+                  <input type="text" class="mono"
+                         [ngModel]="cfg(node, 'expression', '')"
+                         (ngModelChange)="setCfg(node, 'expression', $event)"
+                         placeholder="0 */5 * * * *">
+                </label>
+                <p class="hint">Формат Spring CronTrigger: sec min hour dom mon dow.</p>
+              }
+              @if (getSubtype(node) === 'interval') {
+                <label>
+                  Интервал, сек
+                  <input type="number" min="1" step="1"
+                         [ngModel]="cfg(node, 'periodSeconds', 30)"
+                         (ngModelChange)="setCfg(node, 'periodSeconds', +$event)">
+                </label>
+                <p class="hint">Запуск повторяется каждые N секунд после сохранения графа.</p>
+              }
+            </fieldset>
           }
 
           @if (node.data.kind === 'code') {
             <fieldset class="config-section">
-              <legend>Python sandbox</legend>
+              <legend>{{ isJs(node) ? 'JavaScript sandbox' : 'Python sandbox' }}</legend>
               <label>
                 Docker image (опционально)
                 <input type="text"
                        [ngModel]="cfg(node, 'image', '')"
                        (ngModelChange)="setCfg(node, 'image', $event)"
-                       placeholder="python:3.12-alpine">
+                       [placeholder]="isJs(node) ? 'node:20-alpine' : 'python:3.12-alpine'">
               </label>
               <label>
                 Timeout, ms
@@ -204,70 +254,22 @@ import { WorkflowNode, Variant } from '../../models/workflow.model';
                        (ngModelChange)="setCfg(node, 'memoryMb', +$event)">
               </label>
               <label>
-                Code (получает stdin как JSON, печатает результат)
+                Code (определите <code>run(input)</code> — он получит JSON со входа)
                 <textarea rows="8" class="mono"
                           [ngModel]="cfg(node, 'code', '')"
                           (ngModelChange)="setCfg(node, 'code', $event)"
-                          placeholder="import sys, json
-data = json.load(sys.stdin)
-print(json.dumps({'sum': sum(data.get('xs', []))}))"></textarea>
+                          [placeholder]="codePlaceholder(node)"></textarea>
               </label>
               <p class="hint">Бэк запускает <code>docker run --rm -i</code>. Требуется Docker на хосте бэка.</p>
             </fieldset>
           }
-          @if (node.data.kind === 'ab') {
-            <div class="traffic-section">
-              <h4>Traffic allocation</h4>
-              @for (variant of node.data.variants; track variant.label; let i = $index) {
-                <div class="allocation-row">
-                  <span>{{ variant.label }}</span>
-                  <input type="range" min="5" max="95"
-                         [ngModel]="variant.weight"
-                         (ngModelChange)="updateVariantWeight(i, $event)">
-                  <input type="number"
-                         [ngModel]="variant.weight"
-                         (ngModelChange)="updateVariantWeight(i, $event)">
-                </div>
-              }
-              <label>
-                Randomization
-                <select [ngModel]="node.data.randomization" (ngModelChange)="updateRandomization($event)">
-                  <option value="simple">Simple random</option>
-                  <option value="hashed">Hashed by user_id</option>
-                  <option value="stratified">Stratified</option>
-                </select>
-              </label>
-            </div>
-          }
           <div class="actions-row">
-            <button class="ghost" (click)="testNode.emit(node.id)">Test node</button>
             <button class="ghost danger" (click)="deleteNode(node.id)">Удалить ноду</button>
           </div>
         </div>
       } @else {
         <p>Выберите ноду для настройки.</p>
       }
-
-      <section class="inspector-section">
-        <h3>Stopping rules</h3>
-        <label>
-          <input type="radio" name="stopping"
-                 [checked]="stoppingRule() === 'fixed'"
-                 (change)="stoppingRule.set('fixed')"> Fixed horizon (α контролируется)
-        </label>
-        <label>
-          <input type="radio" name="stopping"
-                 [checked]="stoppingRule() === 'sequential'"
-                 (change)="stoppingRule.set('sequential')"> Sequential (SPRT) + FDR alert
-        </label>
-        <p class="hint">Контролируйте вероятность ложной тревоги (Type I error).</p>
-      </section>
-
-      <section class="inspector-section">
-        <h3>Reroute / roll-out</h3>
-        <button (click)="promoteWinner.emit()">Promote winner</button>
-        <p class="hint">Автоматически обновит доли трафика по результатам.</p>
-      </section>
     </aside>
   `,
   styles: [`
@@ -359,55 +361,6 @@ print(json.dumps({'sum': sum(data.get('xs', []))}))"></textarea>
       background: var(--danger-bg);
     }
 
-    .traffic-section {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .traffic-section h4 {
-      margin: 8px 0 4px;
-      font-size: 13px;
-    }
-
-    .allocation-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .allocation-row span {
-      width: 20px;
-      font-weight: 600;
-    }
-
-    .allocation-row input[type="range"] {
-      flex: 1;
-    }
-
-    .allocation-row input[type="number"] {
-      width: 60px;
-    }
-
-    .inspector-section {
-      background: var(--bg-secondary);
-      padding: 12px;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-    }
-
-    .inspector-section h3 {
-      margin: 0 0 8px;
-      font-size: 14px;
-    }
-
-    .inspector-section label {
-      flex-direction: row;
-      align-items: center;
-      gap: 8px;
-      margin: 4px 0;
-    }
-
     .hint {
       color: var(--fg-muted);
       font-size: 12px;
@@ -434,12 +387,51 @@ print(json.dumps({'sum': sum(data.get('xs', []))}))"></textarea>
 })
 export class InspectorComponent {
   private workflowService = inject(WorkflowService);
+  private platformId = inject(PLATFORM_ID);
 
   activeNode = input<WorkflowNode | null>(null);
-  testNode = output<string>();
-  promoteWinner = output<void>();
+  triggers = input<Trigger[]>([]);
 
-  readonly stoppingRule = signal<'fixed' | 'sequential'>('fixed');
+  private readonly triggerByNodeId = computed(() => {
+    const map = new Map<string, Trigger>();
+    for (const t of this.triggers()) {
+      if (t.nodeId) {
+        map.set(t.nodeId, t);
+      }
+    }
+    return map;
+  });
+
+  triggerLegend(node: WorkflowNode): string {
+    const sub = this.getSubtype(node);
+    if (sub === 'webhook') return 'Webhook';
+    if (sub === 'cron') return 'Cron';
+    if (sub === 'interval') return 'Interval';
+    return 'Trigger';
+  }
+
+  webhookUrl(node: WorkflowNode): string | null {
+    const trigger = this.triggerByNodeId().get(node.id);
+    const token = trigger?.token;
+    if (!token) {
+      return null;
+    }
+    const apiBase = environment.apiBaseUrl;
+    if (apiBase.startsWith('http')) {
+      return `${apiBase}/webhook/${token}`;
+    }
+    const origin = isPlatformBrowser(this.platformId) && typeof window !== 'undefined'
+      ? window.location.origin
+      : '';
+    return `${origin}${apiBase}/webhook/${token}`;
+  }
+
+  copyToClipboard(text: string): void {
+    if (!isPlatformBrowser(this.platformId) || typeof navigator === 'undefined' || !navigator.clipboard) {
+      return;
+    }
+    navigator.clipboard.writeText(text).catch(err => console.error('clipboard write failed', err));
+  }
 
   updateLabel(label: string): void {
     const node = this.activeNode();
@@ -448,30 +440,43 @@ export class InspectorComponent {
     }
   }
 
-  updateSuccessProb(prob: number): void {
-    const node = this.activeNode();
-    if (node) {
-      this.workflowService.updateNodeData(node.id, data => ({ ...data, successProb: prob }));
-    }
-  }
-
-  updateRandomization(randomization: 'simple' | 'hashed' | 'stratified'): void {
-    const node = this.activeNode();
-    if (node) {
-      this.workflowService.updateNodeData(node.id, data => ({ ...data, randomization }));
-    }
-  }
-
   getSubtype(node: WorkflowNode): string {
-    return node.data.__subtype ?? 'filter';
+    if (node.data.__subtype) {
+      return node.data.__subtype;
+    }
+    if (node.data.kind === 'trigger') return 'webhook';
+    if (node.data.kind === 'dataflow') return 'filter';
+    return '';
   }
 
-  updateSubtype(subtype: string): void {
-    const node = this.activeNode();
-    if (!node) {
-      return;
+  isJs(node: WorkflowNode): boolean {
+    return node.data.kind === 'code' && node.data.__subtype === 'js';
+  }
+
+  codePlaceholder(node: WorkflowNode): string {
+    if (this.isJs(node)) {
+      return 'async function run(input) {\n  return { sum: (input?.xs ?? []).reduce((a, b) => a + b, 0) };\n}';
     }
-    this.workflowService.updateNodeData(node.id, data => ({ ...data, __subtype: subtype }));
+    return 'def run(input):\n    return {"sum": sum(input.get("xs", []))}';
+  }
+
+  /** Determine which map-mode is active from the stored config. */
+  mapMode(node: WorkflowNode): 'select' | 'rename' | 'wrap' {
+    const cfg = node.data.config ?? {};
+    if (typeof cfg['wrap'] === 'string' && cfg['wrap']) return 'wrap';
+    if (cfg['rename'] != null) return 'rename';
+    return 'select';
+  }
+
+  /** Switching map mode clears keys of the other modes so backend priority doesn't surprise the user. */
+  setMapMode(node: WorkflowNode, mode: 'select' | 'rename' | 'wrap'): void {
+    this.workflowService.updateNodeData(node.id, data => {
+      const next: Record<string, unknown> = { ...(data.config ?? {}) };
+      if (mode !== 'select') delete next['select'];
+      if (mode !== 'rename') delete next['rename'];
+      if (mode !== 'wrap') delete next['wrap'];
+      return { ...data, config: next };
+    });
   }
 
   // ----- helpers для редактирования data.config из шаблона -----
@@ -535,21 +540,5 @@ export class InspectorComponent {
       return;
     }
     this.workflowService.removeNode(nodeId);
-  }
-
-  updateVariantWeight(index: number, value: number): void {
-    const node = this.activeNode();
-    if (!node) return;
-
-    this.workflowService.updateNodeData(node.id, data => {
-      const variants = data.variants.map((v, i) =>
-        i === index ? { ...v, weight: Number(value) } : v
-      );
-      const total = variants.reduce((sum, v) => sum + v.weight, 0);
-      return {
-        ...data,
-        variants: variants.map(v => ({ ...v, weight: Math.round((v.weight / total) * 100) }))
-      };
-    });
   }
 }

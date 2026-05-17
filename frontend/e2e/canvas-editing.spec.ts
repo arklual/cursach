@@ -141,4 +141,84 @@ test.describe('Canvas editing', () => {
     await page.getByRole('button', { name: 'Center' }).click();
     expect(errs.errors, JSON.stringify(errs.errors, null, 2)).toEqual([]);
   });
+
+  test('trigger node has no input handle (only output)', async ({ page }) => {
+    await page.goto(`/workflow/${createdId}`);
+    await dragPaletteNode(page, 'trigger', { x: 220, y: 220 });
+    await expect(page.locator('.node-wrap')).toHaveCount(1);
+
+    const triggerNode = page.locator('.node-wrap').first();
+    await expect(triggerNode.locator('.handle-out')).toHaveCount(1);
+    await expect(triggerNode.locator('.handle-in')).toHaveCount(0);
+  });
+
+  test('non-trigger nodes have both input and output handles', async ({ page }) => {
+    await page.goto(`/workflow/${createdId}`);
+    await dragPaletteNode(page, 'http', { x: 220, y: 220 });
+    await expect(page.locator('.node-wrap')).toHaveCount(1);
+
+    const httpNode = page.locator('.node-wrap').first();
+    await expect(httpNode.locator('.handle-in')).toHaveCount(1);
+    await expect(httpNode.locator('.handle-out')).toHaveCount(1);
+  });
+
+  test('dragging from any source onto a trigger node does not create an edge', async ({ page }) => {
+    await page.goto(`/workflow/${createdId}`);
+    await dragPaletteNode(page, 'http', { x: 200, y: 250 });
+    await dragPaletteNode(page, 'trigger', { x: 500, y: 250 });
+    await expect(page.locator('.node-wrap')).toHaveCount(2);
+
+    // Drag from http's output handle onto the trigger's body (since it has no input handle).
+    const httpOut = page.locator('.node-wrap').nth(0).locator('.handle-out');
+    const triggerNode = page.locator('.node-wrap').nth(1);
+    const srcBox = await httpOut.boundingBox();
+    const tgtBox = await triggerNode.boundingBox();
+    if (!srcBox || !tgtBox) throw new Error('boxes not found');
+
+    await page.mouse.move(srcBox.x + srcBox.width / 2, srcBox.y + srcBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(tgtBox.x + tgtBox.width / 2, tgtBox.y + tgtBox.height / 2, { steps: 8 });
+    await page.mouse.up();
+
+    // No edge should be created — trigger refuses incoming connections.
+    await expect(page.locator('.edge-group')).toHaveCount(0);
+    await expect(page.locator('.info-panel')).toContainText('Связи: 0');
+  });
+
+  test('can connect trigger → http → filter in a valid chain', async ({ page, request }) => {
+    await page.goto(`/workflow/${createdId}`);
+    await dragPaletteNode(page, 'trigger', { x: 200, y: 200 });
+    await dragPaletteNode(page, 'http', { x: 200, y: 320 });
+    await dragPaletteNode(page, 'filter', { x: 200, y: 440 });
+    await expect(page.locator('.node-wrap')).toHaveCount(3);
+
+    await connectNodes(page, 0, 1);
+    await expect(page.locator('.edge-group')).toHaveCount(1);
+    await connectNodes(page, 1, 2);
+    await expect(page.locator('.edge-group')).toHaveCount(2);
+    await expect(page.locator('.info-panel')).toContainText('Связи: 2');
+
+    // Persist and verify on backend.
+    await page.locator('.back-btn').click();
+    await page.waitForURL(/\/$/);
+    await expect.poll(async () => {
+      const wf = await getWorkflowViaApi(request, createdId);
+      return wf.graph.connections.length;
+    }, { timeout: 5_000 }).toBeGreaterThanOrEqual(2);
+  });
+
+  test('duplicate edges are rejected (idempotent connection)', async ({ page }) => {
+    await page.goto(`/workflow/${createdId}`);
+    await dragPaletteNode(page, 'trigger', { x: 200, y: 250 });
+    await dragPaletteNode(page, 'http', { x: 500, y: 250 });
+    await expect(page.locator('.node-wrap')).toHaveCount(2);
+
+    await connectNodes(page, 0, 1);
+    await expect(page.locator('.edge-group')).toHaveCount(1);
+
+    // Try connecting the same pair again — should not duplicate.
+    await connectNodes(page, 0, 1);
+    await expect(page.locator('.edge-group')).toHaveCount(1);
+    await expect(page.locator('.info-panel')).toContainText('Связи: 1');
+  });
 });

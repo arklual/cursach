@@ -339,7 +339,7 @@ export interface paths {
         };
         /**
          * Список триггеров workflow
-         * @description Возвращает все триггеры, относящиеся к указанному workflow.
+         * @description Возвращает все триггеры workflow. Триггеры создаются/удаляются автоматически при сохранении графа (по нодам с type trigger.webhook/cron/interval).
          */
         get: {
             parameters: {
@@ -372,93 +372,8 @@ export interface paths {
             };
         };
         put?: never;
-        /**
-         * Создать триггер
-         * @description Добавляет новый триггер запуска для указанного workflow.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                };
-                cookie?: never;
-            };
-            /** @description Конфигурация триггера. */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["TriggerCreateRequest"];
-                };
-            };
-            responses: {
-                /** @description Триггер создан. */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Trigger"];
-                    };
-                };
-                /** @description Workflow не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/triggers/{triggerId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
         post?: never;
-        /**
-         * Удалить триггер
-         * @description Удаляет указанный триггер по ID.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор триггера. */
-                    triggerId: components["parameters"]["TriggerId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Триггер удалён. */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Триггер не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -786,23 +701,20 @@ export interface components {
             /** @description Метка входящего порта. */
             targetHandle?: string;
         };
-        /** @description Тело запроса для создания триггера. */
-        TriggerCreateRequest: {
-            /** @description Тип триггера (cron, webhook и т.п.). */
-            type: string;
-            /** @description Конфигурация триггера. */
-            config?: Record<string, never>;
-        };
-        /** @description Триггер запуска workflow. */
+        /** @description Триггер запуска workflow, привязанный к ноде в графе. */
         Trigger: {
             /** @description Идентификатор триггера. */
             id?: string;
             /** @description Идентификатор workflow. */
             workflowId?: string;
-            /** @description Тип триггера. */
+            /** @description Идентификатор ноды в графе, к которой привязан триггер. */
+            nodeId?: string;
+            /** @description Тип триггера (webhook, cron, interval). */
             type?: string;
-            /** @description Конфигурация триггера. */
+            /** @description Конфигурация триггера (например, cron-выражение, everySeconds). */
             config?: Record<string, never>;
+            /** @description Публичный токен для webhook-триггера (генерируется на бэке). */
+            token?: string;
         };
         /** @description Один запуск workflow. */
         WorkflowRun: {
@@ -849,8 +761,6 @@ export interface components {
         WorkflowId: string;
         /** @description Идентификатор версии workflow. */
         VersionId: string;
-        /** @description Идентификатор триггера. */
-        TriggerId: string;
         /** @description Публичный токен webhook-триггера. */
         Token: string;
         /** @description Идентификатор запуска workflow. */

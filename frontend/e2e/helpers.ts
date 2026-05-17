@@ -71,13 +71,17 @@ export async function dragPaletteNode(page: Page, kind: string, offset: { x: num
   // Ждём появления палитры и канваса
   await page.waitForSelector('app-palette .palette-item', { timeout: 5000 });
   await page.waitForSelector('.canvas-viewport', { timeout: 5000 });
-  
+
   await page.evaluate(({ kind, offset }) => {
+    // Accept "kind" or "kind:subtype" — the drop handler splits on ":".
+    const [baseKind, subtype] = kind.split(':');
     const items = document.querySelectorAll('app-palette .palette-item');
     let paletteBtn: HTMLElement | null = null;
+    // Prefer an item whose visible label hints at the subtype (or kind).
+    const needle = (subtype || baseKind).toLowerCase();
     for (const it of Array.from(items)) {
       const text = (it.textContent || '').toLowerCase();
-      if (text.includes(kind.toLowerCase())) { paletteBtn = it as HTMLElement; break; }
+      if (text.includes(needle)) { paletteBtn = it as HTMLElement; break; }
     }
     if (!paletteBtn) paletteBtn = items[0] as HTMLElement;
     const canvas = document.querySelector('.canvas-viewport') as HTMLElement;
@@ -121,8 +125,10 @@ export async function getWorkflowViaApi(request: APIRequestContext, id: string) 
 export interface TriggerResponse {
   id: string;
   workflowId: string;
+  nodeId: string;
   type: string;
   config?: Record<string, unknown> | null;
+  token?: string | null;
 }
 
 export async function listTriggersViaApi(request: APIRequestContext, workflowId: string): Promise<TriggerResponse[]> {
@@ -131,18 +137,24 @@ export async function listTriggersViaApi(request: APIRequestContext, workflowId:
   return res.json();
 }
 
-export async function createTriggerViaApi(
+/**
+ * Poll `GET /workflows/{id}/triggers` until the predicate is satisfied or timeout expires.
+ * Useful because the editor's auto-save is debounced — triggers appear only after the save lands.
+ */
+export async function waitForTriggers(
   request: APIRequestContext,
   workflowId: string,
-  body: { type: string; config?: Record<string, unknown> },
-): Promise<TriggerResponse> {
-  const res = await request.post(`${API_BASE}/workflows/${workflowId}/triggers`, { data: body });
-  expect(res.ok()).toBeTruthy();
-  return res.json();
-}
-
-export async function deleteTriggerViaApi(request: APIRequestContext, triggerId: string) {
-  await request.delete(`${API_BASE}/triggers/${triggerId}`);
+  predicate: (list: TriggerResponse[]) => boolean,
+  timeoutMs = 10_000,
+): Promise<TriggerResponse[]> {
+  const deadline = Date.now() + timeoutMs;
+  let last: TriggerResponse[] = [];
+  while (Date.now() < deadline) {
+    last = await listTriggersViaApi(request, workflowId);
+    if (predicate(last)) return last;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  throw new Error(`waitForTriggers timed out; last list: ${JSON.stringify(last)}`);
 }
 
 export async function enqueueRunViaApi(

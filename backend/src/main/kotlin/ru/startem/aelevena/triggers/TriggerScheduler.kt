@@ -34,7 +34,7 @@ class TriggerScheduler(
                 val cron = config?.get("cron")?.asText()?.takeIf { it.isNotBlank() }
                     ?: throw BadRequestException("cron trigger requires config.cron")
                 taskScheduler.schedule(
-                    Runnable { runEnqueueService.enqueue(trigger.workflowId, inputForTrigger(trigger)) },
+                    Runnable { fire(trigger) },
                     CronTrigger(cron),
                 )
             }
@@ -43,7 +43,7 @@ class TriggerScheduler(
                 val everySeconds = config?.get("everySeconds")?.asLong()
                     ?: throw BadRequestException("interval trigger requires config.everySeconds")
                 taskScheduler.scheduleAtFixedRate(
-                    Runnable { runEnqueueService.enqueue(trigger.workflowId, inputForTrigger(trigger)) },
+                    Runnable { fire(trigger) },
                     Duration.ofSeconds(everySeconds),
                 )
             }
@@ -60,9 +60,17 @@ class TriggerScheduler(
         scheduled.remove(triggerId)?.cancel(false)
     }
 
+    private fun fire(trigger: TriggersRepository.TriggerRow) {
+        runEnqueueService.enqueue(
+            workflowId = trigger.workflowId,
+            input = inputForTrigger(trigger),
+            startNodeId = trigger.nodeId,
+        )
+    }
+
     private fun inputForTrigger(trigger: TriggersRepository.TriggerRow) =
         objectMapper.createObjectNode()
             .put("triggerId", trigger.id)
             .put("triggerType", trigger.type)
+            .put("triggerNodeId", trigger.nodeId)
 }
-
