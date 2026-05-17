@@ -53,6 +53,19 @@ services:
       "
     restart: "no"
 
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    container_name: kursach-docker-proxy
+    restart: unless-stopped
+    environment:
+      # Allow only container lifecycle + image pull. Everything else (EXEC, VOLUMES, NETWORKS, BUILD, …) blocked.
+      CONTAINERS: 1
+      IMAGES: 1
+      POST: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Сокет хоста виден только этому контейнеру; порт наружу не публикуется.
+
   backend:
     image: ghcr.io/${GHCR_OWNER}/kursach-backend:${BACKEND_TAG:-latest}
     container_name: kursach-backend
@@ -62,6 +75,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      docker-proxy:
+        condition: service_started
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-a11a}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-a11a}
@@ -70,6 +85,7 @@ services:
       APP_S3_BUCKET: ${MINIO_BUCKET:-a11a-blobs}
       APP_S3_ACCESS_KEY: ${MINIO_ROOT_USER}
       APP_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      DOCKER_HOST: tcp://docker-proxy:2375
     healthcheck:
       # Actuator не подключён в pom.xml — используем GET /v1/workflows (вернёт 200 + []).
       # Когда добавите spring-boot-starter-actuator + management.endpoints.web.exposure.include=health

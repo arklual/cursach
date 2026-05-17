@@ -14,6 +14,20 @@ services:
       timeout: 5s
       retries: 10
 
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    container_name: a11a-docker-proxy
+    restart: unless-stopped
+    environment:
+      # Allow only what the code-node executors need: list/create/start/wait/attach/remove containers and pull images.
+      # Everything else (EXEC, VOLUMES, NETWORKS, SWARM, INFO, BUILD, AUTH, …) stays blocked.
+      CONTAINERS: 1
+      IMAGES: 1
+      POST: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Сокет хоста виден только этому контейнеру; наружу порт не публикуется — только внутренняя compose-сеть.
+
   app:
     build:
       context: .
@@ -28,6 +42,8 @@ services:
         condition: service_started
       minio-init:
         condition: service_started
+      docker-proxy:
+        condition: service_started
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/a11a
       SPRING_DATASOURCE_USERNAME: a11a
@@ -38,8 +54,10 @@ services:
       APP_S3_ACCESS_KEY: minioadmin
       APP_S3_SECRET_KEY: minioadmin
       APP_S3_PATH_STYLE_ACCESS: "true"
+      DOCKER_HOST: tcp://docker-proxy:2375
     ports:
       - "8080:8080"
+      - "5432:5432"
 
   minio:
     image: minio/minio:latest
