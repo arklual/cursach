@@ -428,6 +428,12 @@ type CreateMode = 'closed' | 'choose' | 'template';
       font-weight: 600;
       color: var(--fg-primary);
       white-space: normal;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      min-height: calc(2 * 1.3 * 15px);
     }
 
     .template-card p {
@@ -437,6 +443,13 @@ type CreateMode = 'closed' | 'choose' | 'template';
       color: var(--fg-secondary);
       flex: 1;
       white-space: normal;
+      /* фиксируем 4 строки описания — без этого высота карточки скачет,
+         и кнопка "Создать копию" уходит на разный уровень в соседних карточках. */
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      min-height: calc(4 * 1.5 * 12px);
     }
 
     .template-card-head {
@@ -477,6 +490,10 @@ type CreateMode = 'closed' | 'choose' | 'template';
       border-radius: 16px;
       padding: 20px;
       transition: transform 0.2s ease, box-shadow 0.2s ease;
+      /* flex-column + растяжимая ссылка нужны, чтобы блок действий внизу был на одной
+         линии у всех карточек ряда независимо от длины описания. */
+      display: flex;
+      flex-direction: column;
     }
 
     .workflow-card:hover {
@@ -485,10 +502,16 @@ type CreateMode = 'closed' | 'choose' | 'template';
     }
 
     .workflow-card-link {
-      display: block;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
       text-decoration: none;
       color: inherit;
       cursor: pointer;
+    }
+
+    .workflow-card-link .card-description {
+      flex: 1;
     }
 
     a.btn-like {
