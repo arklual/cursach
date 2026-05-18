@@ -112,7 +112,7 @@ jobs:
           scp deploy/docker-compose.prod.yml \
               "${VPS_USER}@${VPS_HOST}:/opt/kursach/docker-compose.prod.yml"
 
-- name: Login server's Docker to GHCR
+      - name: Login server's Docker to GHCR
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
