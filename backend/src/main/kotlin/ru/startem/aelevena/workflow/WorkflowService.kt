@@ -223,6 +223,7 @@ class WorkflowService(
             name = this.name,
             description = this.description,
             isDemo = this.isDemo,
+            nodesCount = this.nodesCount,
             createdAt = this.createdAt.toInstant().toString(),
             updatedAt = this.updatedAt.toInstant().toString(),
         )

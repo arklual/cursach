@@ -31,7 +31,7 @@ class HolidayCalendarPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
             x = 80.0, y = 440.0, label = "Interval: every 6h",
             purpose = "Альтернативный вход — авто-обновление снимка каждые 6 часов для длительных кампаний.",
             config = b.intervalConfig(
-                seconds = 21_600L,
+                everySeconds = 21_600L,
                 description = "21600s = 6 часов между прогонами; снимок праздников редко меняется чаще.",
             ),
         )

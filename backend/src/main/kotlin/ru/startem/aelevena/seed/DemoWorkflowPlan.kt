@@ -128,23 +128,22 @@ internal class PlanBuilders(private val mapper: ObjectMapper) {
     }
 
     /**
-     * Конфиг cron-триггера. Поле `expression` — стандартная Spring-cron строка.
-     * Сам исполняемый узел — passthrough; реальный планировщик подключается через TriggerService,
-     * но в seed-планах нам важна именно визуализация типа узла на канве.
+     * Конфиг cron-триггера. Ключ `cron` — то, что валидирует TriggerService.validateConfig.
+     * Сам исполняемый узел — passthrough; реальный планировщик подключается через TriggerService.
      */
-    fun cronConfig(expression: String, description: String? = null): JsonNode {
+    fun cronConfig(cron: String, description: String? = null): JsonNode {
         val cfg = mapper.createObjectNode()
-        cfg.put("expression", expression)
+        cfg.put("cron", cron)
         if (description != null) cfg.put("description", description)
         return cfg
     }
 
     /**
-     * Конфиг interval-триггера. `seconds` — период между прогонами.
+     * Конфиг interval-триггера. Ключ `everySeconds` — это то, что валидирует TriggerService.validateConfig.
      */
-    fun intervalConfig(seconds: Long, description: String? = null): JsonNode {
+    fun intervalConfig(everySeconds: Long, description: String? = null): JsonNode {
         val cfg = mapper.createObjectNode()
-        cfg.put("seconds", seconds)
+        cfg.put("everySeconds", everySeconds)
         if (description != null) cfg.put("description", description)
         return cfg
     }

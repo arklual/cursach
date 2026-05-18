@@ -366,6 +366,9 @@ components:
         isDemo:
           type: boolean
           description: Признак демонстрационного workflow (создан seeder'ом на старте).
+        nodesCount:
+          type: integer
+          description: Количество нод в текущей ревизии workflow.
         createdAt:
           type: string
           description: Время создания в ISO 8601.

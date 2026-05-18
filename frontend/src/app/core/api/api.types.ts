@@ -638,6 +638,8 @@ export interface components {
             description?: string;
             /** @description Признак демонстрационного workflow (создан seeder'ом на старте). */
             isDemo?: boolean;
+            /** @description Количество нод в текущей ревизии workflow. */
+            nodesCount?: number;
             /** @description Время создания в ISO 8601. */
             createdAt?: string;
             /** @description Время последнего изменения в ISO 8601. */

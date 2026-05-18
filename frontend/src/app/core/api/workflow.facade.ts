@@ -16,14 +16,16 @@ export interface LoadedWorkflow {
     edges: FrontEdge[];
 }
 
-function toUiMeta(backend: Partial<BackendMeta> | undefined, nodesCount = 0): UiMeta {
+function toUiMeta(backend: Partial<BackendMeta> | undefined, nodesCount?: number): UiMeta {
     const m = backend ?? {};
     return {
         id: m.id ?? '',
         name: m.name ?? '',
         description: m.description ?? '',
         status: 'draft',
-        nodesCount,
+        // Если вызывающий явно передал count (например, после parseGraphFromBackend) — используем его,
+        // иначе берём из меты, которую теперь возвращает бэкенд в /workflows и /workflows/{id}.
+        nodesCount: nodesCount ?? m.nodesCount ?? 0,
         isDemo: m.isDemo === true,
         createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
         updatedAt: m.updatedAt ? new Date(m.updatedAt) : new Date(),

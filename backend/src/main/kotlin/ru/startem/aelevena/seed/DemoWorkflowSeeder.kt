@@ -41,28 +41,52 @@ class DemoWorkflowSeeder(
         if (plans.isEmpty()) {
             return
         }
-        val existingNames = workflowsRepository.list().map { it.name }.toSet()
+        val existingByName: Map<String, WorkflowsRepository.WorkflowRow> =
+            workflowsRepository.list().associateBy { it.name }
         var created = 0
+        var repaired = 0
+        var marked = 0
         plans.forEach { plan ->
-            if (plan.name in existingNames) {
-                log.debug("Skipping demo workflow '{}': already exists", plan.name)
-                return@forEach
-            }
+            val existing = existingByName[plan.name]
             try {
-                val workflow = workflowService.createWorkflow(
-                    WorkflowCreateRequest(name = plan.name, description = plan.description),
-                    isDemo = true,
-                )
-                val versionId = workflow.graph.versionId.toLong()
-                workflowService.updateGraph(versionId, plan.buildGraph())
-                created++
-                log.info("Seeded demo workflow '{}' (id={})", plan.name, workflow.meta.id)
+                if (existing != null && !existing.isDemo) {
+                    // Workflow посеян до миграции 004-add-is-demo (или флаг сбили вручную):
+                    // имя совпадает с активным DemoWorkflowPlan → поднимаем флаг.
+                    if (workflowsRepository.markAsDemo(existing.id)) {
+                        marked++
+                    }
+                }
+                if (existing == null) {
+                    // Свежая установка — создаём workflow и наполняем граф.
+                    val workflow = workflowService.createWorkflow(
+                        WorkflowCreateRequest(name = plan.name, description = plan.description),
+                        isDemo = true,
+                    )
+                    val versionId = workflow.graph.versionId.toLong()
+                    workflowService.updateGraph(versionId, plan.buildGraph())
+                    created++
+                    log.info("Seeded demo workflow '{}' (id={})", plan.name, workflow.meta.id)
+                } else if (existing.nodesCount == 0) {
+                    // Предыдущий запуск создал workflow, но updateGraph упал — была пустая ревизия.
+                    // Доливаем граф в существующую current-версию (без пересоздания workflow,
+                    // чтобы не плодить дубликаты по имени).
+                    val versionId = existing.currentVersionId
+                        ?: error("Demo workflow '${plan.name}' has no current version — repair impossible")
+                    workflowService.updateGraph(versionId, plan.buildGraph())
+                    repaired++
+                    log.info("Repaired empty demo workflow '{}' (id={})", plan.name, existing.id)
+                } else {
+                    log.debug("Skipping demo workflow '{}': already populated", plan.name)
+                }
             } catch (e: Exception) {
                 log.warn("Failed to seed demo workflow '{}': {}", plan.name, e.message, e)
             }
         }
-        if (created > 0) {
-            log.info("Demo workflow seeding finished: {} workflow(s) created out of {}", created, plans.size)
+        if (created > 0 || repaired > 0 || marked > 0) {
+            log.info(
+                "Demo workflow seeding finished: created={}, repaired={}, marked={}, total plans={}",
+                created, repaired, marked, plans.size,
+            )
         }
     }
 }

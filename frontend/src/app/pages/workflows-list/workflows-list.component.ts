@@ -1,13 +1,17 @@
 import { Component, OnInit, PLATFORM_ID, inject, signal, computed } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { WorkflowMeta } from '../../services/workflow.service';
 import { WorkflowFacade } from '../../core/api/workflow.facade';
+import { ModalComponent } from '../../components/modal/modal.component';
+
+type CreateMode = 'closed' | 'choose' | 'template';
 
 @Component({
   selector: 'app-workflows-list',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, ModalComponent],
   template: `
     <div class="workflows-page">
       <header class="page-header">
@@ -18,7 +22,7 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
             <p>Конструктор экспериментов для product-команд</p>
           </div>
         </div>
-        <button class="primary" (click)="createWorkflow()">
+        <button class="primary" (click)="openCreateModal()">
           + Создать workflow
         </button>
       </header>
@@ -46,64 +50,13 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
             </ul>
           </div>
           <div class="intro-actions">
-            <button class="primary" (click)="createWorkflow()">+ Создать workflow</button>
+            <button class="primary" (click)="openCreateModal()">+ Создать workflow</button>
             <button class="ghost" (click)="dismissIntro()">Понятно, скрыть</button>
           </div>
         </section>
       }
 
-      @if (examples().length > 0) {
-        <section class="examples-section" aria-labelledby="examples-heading">
-          <header class="section-header">
-            <div class="section-title">
-              <span class="section-badge">Examples</span>
-              <h2 id="examples-heading">Готовые шаблоны</h2>
-            </div>
-            <p class="section-hint">
-              Демонстрационные workflow посеяны при старте бэкенда. Скопируйте любой,
-              чтобы редактировать без риска потерять оригинал.
-            </p>
-          </header>
-          <div class="workflows-grid">
-            @for (workflow of examples(); track workflow.id) {
-              <div class="workflow-card example-card">
-                <a class="workflow-card-link" [routerLink]="['/workflow', workflow.id]">
-                  <div class="card-header">
-                    <span class="card-icon" [style.background]="getStatusColor(workflow.status)">
-                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                      </svg>
-                    </span>
-                    <span class="card-status example">example</span>
-                  </div>
-                  <h3>{{ workflow.name }}</h3>
-                  <p class="card-description">{{ workflow.description || 'Без описания' }}</p>
-                  <div class="card-meta">
-                    <span>{{ workflow.nodesCount }} нод</span>
-                    <span>{{ formatDate(workflow.updatedAt) }}</span>
-                  </div>
-                </a>
-                <div class="card-actions">
-                  <button class="primary" (click)="duplicateWorkflow($event, workflow.id)">
-                    Использовать как шаблон
-                  </button>
-                </div>
-              </div>
-            }
-          </div>
-        </section>
-      }
-
-      <section class="user-section" aria-labelledby="user-heading">
-        <header class="section-header">
-          <div class="section-title">
-            <span class="section-badge user">Мои workflow</span>
-            <h2 id="user-heading">Личная библиотека</h2>
-          </div>
-          <p class="section-hint">
-            Всё, что вы создаёте или копируете из примеров. Удаление и переименование не затрагивает шаблоны.
-          </p>
-        </header>
+      <section class="user-section">
         <main class="workflows-grid">
           @for (workflow of userWorkflows(); track workflow.id) {
             <div class="workflow-card">
@@ -150,13 +103,78 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
           } @empty {
             <div class="empty-state">
               <div class="empty-icon">Δ</div>
-              <h2>Нет личных workflows</h2>
-              <p>Создайте новый с нуля или скопируйте один из примеров выше</p>
-              <button class="primary" (click)="createWorkflow()">+ Создать workflow</button>
+              <h2>Нет workflows</h2>
+              <p>Создайте с нуля или возьмите готовый шаблон — это быстрее, чем тащить ноды вручную.</p>
+              <button class="primary" (click)="openCreateModal()">+ Создать workflow</button>
             </div>
           }
         </main>
       </section>
+
+      <app-modal
+        [open]="createMode() !== 'closed'"
+        [title]="createMode() === 'template' ? 'Выбор шаблона' : 'Новый workflow'"
+        [wide]="createMode() === 'template'"
+        (close)="closeCreateModal()">
+        @if (createMode() === 'choose') {
+          <div class="create-choice">
+            <button class="choice-card" type="button" (click)="createFromScratch()">
+              <div class="choice-icon scratch" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                </svg>
+              </div>
+              <div class="choice-text">
+                <h3>Создать с нуля</h3>
+                <p>Пустой холст — будете добавлять ноды сами через палитру слева.</p>
+              </div>
+            </button>
+            <button class="choice-card" type="button" (click)="goToTemplatePicker()" [disabled]="templates().length === 0">
+              <div class="choice-icon template" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="currentColor" width="28" height="28">
+                  <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              </div>
+              <div class="choice-text">
+                <h3>Использовать шаблон</h3>
+                @if (templates().length > 0) {
+                  <p>Готовые пайплайны (FX, погода, землетрясения и др.) — скопируются как новый workflow.</p>
+                } @else {
+                  <p>Шаблоны ещё не загружены с бэкенда.</p>
+                }
+              </div>
+            </button>
+          </div>
+        }
+        @if (createMode() === 'template') {
+          <div class="template-picker">
+            <header class="template-picker-header">
+              <button class="ghost" type="button" (click)="backToChoose()">← Назад к выбору</button>
+              <input
+                type="search"
+                class="template-search"
+                placeholder="Поиск по шаблонам…"
+                [ngModel]="templateQuery()"
+                (ngModelChange)="templateQuery.set($event)"
+                aria-label="Поиск по шаблонам" />
+            </header>
+            <div class="template-grid">
+              @for (tpl of visibleTemplates(); track tpl.id) {
+                <button class="template-card" type="button" [disabled]="creating()" (click)="useTemplate(tpl)">
+                  <div class="template-card-head">
+                    <span class="template-badge">{{ tpl.nodesCount }} нод</span>
+                  </div>
+                  <h3>{{ tpl.name }}</h3>
+                  <p>{{ tpl.description || 'Без описания' }}</p>
+                  <span class="template-cta">Создать копию →</span>
+                </button>
+              } @empty {
+                <p class="template-empty">Ничего не нашлось. Попробуйте другой запрос или вернитесь и создайте с нуля.</p>
+              }
+            </div>
+          </div>
+        }
+      </app-modal>
     </div>
   `,
   styles: [`
@@ -239,87 +257,183 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
       color: var(--danger);
     }
 
-    .examples-section,
     .user-section {
-      padding: 0 48px 8px;
-    }
-
-    .examples-section + .user-section {
-      padding-top: 8px;
-    }
-
-    .section-header {
-      margin: 28px 0 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .section-title {
-      display: flex;
-      align-items: baseline;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .section-title h2 {
-      margin: 0;
-      font-family: var(--font-display);
-      font-style: italic;
-      font-weight: 400;
-      font-size: 24px;
-      line-height: 1.1;
-      color: var(--fg-primary);
-    }
-
-    .section-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: var(--accent-glow);
-      color: var(--accent);
-      font-family: var(--font-mono);
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.16em;
-    }
-
-    .section-badge.user {
-      background: var(--bg-tertiary);
-      color: var(--fg-secondary);
-    }
-
-    .section-hint {
-      margin: 0;
-      font-size: 13px;
-      color: var(--fg-muted);
-      max-width: 720px;
-      line-height: 1.5;
+      padding: 16px 48px 8px;
     }
 
     .workflows-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 24px;
-      padding: 8px 0 32px;
+      padding: 16px 0 32px;
     }
 
-    .workflow-card.example-card {
+    .create-choice {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .choice-card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 20px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--fg-primary);
+      text-align: left;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .choice-card:hover:not(:disabled) {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-glow);
+    }
+
+    .choice-card:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .choice-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: white;
+    }
+
+    .choice-icon.scratch { background: linear-gradient(135deg, #84cc16 0%, #4d7c0f 100%); }
+    .choice-icon.template { background: linear-gradient(135deg, #ff7a1a 0%, #a8300a 100%); }
+
+    .choice-text h3 {
+      margin: 0 0 4px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--fg-primary);
+    }
+
+    .choice-text p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--fg-secondary);
+    }
+
+    .template-picker {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 280px;
+    }
+
+    .template-picker-header {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .template-search {
+      flex: 1;
+      min-width: 200px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md, 10px);
+      background: var(--bg-secondary);
+      color: var(--fg-primary);
+      font-size: 13px;
+    }
+
+    .template-search:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .template-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .template-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 14px 16px;
       background:
         linear-gradient(135deg, rgba(255, 122, 26, 0.10) 0%, rgba(132, 204, 22, 0.06) 100%),
-        var(--panel);
-      border-color: var(--border-light);
+        var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--fg-primary);
+      text-align: left;
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     }
 
-    .workflow-card.example-card:hover {
-      box-shadow: var(--shadow-lg), 0 0 0 1px var(--accent-glow);
+    .template-card:hover:not(:disabled) {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      box-shadow: var(--shadow-md), 0 0 0 1px var(--accent-glow);
     }
 
-    .card-status.example {
+    .template-card:disabled {
+      opacity: 0.6;
+      cursor: progress;
+    }
+
+    .template-card h3 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--fg-primary);
+    }
+
+    .template-card p {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--fg-secondary);
+      flex: 1;
+    }
+
+    .template-card-head {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .template-badge {
+      padding: 2px 8px;
+      border-radius: 999px;
       background: var(--accent-glow);
       color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .template-cta {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .template-empty {
+      grid-column: 1 / -1;
+      margin: 0;
+      padding: 28px 12px;
+      text-align: center;
+      color: var(--fg-muted);
+      font-size: 13px;
     }
 
     .workflow-card {
@@ -551,11 +665,24 @@ export class WorkflowsListComponent implements OnInit {
   private readonly introStorageKey = 'fluxpilot.introSeen';
 
   readonly workflows = signal<WorkflowMeta[]>([]);
-  readonly examples = computed(() => this.workflows().filter(w => w.isDemo));
+  readonly templates = computed(() => this.workflows().filter(w => w.isDemo));
   readonly userWorkflows = computed(() => this.workflows().filter(w => !w.isDemo));
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly showIntro = signal(true);
+
+  readonly createMode = signal<CreateMode>('closed');
+  readonly templateQuery = signal('');
+  readonly creating = signal(false);
+  readonly visibleTemplates = computed(() => {
+    const q = this.templateQuery().trim().toLowerCase();
+    const all = this.templates();
+    if (!q) return all;
+    return all.filter(t =>
+      t.name.toLowerCase().includes(q) ||
+      (t.description ?? '').toLowerCase().includes(q),
+    );
+  });
 
   ngOnInit(): void {
     this.hydrateIntroFlag();
@@ -602,10 +729,34 @@ export class WorkflowsListComponent implements OnInit {
     });
   }
 
-  createWorkflow(): void {
-    const defaultName = `Workflow ${this.workflows().length + 1}`;
+  openCreateModal(): void {
+    this.templateQuery.set('');
+    this.creating.set(false);
+    this.createMode.set('choose');
+  }
+
+  closeCreateModal(): void {
+    if (this.creating()) return;
+    this.createMode.set('closed');
+  }
+
+  goToTemplatePicker(): void {
+    if (this.templates().length === 0) return;
+    this.createMode.set('template');
+  }
+
+  backToChoose(): void {
+    this.createMode.set('choose');
+  }
+
+  createFromScratch(): void {
+    if (this.creating()) return;
+    const defaultName = `Workflow ${this.userWorkflows().length + 1}`;
+    this.creating.set(true);
     this.facade.createWorkflow(defaultName).subscribe({
       next: ({ workflowId }) => {
+        this.creating.set(false);
+        this.createMode.set('closed');
         if (workflowId) {
           this.router.navigate(['/workflow', workflowId]).then(navigated => {
             if (!navigated) {
@@ -618,7 +769,33 @@ export class WorkflowsListComponent implements OnInit {
         }
       },
       error: err => {
+        this.creating.set(false);
         this.errorMessage.set('Не удалось создать workflow.');
+        console.error(err);
+      },
+    });
+  }
+
+  useTemplate(template: WorkflowMeta): void {
+    if (this.creating()) return;
+    this.creating.set(true);
+    this.facade.duplicateWorkflow(template.id).subscribe({
+      next: ({ workflowId }) => {
+        this.creating.set(false);
+        this.createMode.set('closed');
+        if (workflowId) {
+          this.router.navigate(['/workflow', workflowId]).then(navigated => {
+            if (!navigated) {
+              this.refresh();
+            }
+          });
+        } else {
+          this.refresh();
+        }
+      },
+      error: err => {
+        this.creating.set(false);
+        this.errorMessage.set('Не удалось скопировать шаблон.');
         console.error(err);
       },
     });

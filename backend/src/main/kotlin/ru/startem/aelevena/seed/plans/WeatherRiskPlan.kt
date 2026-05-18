@@ -32,7 +32,7 @@ class WeatherRiskPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
             x = 80.0, y = 360.0, label = "Cron: 0 0 7 * * *",
             purpose = "Альтернативный вход — расписание «каждое утро в 7:00» для автоматической рассылки.",
             config = b.cronConfig(
-                expression = "0 0 7 * * *",
+                cron = "0 0 7 * * *",
                 description = "Утренний запуск сводки для диспетчера в 07:00 по серверному TZ.",
             ),
         )
