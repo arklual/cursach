@@ -1,4 +1,4 @@
-import { Component, OnInit, PLATFORM_ID, inject, signal } from '@angular/core';
+import { Component, OnInit, PLATFORM_ID, inject, signal, computed } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { WorkflowMeta } from '../../services/workflow.service';
@@ -52,58 +52,111 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
         </section>
       }
 
-      <main class="workflows-grid">
-        @for (workflow of workflows(); track workflow.id) {
-          <div class="workflow-card">
-            <a class="workflow-card-link" [routerLink]="['/workflow', workflow.id]">
-              <div class="card-header">
-                <span class="card-icon" [style.background]="getStatusColor(workflow.status)">
-                  @switch (workflow.status) {
-                    @case ('running') {
-                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                        <path d="M8 5v14l11-7z"/>
-                      </svg>
-                    }
-                    @case ('completed') {
-                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                      </svg>
-                    }
-                    @case ('paused') {
-                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                      </svg>
-                    }
-                    @default {
-                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-                      </svg>
-                    }
-                  }
-                </span>
-                <span class="card-status" [class]="workflow.status">{{ workflow.status }}</span>
-              </div>
-              <h3>{{ workflow.name }}</h3>
-              <p class="card-description">{{ workflow.description || 'Без описания' }}</p>
-              <div class="card-meta">
-                <span>{{ workflow.nodesCount }} нод</span>
-                <span>{{ formatDate(workflow.updatedAt) }}</span>
-              </div>
-            </a>
-            <div class="card-actions">
-              <button class="ghost" (click)="duplicateWorkflow($event, workflow.id)">Копировать</button>
-              <button class="ghost danger" (click)="deleteWorkflow($event, workflow.id)">Удалить</button>
+      @if (examples().length > 0) {
+        <section class="examples-section" aria-labelledby="examples-heading">
+          <header class="section-header">
+            <div class="section-title">
+              <span class="section-badge">Examples</span>
+              <h2 id="examples-heading">Готовые шаблоны</h2>
             </div>
+            <p class="section-hint">
+              Демонстрационные workflow посеяны при старте бэкенда. Скопируйте любой,
+              чтобы редактировать без риска потерять оригинал.
+            </p>
+          </header>
+          <div class="workflows-grid">
+            @for (workflow of examples(); track workflow.id) {
+              <div class="workflow-card example-card">
+                <a class="workflow-card-link" [routerLink]="['/workflow', workflow.id]">
+                  <div class="card-header">
+                    <span class="card-icon" [style.background]="getStatusColor(workflow.status)">
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                      </svg>
+                    </span>
+                    <span class="card-status example">example</span>
+                  </div>
+                  <h3>{{ workflow.name }}</h3>
+                  <p class="card-description">{{ workflow.description || 'Без описания' }}</p>
+                  <div class="card-meta">
+                    <span>{{ workflow.nodesCount }} нод</span>
+                    <span>{{ formatDate(workflow.updatedAt) }}</span>
+                  </div>
+                </a>
+                <div class="card-actions">
+                  <button class="primary" (click)="duplicateWorkflow($event, workflow.id)">
+                    Использовать как шаблон
+                  </button>
+                </div>
+              </div>
+            }
           </div>
-        } @empty {
-          <div class="empty-state">
-            <div class="empty-icon">Δ</div>
-            <h2>Нет workflows</h2>
-            <p>Создайте первый workflow для A/B тестирования</p>
-            <button class="primary" (click)="createWorkflow()">+ Создать workflow</button>
+        </section>
+      }
+
+      <section class="user-section" aria-labelledby="user-heading">
+        <header class="section-header">
+          <div class="section-title">
+            <span class="section-badge user">Мои workflow</span>
+            <h2 id="user-heading">Личная библиотека</h2>
           </div>
-        }
-      </main>
+          <p class="section-hint">
+            Всё, что вы создаёте или копируете из примеров. Удаление и переименование не затрагивает шаблоны.
+          </p>
+        </header>
+        <main class="workflows-grid">
+          @for (workflow of userWorkflows(); track workflow.id) {
+            <div class="workflow-card">
+              <a class="workflow-card-link" [routerLink]="['/workflow', workflow.id]">
+                <div class="card-header">
+                  <span class="card-icon" [style.background]="getStatusColor(workflow.status)">
+                    @switch (workflow.status) {
+                      @case ('running') {
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      }
+                      @case ('completed') {
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                      }
+                      @case ('paused') {
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                        </svg>
+                      }
+                      @default {
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                        </svg>
+                      }
+                    }
+                  </span>
+                  <span class="card-status" [class]="workflow.status">{{ workflow.status }}</span>
+                </div>
+                <h3>{{ workflow.name }}</h3>
+                <p class="card-description">{{ workflow.description || 'Без описания' }}</p>
+                <div class="card-meta">
+                  <span>{{ workflow.nodesCount }} нод</span>
+                  <span>{{ formatDate(workflow.updatedAt) }}</span>
+                </div>
+              </a>
+              <div class="card-actions">
+                <button class="ghost" (click)="duplicateWorkflow($event, workflow.id)">Копировать</button>
+                <button class="ghost danger" (click)="deleteWorkflow($event, workflow.id)">Удалить</button>
+              </div>
+            </div>
+          } @empty {
+            <div class="empty-state">
+              <div class="empty-icon">Δ</div>
+              <h2>Нет личных workflows</h2>
+              <p>Создайте новый с нуля или скопируйте один из примеров выше</p>
+              <button class="primary" (click)="createWorkflow()">+ Создать workflow</button>
+            </div>
+          }
+        </main>
+      </section>
     </div>
   `,
   styles: [`
@@ -186,11 +239,87 @@ import { WorkflowFacade } from '../../core/api/workflow.facade';
       color: var(--danger);
     }
 
+    .examples-section,
+    .user-section {
+      padding: 0 48px 8px;
+    }
+
+    .examples-section + .user-section {
+      padding-top: 8px;
+    }
+
+    .section-header {
+      margin: 28px 0 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .section-title h2 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-weight: 400;
+      font-size: 24px;
+      line-height: 1.1;
+      color: var(--fg-primary);
+    }
+
+    .section-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--accent-glow);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+
+    .section-badge.user {
+      background: var(--bg-tertiary);
+      color: var(--fg-secondary);
+    }
+
+    .section-hint {
+      margin: 0;
+      font-size: 13px;
+      color: var(--fg-muted);
+      max-width: 720px;
+      line-height: 1.5;
+    }
+
     .workflows-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 24px;
-      padding: 32px 48px;
+      padding: 8px 0 32px;
+    }
+
+    .workflow-card.example-card {
+      background:
+        linear-gradient(135deg, rgba(255, 122, 26, 0.10) 0%, rgba(132, 204, 22, 0.06) 100%),
+        var(--panel);
+      border-color: var(--border-light);
+    }
+
+    .workflow-card.example-card:hover {
+      box-shadow: var(--shadow-lg), 0 0 0 1px var(--accent-glow);
+    }
+
+    .card-status.example {
+      background: var(--accent-glow);
+      color: var(--accent);
     }
 
     .workflow-card {
@@ -422,6 +551,8 @@ export class WorkflowsListComponent implements OnInit {
   private readonly introStorageKey = 'fluxpilot.introSeen';
 
   readonly workflows = signal<WorkflowMeta[]>([]);
+  readonly examples = computed(() => this.workflows().filter(w => w.isDemo));
+  readonly userWorkflows = computed(() => this.workflows().filter(w => !w.isDemo));
   readonly loading = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly showIntro = signal(true);

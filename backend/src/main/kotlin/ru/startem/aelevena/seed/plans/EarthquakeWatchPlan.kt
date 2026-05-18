@@ -10,7 +10,9 @@ import ru.startem.aelevena.seed.PlanBuilders
  * Insurance / GIS / public-safety: оперативная сводка значимых землетрясений недели.
  * Реальные данные: earthquake.usgs.gov — публичный GeoJSON-фид USGS (значимые события за 7 дней).
  *
- * Цепочка демонстрирует связку: HTTP → JS (нормализация и фильтр) → Python (агрегация и top-N).
+ * Связка нод-типов: trigger.manual → http → javascript → python (PM-сводка)
+ * плюс параллельная dataflow-ветка для аналитики (flatmap → foreach → filter → map → reduce).
+ * Этот план — наглядный showcase того, как все dataflow-ноды складываются в реальную цепочку.
  */
 @Component
 class EarthquakeWatchPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
@@ -20,17 +22,18 @@ class EarthquakeWatchPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
     override val description: String =
         "Сводка значимых землетрясений за последние 7 дней по GeoJSON-фиду USGS. " +
             "Нормализует геометрию + properties, оставляет M ≥ 5.0, агрегирует по магнитудным " +
-            "коридорам и регионам — готово для GIS-дешборда / страхового мониторинга."
-
+            "коридорам и регионам — готово для GIS-дешборда / страхового мониторинга. " +
+            "Включает параллельную dataflow-ветку (flatmap → foreach → filter → map → reduce), " +
+            "которая считает количество событий M ≥ 6 в одной цепочке без кода."
     override fun buildGraph(): WorkflowGraph {
         val trigger = b.node(
             id = "start", type = "trigger.manual",
-            x = 80.0, y = 240.0, label = "Manual run",
+            x = 80.0, y = 320.0, label = "Manual run",
             purpose = "Запускает прогон сводки по USGS GeoJSON.",
         )
         val feed = b.node(
             id = "feed", type = "http",
-            x = 380.0, y = 240.0, label = "USGS GeoJSON: significant week",
+            x = 360.0, y = 320.0, label = "USGS GeoJSON: significant week",
             purpose = "Тянет публичный USGS-фид значимых землетрясений за последние 7 дней.",
             inputsHint = "Не зависит от других нод — фиксированный URL " +
                 "earthquake.usgs.gov/.../summary/significant_week.geojson.",
@@ -41,7 +44,7 @@ class EarthquakeWatchPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
         )
         val extract = b.node(
             id = "extract", type = "javascript",
-            x = 720.0, y = 240.0, label = "Normalize + filter M≥5",
+            x = 660.0, y = 320.0, label = "Normalize + filter M≥5",
             purpose = "Превращает GeoJSON в плоский массив событий и оставляет только M ≥ 5.0.",
             inputsHint = "Принимает inputs.feed.body — GeoJSON FeatureCollection " +
                 "({ type, metadata.title, features: [{ id, properties{mag,place,time,url,...}, geometry.coordinates }] }).",
@@ -49,7 +52,7 @@ class EarthquakeWatchPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
         )
         val report = b.node(
             id = "report", type = "python",
-            x = 1060.0, y = 240.0, label = "Aggregate → PM brief",
+            x = 980.0, y = 480.0, label = "Aggregate → PM brief",
             purpose = "Считает агрегаты (магнитудные коридоры, top-регионы, top-5 событий) и " +
                 "оформляет PM-сводку для дешборда / страховщика.",
             inputsHint = "Принимает payload.inputs.extract — объект от предыдущей ноды:\n" +
@@ -58,12 +61,58 @@ class EarthquakeWatchPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
             config = b.pyConfig(REPORT_PY),
         )
 
+        // ---- параллельная dataflow-ветка: extract → flatmap → foreach → filter → map → reduce ----
+        val flatten = b.node(
+            id = "flatten", type = "dataflow.flatmap",
+            x = 980.0, y = 160.0, label = "FlatMap: unwrap majorEvents",
+            purpose = "Разворачивает объект { majorEvents:[...] } в плоский поток событий — " +
+                "стартовая точка dataflow-конвейера без кода.",
+            inputsHint = "Берёт upstream-ноду `extract` через config.from и читает её поле `majorEvents`.",
+            config = b.dataflowConfig(from = "extract", field = "majorEvents"),
+        )
+        val foreach = b.node(
+            id = "events-each", type = "dataflow.foreach",
+            x = 1240.0, y = 160.0, label = "ForEach: pass events through",
+            purpose = "Idempotent passthrough — нужна для разделения шагов и под будущий fan-out.",
+            inputsHint = "Принимает массив событий с шага FlatMap.",
+            config = b.dataflowConfig(from = "flatten"),
+        )
+        val filterStrong = b.node(
+            id = "filter-strong", type = "dataflow.filter",
+            x = 1500.0, y = 160.0, label = "Filter: M ≥ 6",
+            purpose = "Оставляет только сильные события (магнитуда не ниже 6.0).",
+            inputsHint = "Принимает массив событий с шага ForEach. Сравнение по числовому полю mag.",
+            config = b.dataflowConfig(from = "events-each", field = "mag", op = "gte", value = 6.0),
+        )
+        val projection = b.node(
+            id = "project", type = "dataflow.map",
+            x = 1760.0, y = 160.0, label = "Map: select [mag, place, time_iso]",
+            purpose = "Проекция полей — оставляет только то, что нужно для дашборда.",
+            inputsHint = "Принимает отфильтрованный массив с шага Filter.",
+            config = b.dataflowConfig(
+                from = "filter-strong",
+                select = listOf("mag", "place", "time_iso", "tsunami"),
+            ),
+        )
+        val totals = b.node(
+            id = "totals", type = "dataflow.reduce",
+            x = 2020.0, y = 160.0, label = "Reduce: count(M ≥ 6)",
+            purpose = "Сворачивает массив в скаляр `{ result: N }` — готовое число для алерта.",
+            inputsHint = "Принимает массив проекций с шага Map.",
+            config = b.dataflowConfig(from = "project", op = "count"),
+        )
+
         return b.graph(
-            nodes = listOf(trigger, feed, extract, report),
+            nodes = listOf(trigger, feed, extract, report, flatten, foreach, filterStrong, projection, totals),
             edges = listOf(
                 b.edge("start", "feed"),
                 b.edge("feed", "extract"),
                 b.edge("extract", "report"),
+                b.edge("extract", "flatten"),
+                b.edge("flatten", "events-each"),
+                b.edge("events-each", "filter-strong"),
+                b.edge("filter-strong", "project"),
+                b.edge("project", "totals"),
             ),
         )
     }

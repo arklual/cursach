@@ -24,6 +24,7 @@ function toUiMeta(backend: Partial<BackendMeta> | undefined, nodesCount = 0): Ui
         description: m.description ?? '',
         status: 'draft',
         nodesCount,
+        isDemo: m.isDemo === true,
         createdAt: m.createdAt ? new Date(m.createdAt) : new Date(),
         updatedAt: m.updatedAt ? new Date(m.updatedAt) : new Date(),
     };

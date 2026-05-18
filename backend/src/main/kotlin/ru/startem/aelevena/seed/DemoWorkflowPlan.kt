@@ -87,4 +87,65 @@ internal class PlanBuilders(private val mapper: ObjectMapper) {
         cfg.put("timeoutSeconds", timeoutSeconds)
         return cfg
     }
+
+    /**
+     * Конфиг для dataflow-ноды. `from` опционально указывает имя upstream-ноды, из которой
+     * брать массив (если upstream'ов несколько и executor не сможет угадать сам). Остальные
+     * параметры (field/op/value/select/rename/wrap) совпадают с контрактом конкретного executor'а.
+     */
+    fun dataflowConfig(
+        from: String? = null,
+        field: String? = null,
+        op: String? = null,
+        value: Any? = null,
+        select: List<String>? = null,
+        rename: Map<String, String>? = null,
+        wrap: String? = null,
+    ): JsonNode {
+        val cfg = mapper.createObjectNode()
+        if (from != null) cfg.put("from", from)
+        if (field != null) cfg.put("field", field)
+        if (op != null) cfg.put("op", op)
+        if (value != null) {
+            when (value) {
+                is Int -> cfg.put("value", value)
+                is Long -> cfg.put("value", value)
+                is Double -> cfg.put("value", value)
+                is Boolean -> cfg.put("value", value)
+                else -> cfg.put("value", value.toString())
+            }
+        }
+        if (select != null) {
+            val arr = cfg.putArray("select")
+            select.forEach { arr.add(it) }
+        }
+        if (rename != null) {
+            val obj = cfg.putObject("rename")
+            rename.forEach { (newName, oldName) -> obj.put(newName, oldName) }
+        }
+        if (wrap != null) cfg.put("wrap", wrap)
+        return cfg
+    }
+
+    /**
+     * Конфиг cron-триггера. Поле `expression` — стандартная Spring-cron строка.
+     * Сам исполняемый узел — passthrough; реальный планировщик подключается через TriggerService,
+     * но в seed-планах нам важна именно визуализация типа узла на канве.
+     */
+    fun cronConfig(expression: String, description: String? = null): JsonNode {
+        val cfg = mapper.createObjectNode()
+        cfg.put("expression", expression)
+        if (description != null) cfg.put("description", description)
+        return cfg
+    }
+
+    /**
+     * Конфиг interval-триггера. `seconds` — период между прогонами.
+     */
+    fun intervalConfig(seconds: Long, description: String? = null): JsonNode {
+        val cfg = mapper.createObjectNode()
+        cfg.put("seconds", seconds)
+        if (description != null) cfg.put("description", description)
+        return cfg
+    }
 }

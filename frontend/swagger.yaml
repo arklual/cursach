@@ -394,6 +394,9 @@ components:
         description:
           type: string
           description: Описание workflow.
+        isDemo:
+          type: boolean
+          description: Признак демонстрационного workflow (создан seeder'ом на старте).
         createdAt:
           type: string
           description: Время создания в ISO 8601.

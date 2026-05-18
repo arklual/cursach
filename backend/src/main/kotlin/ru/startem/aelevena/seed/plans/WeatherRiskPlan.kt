@@ -18,13 +18,23 @@ class WeatherRiskPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
     override val description: String =
         "Сводный risk-score по погоде в четырёх логистических хабах (Москва, СПб, Казань, Новосибирск). " +
             "Считает композитный индекс из температуры, ветра и осадков, классифицирует low/medium/high " +
-            "и сортирует хабы по рискам — готовая утренняя сводка для диспетчера."
+            "и сортирует хабы по рискам — готовая утренняя сводка для диспетчера. " +
+            "Два альтернативных входа: ручной запуск и cron «каждое утро в 7:00»."
 
     override fun buildGraph(): WorkflowGraph {
         val trigger = b.node(
             id = "start", type = "trigger.manual",
-            x = 80.0, y = 280.0, label = "Manual run",
+            x = 80.0, y = 200.0, label = "Manual run",
             purpose = "Запускает утренний прогон сводки по всем хабам.",
+        )
+        val cron = b.node(
+            id = "cron", type = "trigger.cron",
+            x = 80.0, y = 360.0, label = "Cron: 0 0 7 * * *",
+            purpose = "Альтернативный вход — расписание «каждое утро в 7:00» для автоматической рассылки.",
+            config = b.cronConfig(
+                expression = "0 0 7 * * *",
+                description = "Утренний запуск сводки для диспетчера в 07:00 по серверному TZ.",
+            ),
         )
         val moscow = b.node(
             id = "w-moscow", type = "http",
@@ -66,12 +76,16 @@ class WeatherRiskPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
         )
 
         return b.graph(
-            nodes = listOf(trigger, moscow, spb, kazan, nsk, score),
+            nodes = listOf(trigger, cron, moscow, spb, kazan, nsk, score),
             edges = listOf(
                 b.edge("start", "w-moscow"),
                 b.edge("start", "w-spb"),
                 b.edge("start", "w-kazan"),
                 b.edge("start", "w-novosibirsk"),
+                b.edge("cron", "w-moscow"),
+                b.edge("cron", "w-spb"),
+                b.edge("cron", "w-kazan"),
+                b.edge("cron", "w-novosibirsk"),
                 b.edge("w-moscow", "score"),
                 b.edge("w-spb", "score"),
                 b.edge("w-kazan", "score"),

@@ -17,13 +17,23 @@ class HolidayCalendarPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
     override val name: String = "Public Holidays — Multi-Market Operations Calendar"
     override val description: String =
         "HR/Ops-сводка: пересечение государственных праздников в DE / US / JP / GB / BR на ближайшие 60 дней. " +
-            "Полезно при планировании рассылок, поставок, дежурств и SLA-окон через границы юрисдикций."
+            "Полезно при планировании рассылок, поставок, дежурств и SLA-окон через границы юрисдикций. " +
+            "Два входа — ручной запуск и interval «каждые 6 часов» для регулярного пере-snapshot'а."
 
     override fun buildGraph(): WorkflowGraph {
         val trigger = b.node(
             id = "start", type = "trigger.manual",
-            x = 80.0, y = 320.0, label = "Manual run",
+            x = 80.0, y = 200.0, label = "Manual run",
             purpose = "Кнопка «Запустить» — собирает следующие 60 дней по 5 рынкам.",
+        )
+        val interval = b.node(
+            id = "interval", type = "trigger.interval",
+            x = 80.0, y = 440.0, label = "Interval: every 6h",
+            purpose = "Альтернативный вход — авто-обновление снимка каждые 6 часов для длительных кампаний.",
+            config = b.intervalConfig(
+                seconds = 21_600L,
+                description = "21600s = 6 часов между прогонами; снимок праздников редко меняется чаще.",
+            ),
         )
         val de = b.node(
             id = "h-de", type = "http",
@@ -71,13 +81,18 @@ class HolidayCalendarPlan(objectMapper: ObjectMapper) : DemoWorkflowPlan {
         )
 
         return b.graph(
-            nodes = listOf(trigger, de, us, jp, gb, br, consolidate),
+            nodes = listOf(trigger, interval, de, us, jp, gb, br, consolidate),
             edges = listOf(
                 b.edge("start", "h-de"),
                 b.edge("start", "h-us"),
                 b.edge("start", "h-jp"),
                 b.edge("start", "h-gb"),
                 b.edge("start", "h-br"),
+                b.edge("interval", "h-de"),
+                b.edge("interval", "h-us"),
+                b.edge("interval", "h-jp"),
+                b.edge("interval", "h-gb"),
+                b.edge("interval", "h-br"),
                 b.edge("h-de", "consolidate"),
                 b.edge("h-us", "consolidate"),
                 b.edge("h-jp", "consolidate"),

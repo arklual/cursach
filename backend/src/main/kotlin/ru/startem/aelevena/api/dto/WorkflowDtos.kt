@@ -18,6 +18,7 @@ data class WorkflowMeta(
     val id: String,
     val name: String,
     val description: String? = null,
+    val isDemo: Boolean = false,
     val createdAt: String,
     val updatedAt: String,
 )

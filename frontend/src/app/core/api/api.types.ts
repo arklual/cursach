@@ -475,11 +475,14 @@ export interface paths {
         put?: never;
         /**
          * Ручной запуск workflow
-         * @description Запускает выполнение workflow вручную.
+         * @description Запускает выполнение workflow вручную. Принимает произвольный JSON в теле — он будет доступен нодам как `runInput`. Опционально через `startNodeId` можно стартовать только подграф, достижимый из конкретной ноды.
          */
         post: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description Если указан — исполняем только subgraph, достижимый из этой ноды. */
+                    startNodeId?: string;
+                };
                 header?: never;
                 path: {
                     /** @description Идентификатор workflow. */
@@ -487,7 +490,7 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            /** @description Дополнительные параметры запуска. */
+            /** @description Произвольный JSON-payload, прокидывается в `runInput` для нод без входов. */
             requestBody?: {
                 content: {
                     "application/json": Record<string, never>;
@@ -633,6 +636,8 @@ export interface components {
             name?: string;
             /** @description Описание workflow. */
             description?: string;
+            /** @description Признак демонстрационного workflow (создан seeder'ом на старте). */
+            isDemo?: boolean;
             /** @description Время создания в ISO 8601. */
             createdAt?: string;
             /** @description Время последнего изменения в ISO 8601. */
@@ -724,14 +729,23 @@ export interface components {
             workflowId?: string;
             /** @description Статус запуска (queued, running, success, failed). */
             status?: string;
-            /** @description Время старта запуска. */
+            /** @description Время старта запуска (ISO-8601). */
             startedAt?: string;
-            /** @description Время завершения запуска. */
+            /** @description Время завершения запуска (ISO-8601). */
             finishedAt?: string;
-            /** @description Входные параметры запуска. */
+            /**
+             * Format: int64
+             * @description Длительность запуска в миллисекундах. Заполнено только для завершённых запусков.
+             */
+            durationMs?: number;
+            /** @description Входные параметры запуска (что было передано в POST как payload). */
             input?: Record<string, never>;
             /** @description Агрегированный результат выполнения workflow. */
             output?: Record<string, never>;
+            /** @description Если запуск стартован с конкретной ноды (subgraph) — её id. */
+            startNodeId?: string;
+            /** @description Состояние каждой ноды этого запуска в порядке создания node_run-записей. */
+            nodes?: components["schemas"]["NodeRun"][];
         };
         /** @description Результат выполнения отдельной ноды. */
         NodeRun: {

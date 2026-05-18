@@ -40,6 +40,22 @@ describe('RunApiService', () => {
         const req = httpMock.expectOne(`${base}/workflows/wf-1/runs`);
         expect(req.request.method).toBe('POST');
         expect(req.request.body).toEqual(input);
+        expect(req.request.params.has('startNodeId')).toBe(false);
+        req.flush(fixture, { status: 202, statusText: 'Accepted' });
+    });
+
+    it('enqueue(startNodeId) пробрасывает startNodeId как query-param', () => {
+        const input = { foo: 'bar' };
+        const fixture = { id: 'run-2', workflowId: 'wf-1', status: 'queued' } as unknown as WorkflowRun;
+
+        service.enqueue('wf-1', input as never, 'node-a').subscribe();
+
+        const req = httpMock.expectOne(r =>
+            r.method === 'POST' &&
+            r.url === `${base}/workflows/wf-1/runs` &&
+            r.params.get('startNodeId') === 'node-a',
+        );
+        expect(req.request.body).toEqual(input);
         req.flush(fixture, { status: 202, statusText: 'Accepted' });
     });
 

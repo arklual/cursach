@@ -30,6 +30,7 @@ import ru.startem.aelevena.blob.BlobService
 import ru.startem.aelevena.config.S3Properties
 import ru.startem.aelevena.executor.NodeExecutor
 import ru.startem.aelevena.run.RunEnqueueService
+import ru.startem.aelevena.run.RunQueryService
 import ru.startem.aelevena.run.WorkflowRunRepository
 import ru.startem.aelevena.workflow.WorkflowService
 import software.amazon.awssdk.services.s3.S3Client
@@ -72,6 +73,7 @@ class MvpIntegrationTests {
     @Autowired private lateinit var s3: S3Client
     @Autowired private lateinit var s3Props: S3Properties
     @Autowired private lateinit var workflowRuns: WorkflowRunRepository
+    @Autowired private lateinit var runQueryService: RunQueryService
     @Autowired private lateinit var objectMapper: ObjectMapper
 
     @BeforeAll
@@ -148,6 +150,17 @@ class MvpIntegrationTests {
         val finished = waitUntilFinished(runId, Duration.ofSeconds(10))
         assertTrue(finished.status == "success" || finished.status == "failed")
         assertNotNull(finished.outputJson)
+
+        // Regression: WorkflowRun DTO теперь должен отдавать ноды (раньше UI получал пустой список,
+        // что и было причиной "0 инфы" в панели «Запуски»).
+        val dto = runQueryService.getWorkflowRun(runId)
+        assertEquals(1, dto.nodes.size)
+        val nodeRun = dto.nodes.first()
+        assertEquals("n1", nodeRun.nodeId)
+        assertEquals("success", nodeRun.status)
+        assertNotNull(nodeRun.input)
+        assertNotNull(nodeRun.output)
+        assertNotNull(dto.durationMs)
     }
 
     private fun waitUntilFinished(runId: Long, timeout: Duration): WorkflowRunRepository.WorkflowRunRow {

@@ -220,12 +220,21 @@ paths:
     post:
       tags: [Runs]
       summary: Ручной запуск workflow
-      description: Запускает выполнение workflow вручную.
+      description: >
+        Запускает выполнение workflow вручную. Принимает произвольный JSON в теле — он будет
+        доступен нодам как `runInput`. Опционально через `startNodeId` можно стартовать только
+        подграф, достижимый из конкретной ноды.
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
+        - name: startNodeId
+          in: query
+          required: false
+          description: Если указан — исполняем только subgraph, достижимый из этой ноды.
+          schema:
+            type: string
       requestBody:
         required: false
-        description: Дополнительные параметры запуска.
+        description: Произвольный JSON-payload, прокидывается в `runInput` для нод без входов.
         content:
           application/json:
             schema:
@@ -354,6 +363,9 @@ components:
         description:
           type: string
           description: Описание workflow.
+        isDemo:
+          type: boolean
+          description: Признак демонстрационного workflow (создан seeder'ом на старте).
         createdAt:
           type: string
           description: Время создания в ISO 8601.
@@ -501,16 +513,28 @@ components:
           description: Статус запуска (queued, running, success, failed).
         startedAt:
           type: string
-          description: Время старта запуска.
+          description: Время старта запуска (ISO-8601).
         finishedAt:
           type: string
-          description: Время завершения запуска.
+          description: Время завершения запуска (ISO-8601).
+        durationMs:
+          type: integer
+          format: int64
+          description: Длительность запуска в миллисекундах. Заполнено только для завершённых запусков.
         input:
           type: object
-          description: Входные параметры запуска.
+          description: Входные параметры запуска (что было передано в POST как payload).
         output:
           type: object
           description: Агрегированный результат выполнения workflow.
+        startNodeId:
+          type: string
+          description: Если запуск стартован с конкретной ноды (subgraph) — её id.
+        nodes:
+          type: array
+          description: Состояние каждой ноды этого запуска в порядке создания node_run-записей.
+          items:
+            $ref: '#/components/schemas/NodeRun'
 
     NodeRun:
       type: object

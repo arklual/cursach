@@ -15,6 +15,35 @@ import org.springframework.stereotype.Component
  * заменить на единый ExpressionEvaluator, не трогая API.
  */
 
+/**
+ * Если на вход пришёл envelope от WorkflowExecutionService ({runInput, inputs:{dep:..}})
+ * — извлекаем поток данных из upstream-ноды:
+ *   - если config.from указан и совпадает с ключом в inputs — берём его;
+ *   - иначе, если upstream ровно один — берём его;
+ *   - иначе оставляем envelope как есть (тесты с прямым массивом / объектом не ломаются).
+ *
+ * Это даёт seed-плану возможность включать dataflow-цепочки прямо после HTTP/JS-нод
+ * без специальной адаптации каждого executor'а.
+ */
+private fun resolveStreamInput(input: JsonNode, config: JsonNode?): JsonNode {
+    if (!input.isObject || !input.has("inputs")) {
+        return input
+    }
+    val inputs = input.get("inputs")
+    if (!inputs.isObject) {
+        return input
+    }
+    val from = config?.get("from")?.asText()?.takeIf { it.isNotBlank() }
+    if (from != null && inputs.has(from)) {
+        return inputs.get(from)
+    }
+    val keys = inputs.fieldNames().asSequence().toList()
+    if (keys.size == 1) {
+        return inputs.get(keys[0])
+    }
+    return input
+}
+
 private fun JsonNode?.asArrayOrEmpty(mapper: ObjectMapper): ArrayNode {
     if (this == null || this.isNull) {
         return mapper.createArrayNode()
@@ -69,7 +98,7 @@ class FilterNodeExecutor(
     override val type: String = "dataflow.filter"
 
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode {
-        val items = input.asArrayOrEmpty(objectMapper)
+        val items = resolveStreamInput(input, config).asArrayOrEmpty(objectMapper)
         val field = config?.get("field")?.asText()
         val op = config?.get("op")?.asText()
         val value = config?.get("value")
@@ -104,7 +133,7 @@ class MapNodeExecutor(
     override val type: String = "dataflow.map"
 
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode {
-        val items = input.asArrayOrEmpty(objectMapper)
+        val items = resolveStreamInput(input, config).asArrayOrEmpty(objectMapper)
         val select = config?.get("select")?.takeIf { it.isArray }?.map { it.asText() }
         val rename = config?.get("rename")?.takeIf { it.isObject }
         val wrap = config?.get("wrap")?.asText()?.takeIf { it.isNotBlank() }
@@ -148,7 +177,7 @@ class ReduceNodeExecutor(
     override val type: String = "dataflow.reduce"
 
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode {
-        val items = input.asArrayOrEmpty(objectMapper)
+        val items = resolveStreamInput(input, config).asArrayOrEmpty(objectMapper)
         val op = config?.get("op")?.asText() ?: "count"
         val field = config?.get("field")?.asText()
 
@@ -188,7 +217,7 @@ class ForeachNodeExecutor(
     override val type: String = "dataflow.foreach"
 
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode {
-        return input.asArrayOrEmpty(objectMapper)
+        return resolveStreamInput(input, config).asArrayOrEmpty(objectMapper)
     }
 }
 
@@ -205,7 +234,7 @@ class FlatMapNodeExecutor(
     override val type: String = "dataflow.flatmap"
 
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode {
-        val items = input.asArrayOrEmpty(objectMapper)
+        val items = resolveStreamInput(input, config).asArrayOrEmpty(objectMapper)
         val field = config?.get("field")?.asText()
 
         val out = objectMapper.createArrayNode()

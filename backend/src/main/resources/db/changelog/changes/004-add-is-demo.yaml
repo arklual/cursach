@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-001-add-is-demo
+      author: a11a
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: workflows
+                columnName: is_demo
+      changes:
+        - addColumn:
+            tableName: workflows
+            columns:
+              - column:
+                  name: is_demo
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: workflows
+            indexName: ix_workflows_is_demo
+            columns:
+              - column:
+                  name: is_demo

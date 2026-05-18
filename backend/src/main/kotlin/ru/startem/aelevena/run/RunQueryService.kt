@@ -8,6 +8,7 @@ import ru.startem.aelevena.api.NotFoundException
 import ru.startem.aelevena.api.dto.NodeRun
 import ru.startem.aelevena.api.dto.WorkflowRun
 import ru.startem.aelevena.workflow.persistence.WorkflowsRepository
+import java.time.Duration
 import java.util.UUID
 
 @Service
@@ -18,27 +19,50 @@ class RunQueryService(
     private val nodeRuns: NodeRunRepository,
     private val objectMapper: ObjectMapper,
 ) {
-    fun getWorkflowRun(runId: Long): WorkflowRun =
-        workflowRuns.findById(runId)?.toDto() ?: throw NotFoundException("Run not found")
+    fun getWorkflowRun(runId: Long): WorkflowRun {
+        val row = workflowRuns.findById(runId) ?: throw NotFoundException("Run not found")
+        val nodes = nodeRuns.listByWorkflowRun(runId).map { it.toDto() }
+        return row.toDto(nodes)
+    }
 
-    fun listWorkflowRuns(workflowId: UUID): List<WorkflowRun> =
-        workflows.findById(workflowId)?.let {
-            workflowRuns.listByWorkflow(workflowId).map { run -> run.toDto() }
-        } ?: throw NotFoundException("Workflow not found")
+    fun listWorkflowRuns(workflowId: UUID): List<WorkflowRun> {
+        workflows.findById(workflowId) ?: throw NotFoundException("Workflow not found")
+        val runs = workflowRuns.listByWorkflow(workflowId)
+        if (runs.isEmpty()) {
+            return emptyList()
+        }
+        // Один SQL-запрос вместо N+1 — node_runs всех запусков сразу.
+        val nodesByRun = nodeRuns.listByWorkflowRunIds(runs.map { it.id })
+        return runs.map { run ->
+            val nodeDtos = (nodesByRun[run.id] ?: emptyList()).map { it.toDto() }
+            run.toDto(nodeDtos)
+        }
+    }
 
     fun getNodeRun(nodeRunId: Long): NodeRun =
         nodeRuns.findById(nodeRunId)?.toDto() ?: throw NotFoundException("Node run not found")
 
-    private fun WorkflowRunRepository.WorkflowRunRow.toDto(): WorkflowRun =
-        WorkflowRun(
+    private fun WorkflowRunRepository.WorkflowRunRow.toDto(nodes: List<NodeRun>): WorkflowRun {
+        val started = this.startedAt?.toInstant()
+        val finished = this.finishedAt?.toInstant()
+        val durationMs = if (started != null && finished != null) {
+            Duration.between(started, finished).toMillis().coerceAtLeast(0)
+        } else {
+            null
+        }
+        return WorkflowRun(
             id = this.id.toString(),
             workflowId = this.workflowId.toString(),
             status = this.status,
-            startedAt = this.startedAt?.toInstant()?.toString(),
-            finishedAt = this.finishedAt?.toInstant()?.toString(),
+            startedAt = started?.toString(),
+            finishedAt = finished?.toString(),
+            durationMs = durationMs,
             input = this.inputJson?.let(::parseJson),
             output = this.outputJson?.let(::parseJson),
+            startNodeId = this.startNodeId,
+            nodes = nodes,
         )
+    }
 
     private fun NodeRunRepository.NodeRunRow.toDto(): NodeRun =
         NodeRun(
@@ -55,4 +79,3 @@ class RunQueryService(
 
     private fun parseJson(json: String): JsonNode = objectMapper.readTree(json)
 }
-

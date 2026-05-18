@@ -45,9 +45,9 @@ class WorkflowService(
 ) {
 
     @Transactional
-    fun createWorkflow(req: WorkflowCreateRequest): Workflow {
+    fun createWorkflow(req: WorkflowCreateRequest, isDemo: Boolean = false): Workflow {
         val workflowId = UUID.randomUUID()
-        workflows.insert(id = workflowId, name = req.name, description = req.description)
+        workflows.insert(id = workflowId, name = req.name, description = req.description, isDemo = isDemo)
 
         val initialSkeleton = GraphSkeleton(nodes = emptyList(), connections = emptyList())
         val initialRevisionId = revisions.insert(
@@ -222,6 +222,7 @@ class WorkflowService(
             id = this.id.toString(),
             name = this.name,
             description = this.description,
+            isDemo = this.isDemo,
             createdAt = this.createdAt.toInstant().toString(),
             updatedAt = this.updatedAt.toInstant().toString(),
         )

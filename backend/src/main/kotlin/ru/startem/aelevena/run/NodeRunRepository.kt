@@ -20,6 +20,20 @@ class NodeRunRepository(
         val errorMessage: String?,
     )
 
+    private val rowMapper: (java.sql.ResultSet, Int) -> NodeRunRow = { rs, _ ->
+        NodeRunRow(
+            id = rs.getLong("id"),
+            workflowRunId = rs.getLong("workflow_run_id"),
+            nodeId = rs.getString("node_id"),
+            status = rs.getString("status"),
+            startedAt = rs.getObject("started_at", java.time.OffsetDateTime::class.java),
+            finishedAt = rs.getObject("finished_at", java.time.OffsetDateTime::class.java),
+            inputJson = rs.getString("input_json"),
+            outputJson = rs.getString("output_json"),
+            errorMessage = rs.getString("error_message"),
+        )
+    }
+
     fun findById(nodeRunId: Long): NodeRunRow? {
         val params = MapSqlParameterSource().addValue("id", nodeRunId)
         val rows = jdbc.query(
@@ -29,20 +43,41 @@ class NodeRunRepository(
             where id = :id
             """.trimIndent(),
             params,
-        ) { rs, _ ->
-            NodeRunRow(
-                id = rs.getLong("id"),
-                workflowRunId = rs.getLong("workflow_run_id"),
-                nodeId = rs.getString("node_id"),
-                status = rs.getString("status"),
-                startedAt = rs.getObject("started_at", java.time.OffsetDateTime::class.java),
-                finishedAt = rs.getObject("finished_at", java.time.OffsetDateTime::class.java),
-                inputJson = rs.getString("input_json"),
-                outputJson = rs.getString("output_json"),
-                errorMessage = rs.getString("error_message"),
-            )
-        }
+            rowMapper,
+        )
         return rows.firstOrNull()
+    }
+
+    fun listByWorkflowRun(workflowRunId: Long): List<NodeRunRow> {
+        val params = MapSqlParameterSource().addValue("workflowRunId", workflowRunId)
+        return jdbc.query(
+            """
+            select id, workflow_run_id, node_id, status, started_at, finished_at, input_json, output_json, error_message
+            from node_run
+            where workflow_run_id = :workflowRunId
+            order by id
+            """.trimIndent(),
+            params,
+            rowMapper,
+        )
+    }
+
+    fun listByWorkflowRunIds(workflowRunIds: Collection<Long>): Map<Long, List<NodeRunRow>> {
+        if (workflowRunIds.isEmpty()) {
+            return emptyMap()
+        }
+        val params = MapSqlParameterSource().addValue("workflowRunIds", workflowRunIds)
+        val rows = jdbc.query(
+            """
+            select id, workflow_run_id, node_id, status, started_at, finished_at, input_json, output_json, error_message
+            from node_run
+            where workflow_run_id in (:workflowRunIds)
+            order by workflow_run_id, id
+            """.trimIndent(),
+            params,
+            rowMapper,
+        )
+        return rows.groupBy { it.workflowRunId }
     }
 
     fun insertQueued(workflowRunId: Long, nodeId: String, configHash: String?): Long {

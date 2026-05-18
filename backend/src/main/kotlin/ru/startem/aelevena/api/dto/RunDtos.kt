@@ -8,8 +8,11 @@ data class WorkflowRun(
     val status: String,
     val startedAt: String? = null,
     val finishedAt: String? = null,
+    val durationMs: Long? = null,
     val input: JsonNode? = null,
     val output: JsonNode? = null,
+    val startNodeId: String? = null,
+    val nodes: List<NodeRun> = emptyList(),
 )
 
 data class NodeRun(

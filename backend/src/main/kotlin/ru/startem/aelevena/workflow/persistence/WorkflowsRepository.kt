@@ -15,64 +15,58 @@ class WorkflowsRepository(
         val name: String,
         val description: String?,
         val currentVersionId: Long?,
+        val isDemo: Boolean,
         val createdAt: OffsetDateTime,
         val updatedAt: OffsetDateTime,
     )
 
-    fun insert(id: UUID, name: String, description: String?) {
+    fun insert(id: UUID, name: String, description: String?, isDemo: Boolean = false) {
         val params = MapSqlParameterSource()
             .addValue("id", id)
             .addValue("name", name)
             .addValue("description", description)
+            .addValue("isDemo", isDemo)
 
         jdbc.update(
             """
-            insert into workflows (id, name, description)
-            values (:id, :name, :description)
+            insert into workflows (id, name, description, is_demo)
+            values (:id, :name, :description, :isDemo)
             """.trimIndent(),
             params,
         )
     }
 
+    private fun mapRow(rs: java.sql.ResultSet): WorkflowRow = WorkflowRow(
+        id = rs.getObject("id", UUID::class.java),
+        name = rs.getString("name"),
+        description = rs.getString("description"),
+        currentVersionId = rs.getObject("current_version_id")?.let { rs.getLong("current_version_id") },
+        isDemo = rs.getBoolean("is_demo"),
+        createdAt = rs.getObject("created_at", OffsetDateTime::class.java),
+        updatedAt = rs.getObject("updated_at", OffsetDateTime::class.java),
+    )
+
     fun findById(id: UUID): WorkflowRow? {
         val params = MapSqlParameterSource().addValue("id", id)
         val rows = jdbc.query(
             """
-            select id, name, description, current_version_id, created_at, updated_at
+            select id, name, description, current_version_id, is_demo, created_at, updated_at
             from workflows
             where id = :id
             """.trimIndent(),
             params,
-        ) { rs, _ ->
-            WorkflowRow(
-                id = rs.getObject("id", UUID::class.java),
-                name = rs.getString("name"),
-                description = rs.getString("description"),
-                currentVersionId = rs.getObject("current_version_id")?.let { rs.getLong("current_version_id") },
-                createdAt = rs.getObject("created_at", OffsetDateTime::class.java),
-                updatedAt = rs.getObject("updated_at", OffsetDateTime::class.java),
-            )
-        }
+        ) { rs, _ -> mapRow(rs) }
         return rows.firstOrNull()
     }
 
     fun list(): List<WorkflowRow> =
         jdbc.query(
             """
-            select id, name, description, current_version_id, created_at, updated_at
+            select id, name, description, current_version_id, is_demo, created_at, updated_at
             from workflows
             order by created_at desc
             """.trimIndent()
-        ) { rs, _ ->
-            WorkflowRow(
-                id = rs.getObject("id", UUID::class.java),
-                name = rs.getString("name"),
-                description = rs.getString("description"),
-                currentVersionId = rs.getObject("current_version_id")?.let { rs.getLong("current_version_id") },
-                createdAt = rs.getObject("created_at", OffsetDateTime::class.java),
-                updatedAt = rs.getObject("updated_at", OffsetDateTime::class.java),
-            )
-        }
+        ) { rs, _ -> mapRow(rs) }
 
     fun updateMeta(id: UUID, name: String?, description: String?): WorkflowRow? {
         val params = MapSqlParameterSource()
@@ -87,19 +81,10 @@ class WorkflowsRepository(
                 description = coalesce(:description, description),
                 updated_at = CURRENT_TIMESTAMP
             where id = :id
-            returning id, name, description, current_version_id, created_at, updated_at
+            returning id, name, description, current_version_id, is_demo, created_at, updated_at
             """.trimIndent(),
             params,
-        ) { rs, _ ->
-            WorkflowRow(
-                id = rs.getObject("id", UUID::class.java),
-                name = rs.getString("name"),
-                description = rs.getString("description"),
-                currentVersionId = rs.getObject("current_version_id")?.let { rs.getLong("current_version_id") },
-                createdAt = rs.getObject("created_at", OffsetDateTime::class.java),
-                updatedAt = rs.getObject("updated_at", OffsetDateTime::class.java),
-            )
-        }
+        ) { rs, _ -> mapRow(rs) }
         return rows.firstOrNull()
     }
 

@@ -5,4 +5,6 @@ databaseChangeLog:
       file: db/changelog/changes/002-trigger-node-id.yaml
   - include:
       file: db/changelog/changes/003-restore-after-drop.yaml
+  - include:
+      file: db/changelog/changes/004-add-is-demo.yaml
 

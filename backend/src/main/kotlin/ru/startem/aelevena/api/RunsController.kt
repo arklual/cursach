@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import ru.startem.aelevena.api.dto.NodeRun
 import ru.startem.aelevena.api.dto.WorkflowRun
@@ -22,9 +23,10 @@ class RunsController(
     @PostMapping("/workflows/{workflowId}/runs")
     fun runWorkflow(
         @PathVariable workflowId: UUID,
+        @RequestParam(required = false) startNodeId: String?,
         @RequestBody(required = false) @Valid payload: JsonNode?,
     ): ResponseEntity<WorkflowRun> {
-        val runId = runEnqueueService.enqueue(workflowId, payload)
+        val runId = runEnqueueService.enqueue(workflowId, payload, startNodeId = startNodeId)
         return ResponseEntity.accepted().body(runQueryService.getWorkflowRun(runId))
     }
 

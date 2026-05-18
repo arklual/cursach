@@ -19,6 +19,7 @@ export interface WorkflowMeta {
   description: string;
   status: 'draft' | 'running' | 'paused' | 'completed';
   nodesCount: number;
+  isDemo: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

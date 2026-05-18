@@ -51,6 +51,7 @@ class DemoWorkflowSeeder(
             try {
                 val workflow = workflowService.createWorkflow(
                     WorkflowCreateRequest(name = plan.name, description = plan.description),
+                    isDemo = true,
                 )
                 val versionId = workflow.graph.versionId.toLong()
                 workflowService.updateGraph(versionId, plan.buildGraph())

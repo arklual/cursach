@@ -3,6 +3,7 @@ import {
     Component,
     DestroyRef,
     OnInit,
+    computed,
     inject,
     input,
     signal,
@@ -10,8 +11,8 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subscription, forkJoin, interval, of, switchMap, takeWhile } from 'rxjs';
-import { catchError, finalize } from 'rxjs/operators';
+import { Subscription, interval, switchMap, takeWhile } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 import { RunApiService } from '../../core/api/run.api';
 import type { NodeRun, WorkflowRun } from '../../core/api/api.models';
 import { prettyOutput } from '../../core/pretty-output';
@@ -69,6 +70,10 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
                         </div>
                         <div class="run-meta">
                             <span>{{ formatDuration(run) }}</span>
+                            @if (nodeSummary(run); as sum) {
+                                <span class="dot">·</span>
+                                <span class="node-summary" [title]="nodeSummaryTooltip(run)">{{ sum }}</span>
+                            }
                             @if (hasInputPreview(run)) {
                                 <span class="dot">·</span>
                                 <span class="input-preview" [title]="formatJson(run.input)">{{ inputPreview(run) }}</span>
@@ -88,10 +93,16 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
                         <div class="node-run">
                             <div class="nr-head">
                                 <strong>{{ nr.nodeId }}</strong>
-                                <span class="status" [class]="normalise(nr.status)">{{ nr.status ?? '?' }}</span>
+                                <span class="status" [class]="normalise(nr.status)">{{ nrStatusLabel(nr.status) }}</span>
                             </div>
                             @if (nr.errorMessage) {
                                 <pre class="err">{{ nr.errorMessage }}</pre>
+                            }
+                            @if (nr.input) {
+                                <details>
+                                    <summary>input</summary>
+                                    <pre>{{ formatJson(nr.input) }}</pre>
+                                </details>
                             }
                             @if (nr.output) {
                                 <details>
@@ -127,6 +138,7 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
         .run-meta { font-size: 11px; color: var(--fg-muted); margin-top: 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
         .run-meta .dot { color: var(--fg-muted); }
         .run-meta .input-preview { font-family: var(--font-mono); color: var(--fg-secondary); max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .run-meta .node-summary { font-family: var(--font-mono); color: var(--fg-secondary); white-space: nowrap; }
         .run-meta .run-id-ref { margin-left: auto; font-family: var(--font-mono); color: var(--fg-muted); font-size: 10px; }
         .status { font-size: 11px; padding: 2px 8px; border-radius: 999px; text-transform: none; }
         .status.queued { background: var(--warning-bg); color: var(--warning); }
@@ -151,7 +163,13 @@ export class RunsPanelComponent implements OnInit {
 
     readonly runs = signal<WorkflowRun[]>([]);
     readonly selectedRunId = signal<string | null>(null);
-    readonly selectedRunNodes = signal<NodeRun[]>([]);
+    /** Ноды читаются напрямую из выбранного WorkflowRun (DTO теперь содержит nodes). */
+    readonly selectedRunNodes = computed<NodeRun[]>(() => {
+        const id = this.selectedRunId();
+        if (!id) return [];
+        const run = this.runs().find(r => r.id === id);
+        return run?.nodes ?? [];
+    });
     readonly errorMessage = signal<string | null>(null);
     readonly inputJsonError = signal<string | null>(null);
     readonly isRunning = signal(false);
@@ -215,26 +233,9 @@ export class RunsPanelComponent implements OnInit {
         ).subscribe({
             next: run => {
                 this.runs.update(list => list.map(r => (r.id === run.id ? run : r)));
-                this.loadNodeRunsFor(run);
             },
             error: err => console.error('run polling failed', err),
         });
-    }
-
-    private loadNodeRunsFor(run: WorkflowRun): void {
-        const nodeRunIds = (run as unknown as { nodeRunIds?: string[] }).nodeRunIds ?? [];
-        if (nodeRunIds.length === 0) {
-            return;
-        }
-        forkJoin(
-            nodeRunIds.map(id => this.runApi.getNodeRun(id).pipe(
-                catchError(() => of(null as NodeRun | null)),
-            )),
-        )
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe(results => {
-                this.selectedRunNodes.set(results.filter((r): r is NodeRun => r !== null));
-            });
     }
 
     private refresh(): void {
@@ -310,4 +311,55 @@ export class RunsPanelComponent implements OnInit {
     formatJson(obj: unknown): string {
         return prettyOutput(obj);
     }
+
+    /**
+     * Короткая сводка по статусам нод запуска: «3 ok · 1 err» / «4/5 ok · 1 wait».
+     * Возвращает null, если для run-а ещё не созданы node_run-записи (queued/только-только enqueued).
+     */
+    nodeSummary(run: WorkflowRun): string | null {
+        const nodes = run.nodes ?? [];
+        if (nodes.length === 0) return null;
+        const counts = countByStatus(nodes);
+        const parts: string[] = [];
+        if (counts.success) parts.push(`${counts.success} ok`);
+        if (counts.failed) parts.push(`${counts.failed} err`);
+        if (counts.running) parts.push(`${counts.running} run`);
+        if (counts.queued) parts.push(`${counts.queued} wait`);
+        if (counts.skipped) parts.push(`${counts.skipped} skip`);
+        return parts.length ? parts.join(' · ') : `${nodes.length} нод`;
+    }
+
+    nodeSummaryTooltip(run: WorkflowRun): string {
+        const nodes = run.nodes ?? [];
+        if (!nodes.length) return '';
+        return nodes
+            .map(n => `${n.nodeId}: ${this.nrStatusLabel(n.status)}${n.errorMessage ? ` — ${n.errorMessage}` : ''}`)
+            .join('\n');
+    }
+
+    nrStatusLabel(status: string | undefined): string {
+        switch ((status ?? '').toLowerCase()) {
+            case 'queued': return 'queued';
+            case 'running': return 'running';
+            case 'success': return 'success';
+            case 'failed': return 'failed';
+            case 'skipped': return 'skipped';
+            default: return status ?? '?';
+        }
+    }
+}
+
+function countByStatus(nodes: NodeRun[]): {
+    success: number; failed: number; running: number; queued: number; skipped: number;
+} {
+    const acc = { success: 0, failed: 0, running: 0, queued: 0, skipped: 0 };
+    for (const n of nodes) {
+        const s = (n.status ?? '').toLowerCase();
+        if (s === 'success') acc.success++;
+        else if (s === 'failed') acc.failed++;
+        else if (s === 'running') acc.running++;
+        else if (s === 'queued') acc.queued++;
+        else if (s === 'skipped') acc.skipped++;
+    }
+    return acc;
 }
