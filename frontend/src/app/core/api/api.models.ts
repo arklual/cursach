@@ -12,9 +12,11 @@ export type WorkflowNode = Schemas['Node'];
 export type WorkflowConnection = Schemas['Connection'];
 export type WorkflowVersion = Schemas['WorkflowVersion'];
 export type Trigger = Schemas['Trigger'];
+export type TriggerUpdate = Schemas['TriggerUpdate'];
 export type WorkflowRun = Schemas['WorkflowRun'];
 export type NodeRun = Schemas['NodeRun'];
 export type WebhookAccepted = Schemas['WebhookAccepted'];
+export type WorkflowRunResult = Schemas['WorkflowRunResult'];
 
 // Inline request-bodies из paths
 export type WorkflowCreateRequest = NonNullable<

@@ -11,6 +11,7 @@ export interface Trigger {
     type: 'webhook' | 'cron' | 'interval';
     config?: Record<string, unknown> | null;
     token?: string | null;
+    enabled?: boolean;
 }
 
 /**
@@ -25,6 +26,13 @@ export class TriggerApiService {
 
     list(workflowId: string): Observable<Trigger[]> {
         return this.http.get<Trigger[]>(`${this.base}/workflows/${workflowId}/triggers`);
+    }
+
+    setEnabled(workflowId: string, triggerId: string, enabled: boolean): Observable<Trigger> {
+        return this.http.patch<Trigger>(
+            `${this.base}/workflows/${workflowId}/triggers/${triggerId}`,
+            { enabled },
+        );
     }
 
     invokeWebhook(token: string, payload: unknown): Observable<WebhookAccepted> {

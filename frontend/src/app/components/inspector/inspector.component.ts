@@ -214,6 +214,25 @@ import type { Trigger } from '../../core/api/trigger.api';
                   <button class="primary" (click)="runFromNode.emit(node.id)">Запустить отсюда</button>
                 </div>
               }
+              @if (getSubtype(node) !== 'manual') {
+                @if (triggerByNodeId().get(node.id); as trigger) {
+                  <label class="toggle-row">
+                    <input type="checkbox"
+                           [checked]="trigger.enabled !== false"
+                           (change)="onEnabledToggle(trigger, $any($event.target).checked)">
+                    <span>Активен</span>
+                  </label>
+                  @if (trigger.enabled === false) {
+                    @if (getSubtype(node) === 'webhook') {
+                      <p class="hint warn">Webhook остановлен — вызовы по токену возвращают 404.</p>
+                    } @else {
+                      <p class="hint warn">Триггер остановлен — запуски по расписанию не происходят.</p>
+                    }
+                  }
+                } @else {
+                  <p class="hint">Активность будет доступна после сохранения графа.</p>
+                }
+              }
               @if (getSubtype(node) === 'webhook') {
                 @if (webhookUrl(node); as url) {
                   <label>
@@ -299,7 +318,8 @@ import type { Trigger } from '../../core/api/trigger.api';
       display: flex;
       flex-direction: column;
       gap: 12px;
-      height: calc(100vh - 200px);
+      height: 100%;
+      min-height: 0;
       overflow: auto;
     }
 
@@ -427,6 +447,22 @@ import type { Trigger } from '../../core/api/trigger.api';
       margin: 8px 0 0;
     }
 
+    .hint.warn {
+      color: var(--danger, #c0392b);
+    }
+
+    .toggle-row {
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .toggle-row input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+    }
+
     button {
       border: none;
       border-radius: 8px;
@@ -452,8 +488,13 @@ export class InspectorComponent {
   activeNode = input<WorkflowNode | null>(null);
   triggers = input<Trigger[]>([]);
   readonly runFromNode = output<string>();
+  readonly triggerEnabledChange = output<{ triggerId: string; enabled: boolean }>();
 
-  private readonly triggerByNodeId = computed(() => {
+  onEnabledToggle(trigger: Trigger, enabled: boolean): void {
+    this.triggerEnabledChange.emit({ triggerId: trigger.id, enabled });
+  }
+
+  protected readonly triggerByNodeId = computed(() => {
     const map = new Map<string, Trigger>();
     for (const t of this.triggers()) {
       if (t.nodeId) {

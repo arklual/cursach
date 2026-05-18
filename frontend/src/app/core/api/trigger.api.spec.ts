@@ -46,6 +46,23 @@ describe('TriggerApiService', () => {
         expect(result).toEqual(fixture);
     });
 
+    it('setEnabled() выполняет PATCH /workflows/{id}/triggers/{triggerId} с { enabled }', () => {
+        const fixture: Trigger = {
+            id: 't1', workflowId: 'wf-1', nodeId: 'trigger-cron-abc',
+            type: 'cron', config: {}, token: null, enabled: false,
+        };
+
+        let result: Trigger | undefined;
+        service.setEnabled('wf-1', 't1', false).subscribe(r => (result = r));
+
+        const req = httpMock.expectOne(`${base}/workflows/wf-1/triggers/t1`);
+        expect(req.request.method).toBe('PATCH');
+        expect(req.request.body).toEqual({ enabled: false });
+        req.flush(fixture);
+
+        expect(result).toEqual(fixture);
+    });
+
     it('invokeWebhook() выполняет POST /webhook/{token} и возвращает WebhookAccepted с pollUrl', () => {
         const payload = { event: 'click', amount: 42 };
         const run = { id: 'run-9', workflowId: 'wf-1', status: 'queued' } as unknown as WorkflowRun;

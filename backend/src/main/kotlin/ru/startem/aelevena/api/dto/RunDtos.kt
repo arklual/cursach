@@ -32,3 +32,13 @@ data class WebhookAccepted(
     val pollUrl: String,
 )
 
+data class WorkflowRunResult(
+    val id: String,
+    val workflowId: String,
+    val status: String,
+    val startedAt: String? = null,
+    val finishedAt: String? = null,
+    val durationMs: Long? = null,
+    val output: JsonNode? = null,
+)
+

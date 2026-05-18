@@ -379,6 +379,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflows/{workflowId}/triggers/{triggerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Включить/выключить триггер
+         * @description Переключает поле `enabled` у триггера. Для cron/interval включение пере-планирует таск, выключение — отменяет. Для webhook отключённый триггер возвращает 404 при вызове по токену.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Идентификатор workflow. */
+                    workflowId: components["parameters"]["WorkflowId"];
+                    /** @description Идентификатор триггера. */
+                    triggerId: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["TriggerUpdate"];
+                };
+            };
+            responses: {
+                /** @description Обновлённый триггер. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Trigger"];
+                    };
+                };
+                /** @description Триггер или workflow не найден. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
     "/webhook/{token}": {
         parameters: {
             query?: never;
@@ -412,7 +467,7 @@ export interface paths {
                 /** @description Запуск workflow принят в обработку. */
                 202: {
                     headers: {
-                        /** @description Абсолютный URL для опроса статуса запуска (GET /workflow-runs/{runId}). */
+                        /** @description Абсолютный URL для опроса итогового результата запуска (GET /workflow-runs/{runId}/result). */
                         Location?: string;
                         [name: string]: unknown;
                     };
@@ -555,6 +610,55 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["WorkflowRun"];
+                    };
+                };
+                /** @description Запуск не найден. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow-runs/{runId}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Получить агрегированный результат запуска
+         * @description Возвращает только итог пайплайна (без поноды-разбивки): статус, тайминги и output терминальных нод. Если терминальная нода одна — её output как есть, иначе объект {nodeId: output} по терминальным.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Идентификатор запуска workflow. */
+                    runId: components["parameters"]["RunId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Итоговый результат запуска. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowRunResult"];
                     };
                 };
                 /** @description Запуск не найден. */
@@ -726,6 +830,13 @@ export interface components {
             config?: Record<string, never>;
             /** @description Публичный токен для webhook-триггера (генерируется на бэке). */
             token?: string;
+            /** @description Активен ли триггер. Для cron/interval отключённый триггер не запускается по расписанию. Для webhook отключённый триггер возвращает 404 при попытке вызова. */
+            enabled?: boolean;
+        };
+        /** @description Тело для PATCH триггера — переключение активности. */
+        TriggerUpdate: {
+            /** @description Включить (true) или выключить (false) триггер. */
+            enabled: boolean;
         };
         /** @description Один запуск workflow. */
         WorkflowRun: {
@@ -774,14 +885,34 @@ export interface components {
             /** @description Текст ошибки, если выполнение завершилось неуспешно. */
             errorMessage?: string;
         };
-        /** @description Подтверждение приёма webhook-а с ссылкой на статус запуска. */
+        /** @description Подтверждение приёма webhook-а с ссылкой на итоговый результат запуска. */
         WebhookAccepted: {
             run: components["schemas"]["WorkflowRun"];
             /**
              * Format: uri
-             * @description Абсолютный URL для опроса состояния запуска (GET /workflow-runs/{runId}).
+             * @description Абсолютный URL для опроса итогового результата запуска (GET /workflow-runs/{runId}/result).
              */
             pollUrl: string;
+        };
+        /** @description Итоговый результат пайплайна без поноды-разбивки. */
+        WorkflowRunResult: {
+            /** @description Идентификатор запуска. */
+            id: string;
+            /** @description Идентификатор workflow. */
+            workflowId: string;
+            /** @description Статус запуска (queued/running/success/failed). */
+            status: string;
+            /** @description Время старта запуска. */
+            startedAt?: string;
+            /** @description Время завершения запуска. */
+            finishedAt?: string;
+            /**
+             * Format: int64
+             * @description Длительность выполнения, мс.
+             */
+            durationMs?: number;
+            /** @description Агрегированный output пайплайна — данные терминальных нод. Если терминальная нода одна — её output как есть, иначе объект {nodeId: output}. Null, пока запуск не завершён или выходов нет. */
+            output?: unknown;
         };
     };
     responses: never;

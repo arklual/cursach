@@ -125,19 +125,43 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
             <div class="resize-handle resize-handle-left"
                  (mousedown)="startResize($event, 'inspector')"></div>
             <div class="panel-content" [style.width.px]="inspectorWidth()">
-              @if (showExecutionPanel() && selectedExecutionNodeId()) {
-                <app-execution-panel
-                  [nodeId]="selectedExecutionNodeId()"
-                  (close)="closeExecutionPanel()"
-                  (reset)="resetExecution()">
-                </app-execution-panel>
-              } @else {
-                <app-inspector
-                  [activeNode]="workflowService.activeNode()"
-                  [triggers]="triggers()"
-                  (runFromNode)="executeFromNode($event)">
-                </app-inspector>
-              }
+              <div class="inspector-shell">
+                <div class="inspector-tabs" role="tablist">
+                  <button class="inspector-tab" role="tab"
+                          [class.active]="inspectorTab() === 'config'"
+                          (click)="inspectorTab.set('config')"
+                          title="Конфигурация ноды">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                      <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94 0 .31.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+                    </svg>
+                    <span>Конфиг</span>
+                  </button>
+                  <button class="inspector-tab" role="tab"
+                          [class.active]="inspectorTab() === 'results'"
+                          (click)="inspectorTab.set('results')"
+                          title="Результаты последнего запуска ноды">
+                    <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    <span>Результаты</span>
+                  </button>
+                </div>
+                <div class="inspector-tab-content">
+                  @if (inspectorTab() === 'results') {
+                    <app-execution-panel
+                      [nodeId]="selectedExecutionNodeId() ?? workflowService.activeNodeId()"
+                      (reset)="resetExecution()">
+                    </app-execution-panel>
+                  } @else {
+                    <app-inspector
+                      [activeNode]="workflowService.activeNode()"
+                      [triggers]="triggers()"
+                      (runFromNode)="executeFromNode($event)"
+                      (triggerEnabledChange)="setTriggerEnabled($event)">
+                    </app-inspector>
+                  }
+                </div>
+              </div>
             </div>
           }
         </div>
@@ -523,6 +547,64 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
       height: 100%;
     }
 
+    .inspector-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+      gap: 8px;
+    }
+
+    .inspector-tabs {
+      display: flex;
+      gap: 2px;
+      align-items: stretch;
+      flex-shrink: 0;
+    }
+
+    .inspector-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border: none;
+      background: transparent;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--fg-muted);
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+    }
+
+    .inspector-tab:hover {
+      color: var(--fg-primary);
+      background: var(--bg-secondary);
+      transform: none;
+      box-shadow: none;
+    }
+
+    .inspector-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .inspector-tab .tab-icon {
+      display: block;
+      flex-shrink: 0;
+    }
+
+    .inspector-tab-content {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .inspector-tab-content > * {
+      height: 100%;
+    }
+
     .palette-panel {
       flex-direction: row;
     }
@@ -894,7 +976,8 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   private executionService = inject(ExecutionService);
 
   // Execution signals
-  showExecutionPanel = signal(false);
+  /** Какая вкладка показана в правом сайдбаре: конфиг ноды или результаты её последнего запуска. */
+  inspectorTab = signal<'config' | 'results'>('config');
   selectedExecutionNodeId = signal<string | null>(null);
   executionStatus = signal<Record<string, 'pending' | 'running' | 'success' | 'error' | 'skipped'>>({});
   executionProgress = signal<number>(0);
@@ -949,7 +1032,13 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
       // Проверка завершения
       const isRunning = Object.values(statuses).some(s => s === 'running');
       this.isExecuting.set(isRunning);
-      
+
+      // Автопереключение на "Результаты" в начале запуска, чтобы было видно живой I/O.
+      // Делаем это только когда пользователь стоит на "Конфиг" — иначе уважаем его выбор.
+      if (isRunning && this.inspectorTab() === 'config') {
+        this.inspectorTab.set('results');
+      }
+
       // Автоматически показываем нижнюю панель после завершения
       if (!isRunning && completed > 0) {
         setTimeout(() => {
@@ -1134,6 +1223,22 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     });
   }
 
+  setTriggerEnabled(event: { triggerId: string; enabled: boolean }): void {
+    const workflowId = this.currentWorkflowId();
+    if (!workflowId) {
+      return;
+    }
+    this.triggerApi.setEnabled(workflowId, event.triggerId, event.enabled).subscribe({
+      next: updated => {
+        this.triggers.update(list => list.map(t => (t.id === updated.id ? updated : t)));
+      },
+      error: err => {
+        console.error('[editor] setTriggerEnabled failed', err);
+        this.refreshTriggers();
+      },
+    });
+  }
+
   goBack(): void {
     // Сохраняем граф ДО навигации: иначе при размонтировании компонента HTTP-запрос
     // отменяется и пользователь теряет изменения. Если save упадёт — всё равно ухо́дим,
@@ -1200,10 +1305,9 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
 
   onNodeSelected(nodeId: string): void {
     this.workflowService.setActiveNode(nodeId);
-    if (this.executionService.execution()) {
-      this.selectedExecutionNodeId.set(nodeId);
-      this.showExecutionPanel.set(true);
-    }
+    // Делаем выбранную ноду "целью" для вкладки результатов, даже если запуска ещё не было —
+    // вкладка отрисует empty-state, но при появлении данных сразу покажет их без второго клика.
+    this.selectedExecutionNodeId.set(nodeId);
   }
 
   executeWorkflow(): void {
@@ -1223,7 +1327,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     }
 
     this.logPanelCollapsed.set(true);
-    this.showExecutionPanel.set(true);
+    this.inspectorTab.set('results');
     this.selectedExecutionNodeId.set(null);
     this.executionStatus.set({});
     this.executionProgress.set(0);
@@ -1237,14 +1341,9 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     });
   }
 
-  closeExecutionPanel(): void {
-    this.showExecutionPanel.set(false);
-    this.selectedExecutionNodeId.set(null);
-  }
-
   resetExecution(): void {
     this.executionService.clearExecution();
-    this.showExecutionPanel.set(false);
+    this.inspectorTab.set('config');
     this.selectedExecutionNodeId.set(null);
     this.executionStatus.set({});
     this.executionProgress.set(0);

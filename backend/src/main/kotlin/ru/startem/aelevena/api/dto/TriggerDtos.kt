@@ -9,4 +9,9 @@ data class Trigger(
     val type: String,
     val config: JsonNode? = null,
     val token: String? = null,
+    val enabled: Boolean = true,
+)
+
+data class TriggerUpdate(
+    val enabled: Boolean,
 )

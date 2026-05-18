@@ -92,11 +92,41 @@ class TriggerService(
         registerAfterCommit {
             staleIds.forEach { scheduler.cancel(it) }
             upserted.forEach { row ->
-                if (row.type == "cron" || row.type == "interval") {
+                if ((row.type == "cron" || row.type == "interval") && row.enabled) {
                     scheduler.schedule(row)
+                } else if (row.type == "cron" || row.type == "interval") {
+                    scheduler.cancel(row.id)
                 }
             }
         }
+    }
+
+    /**
+     * Включить/выключить триггер.
+     * Cron/interval: при `enabled=true` пере-планируем, при `false` — отменяем.
+     * Webhook: только меняем флаг — обработчик токена сам отфильтрует.
+     */
+    @Transactional
+    fun setEnabled(workflowId: UUID, triggerId: Long, enabled: Boolean): Trigger {
+        val row = triggers.findById(triggerId) ?: throw NotFoundException("Trigger not found")
+        if (row.workflowId != workflowId) {
+            throw NotFoundException("Trigger not found")
+        }
+        if (row.enabled == enabled) {
+            return row.toDto()
+        }
+        triggers.setEnabled(triggerId, enabled)
+        val updated = triggers.findById(triggerId) ?: throw NotFoundException("Trigger not found")
+        registerAfterCommit {
+            if (updated.type == "cron" || updated.type == "interval") {
+                if (enabled) {
+                    scheduler.schedule(updated)
+                } else {
+                    scheduler.cancel(triggerId)
+                }
+            }
+        }
+        return updated.toDto()
     }
 
     private fun stripMetaKeys(config: JsonNode?): ObjectNode? {
@@ -145,5 +175,6 @@ class TriggerService(
             type = this.type,
             config = this.configJson?.let { objectMapper.readTree(it) },
             token = this.token,
+            enabled = this.enabled,
         )
 }

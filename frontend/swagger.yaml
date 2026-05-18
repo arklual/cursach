@@ -174,32 +174,12 @@ paths:
           description: Версия workflow не найдена.
 
   /workflows/{workflowId}/triggers:
-    post:
-      tags: [Triggers]
-      summary: Создать триггер
-      description: Добавляет новый триггер запуска для указанного workflow.
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-      requestBody:
-        required: true
-        description: Конфигурация триггера.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TriggerCreateRequest'
-      responses:
-        '201':
-          description: Триггер создан.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Trigger'
-        '404':
-          description: Workflow не найден.
     get:
       tags: [Triggers]
       summary: Список триггеров workflow
-      description: Возвращает все триггеры, относящиеся к указанному workflow.
+      description: >
+        Возвращает все триггеры workflow. Триггеры создаются/удаляются автоматически
+        при сохранении графа (по нодам с type trigger.webhook/cron/interval).
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
       responses:
@@ -215,18 +195,37 @@ paths:
         '404':
           description: Workflow не найден.
 
-  /triggers/{triggerId}:
-    delete:
+  /workflows/{workflowId}/triggers/{triggerId}:
+    patch:
       tags: [Triggers]
-      summary: Удалить триггер
-      description: Удаляет указанный триггер по ID.
+      summary: Включить/выключить триггер
+      description: >
+        Переключает поле `enabled` у триггера. Для cron/interval включение пере-планирует таск,
+        выключение — отменяет. Для webhook отключённый триггер возвращает 404 при вызове по токену.
       parameters:
-        - $ref: '#/components/parameters/TriggerId'
+        - $ref: '#/components/parameters/WorkflowId'
+        - name: triggerId
+          in: path
+          required: true
+          description: Идентификатор триггера.
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriggerUpdate'
       responses:
-        '204':
-          description: Триггер удалён.
+        '200':
+          description: Обновлённый триггер.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trigger'
         '404':
-          description: Триггер не найден.
+          description: Триггер или workflow не найден.
 
   /webhook/{token}:
     post:
@@ -248,7 +247,7 @@ paths:
           description: Запуск workflow принят в обработку.
           headers:
             Location:
-              description: Абсолютный URL для опроса статуса запуска (GET /workflow-runs/{runId}).
+              description: Абсолютный URL для опроса итогового результата запуска (GET /workflow-runs/{runId}/result).
               schema:
                 type: string
                 format: uri
@@ -263,12 +262,21 @@ paths:
     post:
       tags: [Runs]
       summary: Ручной запуск workflow
-      description: Запускает выполнение workflow вручную.
+      description: >
+        Запускает выполнение workflow вручную. Принимает произвольный JSON в теле — он будет
+        доступен нодам как `runInput`. Опционально через `startNodeId` можно стартовать только
+        подграф, достижимый из конкретной ноды.
       parameters:
         - $ref: '#/components/parameters/WorkflowId'
+        - name: startNodeId
+          in: query
+          required: false
+          description: Если указан — исполняем только subgraph, достижимый из этой ноды.
+          schema:
+            type: string
       requestBody:
         required: false
-        description: Дополнительные параметры запуска.
+        description: Произвольный JSON-payload, прокидывается в `runInput` для нод без входов.
         content:
           application/json:
             schema:
@@ -319,6 +327,26 @@ paths:
         '404':
           description: Запуск не найден.
 
+  /workflow-runs/{runId}/result:
+    get:
+      tags: [Runs]
+      summary: Получить агрегированный результат запуска
+      description: >
+        Возвращает только итог пайплайна (без поноды-разбивки): статус, тайминги и output
+        терминальных нод. Если терминальная нода одна — её output как есть, иначе объект
+        {nodeId: output} по терминальным.
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Итоговый результат запуска.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRunResult'
+        '404':
+          description: Запуск не найден.
+
   /node-runs/{nodeRunId}:
     get:
       tags: [Runs]
@@ -350,13 +378,6 @@ components:
       in: path
       required: true
       description: Идентификатор версии workflow.
-      schema:
-        type: string
-    TriggerId:
-      name: triggerId
-      in: path
-      required: true
-      description: Идентификатор триггера.
       schema:
         type: string
     Token:
@@ -519,21 +540,9 @@ components:
           description: Метка входящего порта.
       required: [id, source, target]
 
-    TriggerCreateRequest:
-      type: object
-      description: Тело запроса для создания триггера.
-      properties:
-        type:
-          type: string
-          description: Тип триггера (cron, webhook и т.п.).
-        config:
-          type: object
-          description: Конфигурация триггера.
-      required: [type]
-
     Trigger:
       type: object
-      description: Триггер запуска workflow.
+      description: Триггер запуска workflow, привязанный к ноде в графе.
       properties:
         id:
           type: string
@@ -541,12 +550,32 @@ components:
         workflowId:
           type: string
           description: Идентификатор workflow.
+        nodeId:
+          type: string
+          description: Идентификатор ноды в графе, к которой привязан триггер.
         type:
           type: string
-          description: Тип триггера.
+          description: Тип триггера (webhook, cron, interval).
         config:
           type: object
-          description: Конфигурация триггера.
+          description: Конфигурация триггера (например, cron-выражение, everySeconds).
+        token:
+          type: string
+          description: Публичный токен для webhook-триггера (генерируется на бэке).
+        enabled:
+          type: boolean
+          description: >
+            Активен ли триггер. Для cron/interval отключённый триггер не запускается по расписанию.
+            Для webhook отключённый триггер возвращает 404 при попытке вызова.
+
+    TriggerUpdate:
+      type: object
+      description: Тело для PATCH триггера — переключение активности.
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+          description: Включить (true) или выключить (false) триггер.
 
     WorkflowRun:
       type: object
@@ -563,16 +592,28 @@ components:
           description: Статус запуска (queued, running, success, failed).
         startedAt:
           type: string
-          description: Время старта запуска.
+          description: Время старта запуска (ISO-8601).
         finishedAt:
           type: string
-          description: Время завершения запуска.
+          description: Время завершения запуска (ISO-8601).
+        durationMs:
+          type: integer
+          format: int64
+          description: Длительность запуска в миллисекундах. Заполнено только для завершённых запусков.
         input:
           type: object
-          description: Входные параметры запуска.
+          description: Входные параметры запуска (что было передано в POST как payload).
         output:
           type: object
           description: Агрегированный результат выполнения workflow.
+        startNodeId:
+          type: string
+          description: Если запуск стартован с конкретной ноды (subgraph) — её id.
+        nodes:
+          type: array
+          description: Состояние каждой ноды этого запуска в порядке создания node_run-записей.
+          items:
+            $ref: '#/components/schemas/NodeRun'
 
     NodeRun:
       type: object
@@ -608,7 +649,7 @@ components:
 
     WebhookAccepted:
       type: object
-      description: Подтверждение приёма webhook-а с ссылкой на статус запуска.
+      description: Подтверждение приёма webhook-а с ссылкой на итоговый результат запуска.
       required: [run, pollUrl]
       properties:
         run:
@@ -616,5 +657,36 @@ components:
         pollUrl:
           type: string
           format: uri
-          description: Абсолютный URL для опроса состояния запуска (GET /workflow-runs/{runId}).
+          description: Абсолютный URL для опроса итогового результата запуска (GET /workflow-runs/{runId}/result).
+
+    WorkflowRunResult:
+      type: object
+      description: Итоговый результат пайплайна без поноды-разбивки.
+      required: [id, workflowId, status]
+      properties:
+        id:
+          type: string
+          description: Идентификатор запуска.
+        workflowId:
+          type: string
+          description: Идентификатор workflow.
+        status:
+          type: string
+          description: Статус запуска (queued/running/success/failed).
+        startedAt:
+          type: string
+          description: Время старта запуска.
+        finishedAt:
+          type: string
+          description: Время завершения запуска.
+        durationMs:
+          type: integer
+          format: int64
+          description: Длительность выполнения, мс.
+        output:
+          description: >
+            Агрегированный output пайплайна — данные терминальных нод. Если терминальная
+            нода одна — её output как есть, иначе объект {nodeId: output}. Null, пока
+            запуск не завершён или выходов нет.
+          nullable: true
 

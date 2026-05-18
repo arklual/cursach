@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import ru.startem.aelevena.api.dto.NodeRun
 import ru.startem.aelevena.api.dto.WorkflowRun
+import ru.startem.aelevena.api.dto.WorkflowRunResult
 import ru.startem.aelevena.run.RunEnqueueService
 import ru.startem.aelevena.run.RunQueryService
 import java.util.UUID
@@ -37,6 +38,10 @@ class RunsController(
     @GetMapping("/workflow-runs/{runId}")
     fun getRun(@PathVariable runId: Long): WorkflowRun =
         runQueryService.getWorkflowRun(runId)
+
+    @GetMapping("/workflow-runs/{runId}/result")
+    fun getRunResult(@PathVariable runId: Long): WorkflowRunResult =
+        runQueryService.getWorkflowRunResult(runId)
 
     @GetMapping("/node-runs/{nodeRunId}")
     fun getNodeRun(@PathVariable nodeRunId: Long): NodeRun =

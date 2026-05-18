@@ -144,6 +144,25 @@ class TriggersRepository(
         )!!
     }
 
+    /**
+     * Установить флаг `enabled` для триггера. Возвращает true, если строка нашлась и обновилась.
+     */
+    fun setEnabled(triggerId: Long, enabled: Boolean): Boolean {
+        val params = MapSqlParameterSource()
+            .addValue("triggerId", triggerId)
+            .addValue("enabled", enabled)
+        val updated = jdbc.update(
+            """
+            update triggers
+            set enabled = :enabled,
+                updated_at = CURRENT_TIMESTAMP
+            where id = :triggerId
+            """.trimIndent(),
+            params,
+        )
+        return updated > 0
+    }
+
     fun deleteByWorkflowIdAndNodeIdNotIn(workflowId: UUID, keepNodeIds: Collection<String>): List<Long> {
         val params = MapSqlParameterSource().addValue("workflowId", workflowId)
         val sql = if (keepNodeIds.isEmpty()) {
