@@ -213,6 +213,10 @@ paths:
       responses:
         '202':
           description: Запуск workflow принят в обработку.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
         '404':
           description: Webhook с таким токеном не найден.
 

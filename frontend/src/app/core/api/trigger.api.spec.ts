@@ -9,6 +9,7 @@ import {
 } from '@angular/common/http/testing';
 
 import { TriggerApiService, Trigger } from './trigger.api';
+import type { WorkflowRun } from './api.models';
 import { environment } from '../../../environments/environment';
 
 describe('TriggerApiService', () => {
@@ -45,14 +46,18 @@ describe('TriggerApiService', () => {
         expect(result).toEqual(fixture);
     });
 
-    it('invokeWebhook() выполняет POST /webhook/{token} с произвольным JSON', () => {
+    it('invokeWebhook() выполняет POST /webhook/{token} и возвращает WorkflowRun', () => {
         const payload = { event: 'click', amount: 42 };
+        const fixture = { id: 'run-9', workflowId: 'wf-1', status: 'queued' } as unknown as WorkflowRun;
 
-        service.invokeWebhook('tok_abc', payload).subscribe();
+        let result: WorkflowRun | undefined;
+        service.invokeWebhook('tok_abc', payload).subscribe(r => (result = r));
 
         const req = httpMock.expectOne(`${base}/webhook/tok_abc`);
         expect(req.request.method).toBe('POST');
         expect(req.request.body).toEqual(payload);
-        req.flush(null, { status: 202, statusText: 'Accepted' });
+        req.flush(fixture, { status: 202, statusText: 'Accepted' });
+
+        expect(result).toEqual(fixture);
     });
 });
