@@ -178,8 +178,8 @@ import { NodeKind } from '../../models/workflow.model';
     .empty-hint {
       margin-top: 16px;
       padding: 10px 16px;
-      background: rgba(255, 122, 26, 0.12);
-      border: 1px solid rgba(255, 122, 26, 0.4);
+      background: var(--accent-glow);
+      border: 1px solid var(--accent-glow-strong);
       border-radius: 999px;
       pointer-events: auto;
       display: inline-flex;

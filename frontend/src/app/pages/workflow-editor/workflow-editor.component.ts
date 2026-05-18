@@ -60,6 +60,24 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
             <span class="status-dot"></span>
             <span class="status-text">{{ validationResult().message }}</span>
           </div>
+          @if (isMobile()) {
+            <button class="icon-btn mobile-only" type="button"
+                    (click)="toggleMobilePalette()"
+                    [class.active]="mobilePaletteOpen()"
+                    title="Палитра нод" aria-label="Палитра нод">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/>
+              </svg>
+            </button>
+            <button class="icon-btn mobile-only" type="button"
+                    (click)="toggleMobileInspector()"
+                    [class.active]="mobileInspectorOpen()"
+                    title="Инспектор" aria-label="Инспектор">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94 0 .31.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+              </svg>
+            </button>
+          }
           <button class="icon-btn" (click)="openModal('guide')" title="Пошаговая инструкция" aria-label="Гайд">
             <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/>
@@ -72,9 +90,16 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
         <div class="editor-error-banner">{{ loadError() }}</div>
       }
 
-      <main [style.grid-template-columns]="mainGridColumns()">
+      <main [style.grid-template-columns]="mainGridColumns()"
+            [class.is-mobile]="isMobile()"
+            [class.has-drawer-open]="isMobile() && (mobilePaletteOpen() || mobileInspectorOpen())">
+        @if (isMobile() && (mobilePaletteOpen() || mobileInspectorOpen())) {
+          <div class="mobile-drawer-backdrop" (click)="closeMobileDrawers()" aria-hidden="true"></div>
+        }
         <!-- Palette -->
-        <div class="panel-container palette-panel" [class.collapsed]="paletteCollapsed()">
+        <div class="panel-container palette-panel"
+             [class.collapsed]="paletteCollapsed() && !isMobile()"
+             [class.mobile-open]="isMobile() && mobilePaletteOpen()">
           @if (!paletteCollapsed()) {
             <div class="panel-content" [style.width.px]="paletteWidth()">
               <app-palette></app-palette>
@@ -108,7 +133,9 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
         </app-workflow-canvas>
 
         <!-- Inspector -->
-        <div class="panel-container inspector-panel" [class.collapsed]="inspectorCollapsed()">
+        <div class="panel-container inspector-panel"
+             [class.collapsed]="inspectorCollapsed() && !isMobile()"
+             [class.mobile-open]="isMobile() && mobileInspectorOpen()">
           <button class="collapse-btn collapse-btn-left"
                   (click)="inspectorCollapsed.set(!inspectorCollapsed())">
             @if (inspectorCollapsed()) {
@@ -354,7 +381,7 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
       border-radius: 10px;
       background: var(--danger-bg);
       color: var(--danger);
-      border: 1px solid rgba(225, 29, 72, 0.35);
+      border: 1px solid var(--danger-glow-strong);
       font-size: 14px;
     }
 
@@ -391,12 +418,20 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
       width: 40px;
       height: 40px;
       border-radius: 12px;
-      background: var(--accent);
-      color: white;
+      background:
+        radial-gradient(circle at 28% 20%, rgba(180, 205, 255, 0.5) 0%, transparent 58%),
+        linear-gradient(135deg, #5b8def 0%, #2c4a99 100%);
+      color: var(--accent-ink);
       display: grid;
       place-items: center;
+      font-family: var(--font-sans);
       font-weight: 700;
       font-size: 20px;
+      letter-spacing: -0.02em;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.18),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+        0 8px 20px rgba(91, 141, 239, 0.24);
     }
 
     .workflow-info {
@@ -893,13 +928,12 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
       height: 28px;
       border-radius: 50%;
       background: var(--accent);
-      color: #1a0e05;
+      color: var(--accent-ink);
       display: grid;
       place-items: center;
-      font-family: var(--font-display);
-      font-style: italic;
-      font-weight: 600;
-      font-size: 15px;
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 13px;
     }
 
     .guide-steps h4 {
@@ -938,6 +972,244 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
     .guide-tips li {
       font-size: 13px;
       color: var(--fg-secondary);
+    }
+
+    /* ============================================
+       Mobile drawers + adaptive header
+       ============================================ */
+
+    .icon-btn.mobile-only.active {
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: var(--accent);
+    }
+
+    .mobile-drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(8, 6, 4, 0.55);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 30;
+      animation: drawerFade 180ms ease;
+    }
+
+    @keyframes drawerFade {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @media (max-width: 1100px) {
+      .app-header {
+        padding: 14px 20px;
+      }
+      .header-actions {
+        gap: 8px;
+      }
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr !important;
+        padding: 12px;
+        gap: 12px;
+      }
+
+      .panel-container {
+        position: fixed;
+        top: 64px;
+        bottom: 12px;
+        width: min(320px, 86vw);
+        max-height: none;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: var(--shadow-xl);
+        z-index: 40;
+        transition: transform 260ms cubic-bezier(0.32, 0.72, 0.24, 1);
+        overflow: hidden;
+      }
+
+      .palette-panel {
+        left: 12px;
+        transform: translateX(calc(-100% - 24px));
+        flex-direction: column;
+      }
+
+      .palette-panel.mobile-open {
+        transform: translateX(0);
+      }
+
+      .inspector-panel {
+        right: 12px;
+        transform: translateX(calc(100% + 24px));
+        flex-direction: column;
+      }
+
+      .inspector-panel.mobile-open {
+        transform: translateX(0);
+      }
+
+      .panel-container .panel-content {
+        width: 100% !important;
+        height: 100%;
+        overflow: auto;
+      }
+
+      .panel-container .resize-handle,
+      .panel-container .collapse-btn {
+        display: none !important;
+      }
+
+      .palette-panel .panel-content > *,
+      .inspector-panel .panel-content > * {
+        height: 100%;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .app-header {
+        padding: 10px 12px;
+        gap: 8px;
+      }
+      .brand {
+        gap: 8px;
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+      .brand .logo {
+        width: 34px;
+        height: 34px;
+        font-size: 17px;
+        border-radius: 9px;
+      }
+      .back-btn {
+        width: 32px;
+        height: 32px;
+      }
+      .workflow-info {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+      .workflow-name-input {
+        font-size: 15px;
+        padding: 2px 4px;
+        margin: -2px -4px;
+        width: 100%;
+        min-width: 0;
+        text-overflow: ellipsis;
+      }
+      .workflow-info p {
+        font-size: 10px;
+        letter-spacing: 0.06em;
+      }
+      .header-actions {
+        gap: 6px;
+        flex: 0 0 auto;
+      }
+      .validation-status {
+        padding: 4px 6px;
+        font-size: 11px;
+      }
+      .validation-status .status-text {
+        display: none;
+      }
+      .icon-btn {
+        width: 32px;
+        height: 32px;
+      }
+      main {
+        padding: 8px;
+        gap: 8px;
+      }
+      .panel-container {
+        top: 56px;
+        bottom: 8px;
+        width: min(300px, 90vw);
+        border-radius: 12px;
+      }
+      .palette-panel { left: 8px; }
+      .inspector-panel { right: 8px; }
+
+      .run-panel {
+        padding: 0 12px 8px;
+      }
+      .run-panel-header {
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .tabs {
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .tabs::-webkit-scrollbar { display: none; }
+      .tabs .tab {
+        padding: 6px 10px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .tab-actions {
+        flex-wrap: wrap;
+      }
+      .icon-action-btn {
+        width: 30px;
+        height: 30px;
+      }
+
+      .guide-steps > li {
+        padding: 10px 12px;
+        gap: 10px;
+        border-radius: 10px;
+      }
+      .guide-step-num {
+        flex: 0 0 24px;
+        width: 24px;
+        height: 24px;
+        font-size: 13px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .editor-error-banner {
+        margin: 8px 8px 0;
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+      .brand .logo {
+        width: 30px;
+        height: 30px;
+        font-size: 15px;
+      }
+      .back-btn {
+        width: 30px;
+        height: 30px;
+      }
+      .workflow-name-input {
+        font-size: 14px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .app-header {
+        padding: 8px 8px;
+      }
+      .brand {
+        gap: 6px;
+      }
+      .header-actions {
+        gap: 4px;
+      }
+      .icon-btn {
+        width: 30px;
+        height: 30px;
+      }
+      .validation-status {
+        padding: 3px 4px;
+      }
+      .panel-container {
+        width: min(280px, 92vw);
+        top: 52px;
+      }
     }
 
   `]
@@ -1066,6 +1338,12 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   logPanelCollapsed = signal(false);
   logPanelHeight = signal(180);
 
+  // Mobile drawer state
+  private static readonly MOBILE_BREAKPOINT = 900;
+  isMobile = signal(false);
+  mobilePaletteOpen = signal(false);
+  mobileInspectorOpen = signal(false);
+
   private resizing: 'palette' | 'inspector' | 'log' | null = null;
   private resizeStartX = 0;
   private resizeStartY = 0;
@@ -1073,10 +1351,53 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   private autoSaveInterval: ReturnType<typeof setInterval> | null = null;
 
   mainGridColumns = computed(() => {
+    if (this.isMobile()) {
+      return '1fr';
+    }
     const paletteW = this.paletteCollapsed() ? '32px' : `${this.paletteWidth()}px`;
     const inspectorW = this.inspectorCollapsed() ? '32px' : `${this.inspectorWidth()}px`;
     return `${paletteW} 1fr ${inspectorW}`;
   });
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    this.syncMobileFromViewport();
+  }
+
+  private syncMobileFromViewport(): void {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const mobile = window.innerWidth < WorkflowEditorComponent.MOBILE_BREAKPOINT;
+    if (mobile !== this.isMobile()) {
+      this.isMobile.set(mobile);
+      if (!mobile) {
+        this.mobilePaletteOpen.set(false);
+        this.mobileInspectorOpen.set(false);
+      }
+    }
+  }
+
+  toggleMobilePalette(): void {
+    const next = !this.mobilePaletteOpen();
+    this.mobilePaletteOpen.set(next);
+    if (next) {
+      this.mobileInspectorOpen.set(false);
+    }
+  }
+
+  toggleMobileInspector(): void {
+    const next = !this.mobileInspectorOpen();
+    this.mobileInspectorOpen.set(next);
+    if (next) {
+      this.mobilePaletteOpen.set(false);
+    }
+  }
+
+  closeMobileDrawers(): void {
+    this.mobilePaletteOpen.set(false);
+    this.mobileInspectorOpen.set(false);
+  }
 
   validationResult = signal<ValidationResult>({
     ready: true,
@@ -1088,6 +1409,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   workflowMeta = computed(() => this.currentMeta());
 
   ngOnInit(): void {
+    this.syncMobileFromViewport();
     this.maybeShowGuide();
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {

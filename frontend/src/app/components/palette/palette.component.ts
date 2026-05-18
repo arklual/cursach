@@ -226,7 +226,7 @@ interface NodeCategory {
       border-radius: var(--radius-lg);
       padding: 12px;
       background:
-        linear-gradient(135deg, rgba(255, 122, 26, 0.10) 0%, rgba(132, 204, 22, 0.06) 100%),
+        linear-gradient(135deg, rgba(91, 141, 239, 0.08) 0%, rgba(52, 201, 124, 0.05) 100%),
         var(--bg-secondary);
       display: flex;
       flex-direction: column;
@@ -303,9 +303,9 @@ interface NodeCategory {
 
     .empty-state p {
       margin: 0;
-      font-family: var(--font-display);
-      font-style: italic;
-      font-size: 17px;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 14px;
       color: var(--fg-secondary);
     }
   `]
@@ -336,7 +336,7 @@ export class PaletteComponent {
     {
       id: 'entry',
       name: 'Триггеры',
-      color: 'var(--success, #84cc16)',
+      color: 'var(--success, #34c97c)',
       items: [
         { id: 'trigger:manual', label: 'Manual', kind: 'trigger', subtype: 'manual', iconPath: this.icons.manual },
         { id: 'trigger:webhook', label: 'Webhook', kind: 'trigger', subtype: 'webhook', iconPath: this.icons.webhook },
@@ -347,7 +347,7 @@ export class PaletteComponent {
     {
       id: 'io',
       name: 'I/O',
-      color: 'var(--warning, #fbbf24)',
+      color: 'var(--warning, #f5a524)',
       items: [
         { id: 'http', label: 'HTTP', kind: 'http', iconPath: this.icons.http },
       ],
@@ -355,7 +355,7 @@ export class PaletteComponent {
     {
       id: 'code',
       name: 'Код',
-      color: 'var(--info, #3b82f6)',
+      color: 'var(--info, #a78bfa)',
       items: [
         { id: 'code', label: 'Python', kind: 'code', iconPath: this.icons.code },
         { id: 'code:js', label: 'JavaScript', kind: 'code', subtype: 'js', iconPath: this.icons.js },
@@ -364,7 +364,7 @@ export class PaletteComponent {
     {
       id: 'dataflow',
       name: 'Dataflow',
-      color: 'var(--accent, #ff7a1a)',
+      color: 'var(--accent, #5b8def)',
       items: [
         { id: 'dataflow:filter', label: 'Filter', kind: 'dataflow', subtype: 'filter', iconPath: this.icons.filter },
         { id: 'dataflow:map', label: 'Map', kind: 'dataflow', subtype: 'map', iconPath: this.icons.map },

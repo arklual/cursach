@@ -188,7 +188,7 @@ type CreateMode = 'closed' | 'choose' | 'template';
       justify-content: space-between;
       align-items: center;
       padding: 32px 48px 28px;
-      background: linear-gradient(180deg, rgba(36, 29, 23, 0.92) 0%, rgba(22, 18, 14, 0.6) 100%);
+      background: linear-gradient(180deg, rgba(28, 32, 38, 0.85) 0%, rgba(20, 23, 28, 0.55) 100%);
       border-bottom: 1px solid var(--border);
     }
 
@@ -203,30 +203,29 @@ type CreateMode = 'closed' | 'choose' | 'template';
       height: 52px;
       border-radius: 14px;
       background:
-        radial-gradient(circle at 30% 22%, #ffd6a3 0%, transparent 55%),
-        linear-gradient(135deg, #ff7a1a 0%, #a8300a 100%);
-      color: #1a0e05;
+        radial-gradient(circle at 28% 20%, rgba(180, 205, 255, 0.5) 0%, transparent 58%),
+        linear-gradient(135deg, #5b8def 0%, #2c4a99 100%);
+      color: var(--accent-ink);
       display: grid;
       place-items: center;
-      font-family: var(--font-display);
-      font-style: italic;
-      font-weight: 400;
-      font-size: 30px;
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 26px;
+      letter-spacing: -0.02em;
       line-height: 1;
       box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.18),
         inset 0 -1px 0 rgba(0, 0, 0, 0.25),
-        0 10px 26px rgba(255, 122, 26, 0.32);
+        0 10px 24px rgba(91, 141, 239, 0.28);
     }
 
     .page-header h1 {
       margin: 0 0 4px;
-      font-family: var(--font-display);
-      font-style: italic;
-      font-weight: 400;
-      font-size: 42px;
-      line-height: 1.02;
-      letter-spacing: -0.028em;
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 32px;
+      line-height: 1.1;
+      letter-spacing: -0.022em;
       color: var(--fg-primary);
     }
 
@@ -328,8 +327,8 @@ type CreateMode = 'closed' | 'choose' | 'template';
       width: 100%;
     }
 
-    .choice-icon.scratch { background: linear-gradient(135deg, #84cc16 0%, #4d7c0f 100%); }
-    .choice-icon.template { background: linear-gradient(135deg, #ff7a1a 0%, #a8300a 100%); }
+    .choice-icon.scratch { background: linear-gradient(135deg, #5b8def 0%, #2c4a99 100%); }
+    .choice-icon.template { background: linear-gradient(135deg, #a78bfa 0%, #6d4dd6 100%); }
 
     .choice-text h3 {
       margin: 0;
@@ -398,7 +397,7 @@ type CreateMode = 'closed' | 'choose' | 'template';
       box-sizing: border-box;
       font: inherit;
       background:
-        linear-gradient(135deg, rgba(255, 122, 26, 0.10) 0%, rgba(132, 204, 22, 0.06) 100%),
+        linear-gradient(135deg, rgba(91, 141, 239, 0.06) 0%, rgba(167, 139, 250, 0.04) 100%),
         var(--bg-secondary);
       border: 1px solid var(--border);
       border-radius: 12px;
@@ -670,7 +669,7 @@ type CreateMode = 'closed' | 'choose' | 'template';
     .intro-banner {
       margin: 16px 48px 0;
       padding: 24px;
-      background: linear-gradient(135deg, var(--accent-glow) 0%, rgba(132, 204, 22, 0.12) 100%);
+      background: linear-gradient(135deg, var(--accent-glow) 0%, var(--success-glow) 100%);
       border: 1px solid var(--border-light);
       border-radius: 16px;
       display: grid;
@@ -709,9 +708,167 @@ type CreateMode = 'closed' | 'choose' | 'template';
       min-width: 200px;
     }
 
-    @media (max-width: 768px) {
+    /* ============================================
+       Responsive — workflows list
+       ============================================ */
+
+    @media (max-width: 900px) {
+      .page-header {
+        padding: 24px 24px 20px;
+      }
+      .page-header h1 {
+        font-size: 34px;
+      }
+      .loading-banner, .error-banner {
+        margin: 12px 24px 0;
+      }
+      .user-section {
+        padding: 12px 24px 8px;
+      }
+      .workflows-grid {
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 16px;
+      }
       .intro-banner {
+        margin: 16px 24px 0;
         grid-template-columns: 1fr;
+        padding: 20px;
+      }
+      .intro-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+        min-width: 0;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+        padding: 20px 16px;
+      }
+      .brand {
+        gap: 12px;
+      }
+      .brand .logo {
+        width: 44px;
+        height: 44px;
+        font-size: 24px;
+        border-radius: 12px;
+      }
+      .page-header h1 {
+        font-size: 28px;
+        line-height: 1.08;
+      }
+      .page-header p {
+        font-size: 10px;
+        letter-spacing: 0.12em;
+      }
+      .page-header > button.primary {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .loading-banner, .error-banner {
+        margin: 12px 16px 0;
+      }
+      .user-section {
+        padding: 8px 16px 16px;
+      }
+      .workflows-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 12px 0 24px;
+      }
+      .intro-banner {
+        margin: 12px 16px 0;
+        padding: 16px;
+      }
+      .intro-banner h2 {
+        font-size: 22px;
+      }
+      .intro-actions {
+        flex-direction: column;
+      }
+      .intro-actions button {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .create-choice {
+        grid-template-columns: 1fr;
+      }
+      .template-picker-header {
+        gap: 8px;
+      }
+      .template-search {
+        min-width: 0;
+        width: 100%;
+      }
+      .template-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .page-header {
+        padding: 16px 12px;
+      }
+      .brand .logo {
+        width: 40px;
+        height: 40px;
+        font-size: 22px;
+      }
+      .page-header h1 {
+        font-size: 24px;
+      }
+      .loading-banner, .error-banner {
+        margin: 10px 12px 0;
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+      .user-section {
+        padding: 6px 12px 14px;
+      }
+      .intro-banner {
+        margin: 10px 12px 0;
+        padding: 14px;
+        border-radius: 12px;
+      }
+      .workflow-card {
+        padding: 14px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .page-header {
+        padding: 12px 10px;
+        gap: 12px;
+      }
+      .brand {
+        gap: 10px;
+      }
+      .brand .logo {
+        width: 36px;
+        height: 36px;
+        font-size: 20px;
+        border-radius: 10px;
+      }
+      .page-header h1 {
+        font-size: 22px;
+        line-height: 1.1;
+      }
+      .user-section {
+        padding: 4px 10px 12px;
+      }
+      .loading-banner, .error-banner {
+        margin: 8px 10px 0;
+      }
+      .intro-banner {
+        margin: 8px 10px 0;
+        padding: 12px;
       }
     }
   `]
@@ -886,10 +1043,10 @@ export class WorkflowsListComponent implements OnInit {
 
   getStatusColor(status: string): string {
     switch (status) {
-      case 'running': return '#84cc16';
-      case 'completed': return '#ff7a1a';
-      case 'paused': return '#fbbf24';
-      default: return '#8b7e6a';
+      case 'running': return '#34c97c';
+      case 'completed': return '#5b8def';
+      case 'paused': return '#f5a524';
+      default: return '#6e7480';
     }
   }
 
