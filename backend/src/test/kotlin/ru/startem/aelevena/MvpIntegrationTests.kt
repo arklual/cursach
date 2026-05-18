@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
@@ -20,7 +21,6 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
-import ru.startem.aelevena.api.dto.Connection
 import ru.startem.aelevena.api.dto.Node
 import ru.startem.aelevena.api.dto.NodeData
 import ru.startem.aelevena.api.dto.Position
@@ -40,16 +40,10 @@ import java.util.UUID
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Import(MvpIntegrationTests.ContainersConfig::class)
 class MvpIntegrationTests {
 
     companion object {
-        @Container
-        @ServiceConnection
-        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")
-            .withDatabaseName("a11a")
-            .withUsername("a11a")
-            .withPassword("a11a")
-
         @Container
         val minio: GenericContainer<*> = GenericContainer("minio/minio:latest")
             .withEnv("MINIO_ROOT_USER", "minioadmin")
@@ -60,7 +54,7 @@ class MvpIntegrationTests {
 
         @JvmStatic
         @DynamicPropertySource
-        fun props(registry: DynamicPropertyRegistry) {
+        fun minioProperties(registry: DynamicPropertyRegistry) {
             registry.add("app.s3.endpoint") { "http://localhost:${minio.getMappedPort(9000)}" }
             registry.add("app.s3.region") { "us-east-1" }
             registry.add("app.s3.bucket") { "a11a-blobs" }
@@ -184,5 +178,15 @@ class MvpIntegrationTests {
                 }
             }
     }
-}
 
+    @TestConfiguration
+    class ContainersConfig {
+        @Bean
+        @ServiceConnection
+        fun postgres(): PostgreSQLContainer<*> =
+            PostgreSQLContainer("postgres:16-alpine")
+                .withDatabaseName("a11a")
+                .withUsername("a11a")
+                .withPassword("a11a")
+    }
+}
