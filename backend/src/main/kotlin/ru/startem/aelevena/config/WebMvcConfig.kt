@@ -9,7 +9,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 // В prod фронт за nginx проксирует /v1 на бэк (один origin), но конфиг безопасен везде.
 @Configuration
 class WebMvcConfig(
-    @Value("\${app.cors.allowed-origins:http://localhost:4200,http://localhost}")
+    @Value("\${app.cors.allowed-origins:http://localhost:4200,http://localhost,https://fluxpilot.ru,https://www.fluxpilot.ru}")
     private val allowedOrigins: String,
 ) : WebMvcConfigurer {
 
