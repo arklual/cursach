@@ -2,6 +2,7 @@ package ru.startem.aelevena
 
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.GenericContainer
@@ -16,6 +17,7 @@ class A11aApplicationTests {
 
     companion object {
         @Container
+        @ServiceConnection
         val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")
             .withDatabaseName("a11a")
             .withUsername("a11a")
@@ -32,10 +34,6 @@ class A11aApplicationTests {
         @JvmStatic
         @DynamicPropertySource
         fun props(registry: DynamicPropertyRegistry) {
-            registry.add("spring.datasource.url") { postgres.jdbcUrl }
-            registry.add("spring.datasource.username") { postgres.username }
-            registry.add("spring.datasource.password") { postgres.password }
-
             registry.add("app.s3.endpoint") { "http://localhost:${minio.getMappedPort(9000)}" }
             registry.add("app.s3.region") { "us-east-1" }
             registry.add("app.s3.bucket") { "a11a-blobs" }

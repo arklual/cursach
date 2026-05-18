@@ -11,6 +11,7 @@ import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.context.annotation.Bean
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -43,6 +44,7 @@ class MvpIntegrationTests {
 
     companion object {
         @Container
+        @ServiceConnection
         val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16-alpine")
             .withDatabaseName("a11a")
             .withUsername("a11a")
@@ -59,10 +61,6 @@ class MvpIntegrationTests {
         @JvmStatic
         @DynamicPropertySource
         fun props(registry: DynamicPropertyRegistry) {
-            registry.add("spring.datasource.url") { postgres.jdbcUrl }
-            registry.add("spring.datasource.username") { postgres.username }
-            registry.add("spring.datasource.password") { postgres.password }
-
             registry.add("app.s3.endpoint") { "http://localhost:${minio.getMappedPort(9000)}" }
             registry.add("app.s3.region") { "us-east-1" }
             registry.add("app.s3.bucket") { "a11a-blobs" }
