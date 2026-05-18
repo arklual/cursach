@@ -274,16 +274,27 @@ type CreateMode = 'closed' | 'choose' | 'template';
       gap: 16px;
     }
 
+    .create-choice > * {
+      min-width: 0;
+    }
+
     .choice-card {
       display: flex;
       flex-direction: column;
       gap: 12px;
       padding: 20px;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      font: inherit;
       background: var(--bg-secondary);
       border: 1px solid var(--border);
       border-radius: 14px;
       color: var(--fg-primary);
       text-align: left;
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
       cursor: pointer;
       transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     }
@@ -306,16 +317,26 @@ type CreateMode = 'closed' | 'choose' | 'template';
       display: grid;
       place-items: center;
       color: white;
+      flex-shrink: 0;
+    }
+
+    .choice-text {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+      width: 100%;
     }
 
     .choice-icon.scratch { background: linear-gradient(135deg, #84cc16 0%, #4d7c0f 100%); }
     .choice-icon.template { background: linear-gradient(135deg, #ff7a1a 0%, #a8300a 100%); }
 
     .choice-text h3 {
-      margin: 0 0 4px;
+      margin: 0;
       font-size: 16px;
       font-weight: 600;
       color: var(--fg-primary);
+      white-space: normal;
     }
 
     .choice-text p {
@@ -323,6 +344,7 @@ type CreateMode = 'closed' | 'choose' | 'template';
       font-size: 13px;
       line-height: 1.45;
       color: var(--fg-secondary);
+      white-space: normal;
     }
 
     .template-picker {
@@ -362,11 +384,19 @@ type CreateMode = 'closed' | 'choose' | 'template';
       gap: 12px;
     }
 
+    .template-grid > * {
+      min-width: 0;
+    }
+
     .template-card {
       display: flex;
       flex-direction: column;
       gap: 8px;
       padding: 14px 16px;
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      font: inherit;
       background:
         linear-gradient(135deg, rgba(255, 122, 26, 0.10) 0%, rgba(132, 204, 22, 0.06) 100%),
         var(--bg-secondary);
@@ -374,6 +404,9 @@ type CreateMode = 'closed' | 'choose' | 'template';
       border-radius: 12px;
       color: var(--fg-primary);
       text-align: left;
+      white-space: normal;
+      word-break: break-word;
+      overflow-wrap: anywhere;
       cursor: pointer;
       transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     }
@@ -394,6 +427,7 @@ type CreateMode = 'closed' | 'choose' | 'template';
       font-size: 15px;
       font-weight: 600;
       color: var(--fg-primary);
+      white-space: normal;
     }
 
     .template-card p {
@@ -402,6 +436,7 @@ type CreateMode = 'closed' | 'choose' | 'template';
       line-height: 1.5;
       color: var(--fg-secondary);
       flex: 1;
+      white-space: normal;
     }
 
     .template-card-head {
