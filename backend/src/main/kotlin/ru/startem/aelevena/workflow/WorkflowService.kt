@@ -186,6 +186,7 @@ class WorkflowService(
                 target = c.target,
                 sourceHandle = c.sourceHandle,
                 targetHandle = c.targetHandle,
+                variant = c.variant,
             )
         }
 
@@ -209,6 +210,7 @@ class WorkflowService(
                 target = c.target,
                 sourceHandle = c.sourceHandle,
                 targetHandle = c.targetHandle,
+                variant = c.variant,
             )
         }
         return WorkflowGraph(versionId = versionId.toString(), nodes = nodes, connections = connections)

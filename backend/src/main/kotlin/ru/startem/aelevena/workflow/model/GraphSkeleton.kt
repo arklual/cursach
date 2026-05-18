@@ -31,5 +31,6 @@ data class ConnectionSkeleton(
     val target: String,
     val sourceHandle: String? = null,
     val targetHandle: String? = null,
+    val variant: String? = null,
 )
 
