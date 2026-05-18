@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
@@ -27,14 +26,11 @@ import ru.startem.aelevena.api.dto.Position
 import ru.startem.aelevena.api.dto.WorkflowGraph
 import ru.startem.aelevena.api.dto.WorkflowMetaUpdate
 import ru.startem.aelevena.blob.BlobService
-import ru.startem.aelevena.config.S3Properties
 import ru.startem.aelevena.executor.NodeExecutor
 import ru.startem.aelevena.run.RunEnqueueService
 import ru.startem.aelevena.run.RunQueryService
 import ru.startem.aelevena.run.WorkflowRunRepository
 import ru.startem.aelevena.workflow.WorkflowService
-import software.amazon.awssdk.services.s3.S3Client
-import software.amazon.awssdk.services.s3.model.CreateBucketRequest
 import java.time.Duration
 import java.util.UUID
 
@@ -73,16 +69,9 @@ class MvpIntegrationTests {
     @Autowired private lateinit var runEnqueueService: RunEnqueueService
     @Autowired private lateinit var jdbc: NamedParameterJdbcTemplate
     @Autowired private lateinit var blobService: BlobService
-    @Autowired private lateinit var s3: S3Client
-    @Autowired private lateinit var s3Props: S3Properties
     @Autowired private lateinit var workflowRuns: WorkflowRunRepository
     @Autowired private lateinit var runQueryService: RunQueryService
     @Autowired private lateinit var objectMapper: ObjectMapper
-
-    @BeforeAll
-    fun ensureBucket() {
-        s3.createBucket(CreateBucketRequest.builder().bucket(s3Props.bucket).build())
-    }
 
     @Test
     fun `graph update creates revisions and CAS dedupes configs`() {
