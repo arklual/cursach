@@ -189,12 +189,8 @@ export class ExecutionService {
       const startTime = nr.startedAt ?? undefined;
       const endTime = nr.finishedAt ?? undefined;
       const duration = computeDuration(startTime, endTime);
-      const inputData: NodeExecutionData['inputData'] = nr.input != null
-        ? [{ json: nr.input as Record<string, unknown> }]
-        : undefined;
-      const outputData: NodeExecutionData['outputData'] = nr.output != null
-        ? [{ json: nr.output as Record<string, unknown> }]
-        : undefined;
+      const inputData = toExecutionItems(nr.input);
+      const outputData = toExecutionItems(nr.output);
       const error = nr.errorMessage ? { message: nr.errorMessage } : undefined;
       return {
         nodeId: nr.nodeId ?? '',
@@ -237,6 +233,28 @@ export class ExecutionService {
       nodesExecuted: nodes.length,
     });
   }
+}
+
+/**
+ * Каждый элемент top-level массива в input/output ноды трактуем как отдельный item
+ * (n8n-style): UI-счётчик "N items" и список элементов в панели должны отражать
+ * реальное число элементов, а не всегда «1».
+ */
+function toExecutionItems(value: unknown): NodeExecutionData['inputData'] {
+  if (value == null) {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    return value.map(v => ({ json: wrapAsRecord(v) }));
+  }
+  return [{ json: wrapAsRecord(value) }];
+}
+
+function wrapAsRecord(v: unknown): Record<string, unknown> {
+  if (v != null && typeof v === 'object' && !Array.isArray(v)) {
+    return v as Record<string, unknown>;
+  }
+  return { value: v };
 }
 
 function mapRunStatus(raw: string | undefined): ExecutionStatus {
