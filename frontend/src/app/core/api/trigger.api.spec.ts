@@ -9,7 +9,7 @@ import {
 } from '@angular/common/http/testing';
 
 import { TriggerApiService, Trigger } from './trigger.api';
-import type { WorkflowRun } from './api.models';
+import type { WebhookAccepted, WorkflowRun } from './api.models';
 import { environment } from '../../../environments/environment';
 
 describe('TriggerApiService', () => {
@@ -46,11 +46,12 @@ describe('TriggerApiService', () => {
         expect(result).toEqual(fixture);
     });
 
-    it('invokeWebhook() выполняет POST /webhook/{token} и возвращает WorkflowRun', () => {
+    it('invokeWebhook() выполняет POST /webhook/{token} и возвращает WebhookAccepted с pollUrl', () => {
         const payload = { event: 'click', amount: 42 };
-        const fixture = { id: 'run-9', workflowId: 'wf-1', status: 'queued' } as unknown as WorkflowRun;
+        const run = { id: 'run-9', workflowId: 'wf-1', status: 'queued' } as unknown as WorkflowRun;
+        const fixture: WebhookAccepted = { run, pollUrl: 'http://localhost/workflow-runs/run-9' };
 
-        let result: WorkflowRun | undefined;
+        let result: WebhookAccepted | undefined;
         service.invokeWebhook('tok_abc', payload).subscribe(r => (result = r));
 
         const req = httpMock.expectOne(`${base}/webhook/tok_abc`);

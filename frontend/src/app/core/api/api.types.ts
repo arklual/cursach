@@ -412,10 +412,12 @@ export interface paths {
                 /** @description Запуск workflow принят в обработку. */
                 202: {
                     headers: {
+                        /** @description Абсолютный URL для опроса статуса запуска (GET /workflow-runs/{runId}). */
+                        Location?: string;
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["WorkflowRun"];
+                        "application/json": components["schemas"]["WebhookAccepted"];
                     };
                 };
                 /** @description Webhook с таким токеном не найден. */
@@ -771,6 +773,15 @@ export interface components {
             output?: Record<string, never>;
             /** @description Текст ошибки, если выполнение завершилось неуспешно. */
             errorMessage?: string;
+        };
+        /** @description Подтверждение приёма webhook-а с ссылкой на статус запуска. */
+        WebhookAccepted: {
+            run: components["schemas"]["WorkflowRun"];
+            /**
+             * Format: uri
+             * @description Абсолютный URL для опроса состояния запуска (GET /workflow-runs/{runId}).
+             */
+            pollUrl: string;
         };
     };
     responses: never;

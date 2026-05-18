@@ -27,3 +27,8 @@ data class NodeRun(
     val errorMessage: String? = null,
 )
 
+data class WebhookAccepted(
+    val run: WorkflowRun,
+    val pollUrl: String,
+)
+

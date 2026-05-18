@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import type { WorkflowRun } from './api.models';
+import type { WebhookAccepted } from './api.models';
 
 export interface Trigger {
     id: string;
@@ -27,7 +27,7 @@ export class TriggerApiService {
         return this.http.get<Trigger[]>(`${this.base}/workflows/${workflowId}/triggers`);
     }
 
-    invokeWebhook(token: string, payload: unknown): Observable<WorkflowRun> {
-        return this.http.post<WorkflowRun>(`${this.base}/webhook/${token}`, payload);
+    invokeWebhook(token: string, payload: unknown): Observable<WebhookAccepted> {
+        return this.http.post<WebhookAccepted>(`${this.base}/webhook/${token}`, payload);
     }
 }

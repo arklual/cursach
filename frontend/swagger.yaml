@@ -246,10 +246,16 @@ paths:
       responses:
         '202':
           description: Запуск workflow принят в обработку.
+          headers:
+            Location:
+              description: Абсолютный URL для опроса статуса запуска (GET /workflow-runs/{runId}).
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkflowRun'
+                $ref: '#/components/schemas/WebhookAccepted'
         '404':
           description: Webhook с таким токеном не найден.
 
@@ -599,4 +605,16 @@ components:
         errorMessage:
           type: string
           description: Текст ошибки, если выполнение завершилось неуспешно.
+
+    WebhookAccepted:
+      type: object
+      description: Подтверждение приёма webhook-а с ссылкой на статус запуска.
+      required: [run, pollUrl]
+      properties:
+        run:
+          $ref: '#/components/schemas/WorkflowRun'
+        pollUrl:
+          type: string
+          format: uri
+          description: Абсолютный URL для опроса состояния запуска (GET /workflow-runs/{runId}).
 
