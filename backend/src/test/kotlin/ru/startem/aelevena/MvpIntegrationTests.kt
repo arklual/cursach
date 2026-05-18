@@ -93,6 +93,12 @@ class MvpIntegrationTests {
             connections = emptyList(),
         )
 
+        val blobCountBefore = jdbc.queryForObject(
+            "select count(*) from blob_index",
+            emptyMap<String, Any>(),
+            Long::class.java,
+        ) ?: 0L
+
         workflowService.updateGraph(versionId, graph)
         workflowService.updateGraph(versionId, graph)
 
@@ -103,12 +109,15 @@ class MvpIntegrationTests {
         )
         assertTrue(revCount != null && revCount >= 3L)
 
-        val blobCount = jdbc.queryForObject(
+        // CAS-дедуп: два updateGraph с идентичным config должны добавить ровно один блоб.
+        // Считаем дельту, а не абсолютный count — `enqueue run` тест в этом же классе при PER_CLASS
+        // lifecycle уже мог наполнить blob_index своими блобами.
+        val blobCountAfter = jdbc.queryForObject(
             "select count(*) from blob_index",
             emptyMap<String, Any>(),
             Long::class.java,
-        )
-        assertEquals(1L, blobCount)
+        ) ?: 0L
+        assertEquals(1L, blobCountAfter - blobCountBefore)
 
         val hash = blobService.putJsonIfMissing(objectMapper.convertValue(config, Any::class.java))
         assertNotNull(blobService.getJsonTree(hash))
