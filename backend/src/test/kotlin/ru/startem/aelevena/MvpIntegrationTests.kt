@@ -56,6 +56,9 @@ class MvpIntegrationTests {
         @JvmStatic
         @DynamicPropertySource
         fun minioProperties(registry: DynamicPropertyRegistry) {
+            // В Kotlin companion object без @JvmStatic поле minio не находится Testcontainers JUnit-расширением,
+            // поэтому стартуем контейнер вручную до того, как Spring начнёт читать app.s3.endpoint.
+            minio.start()
             registry.add("app.s3.endpoint") { "http://localhost:${minio.getMappedPort(9000)}" }
             registry.add("app.s3.region") { "us-east-1" }
             registry.add("app.s3.bucket") { "a11a-blobs" }
