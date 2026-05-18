@@ -59,9 +59,9 @@ cat > "$OUTPUT_FILE" <<EOF
     <rect x="${label_w}" width="${value_w}" height="20" fill="${color}"/>
     <rect width="${total_w}" height="20" fill="url(#s)"/>
   </g>
-  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="11">
-    <text x="${label_x}" y="14" transform="scale(.1)" textLength="$((label_w * 10 - 80))">${label}</text>
-    <text x="${value_x}" y="14" transform="scale(.1)" textLength="$((value_w * 10 - 80))">${value}</text>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" font-size="110">
+    <text x="${label_x}" y="140" transform="scale(.1)" textLength="$((label_w * 10 - 80))">${label}</text>
+    <text x="${value_x}" y="140" transform="scale(.1)" textLength="$((value_w * 10 - 80))">${value}</text>
   </g>
 </svg>
 EOF
