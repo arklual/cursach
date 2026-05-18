@@ -69,6 +69,7 @@ class MvpIntegrationTests {
             registry.add("app.s3.access-key") { "minioadmin" }
             registry.add("app.s3.secret-key") { "minioadmin" }
             registry.add("app.s3.path-style-access") { "true" }
+            registry.add("app.seed.demo-workflows-enabled") { "false" }
         }
     }
 

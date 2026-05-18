@@ -10,3 +10,4 @@ dist/
 *.crt
 *.key
 *.pem
+memory-bank/
