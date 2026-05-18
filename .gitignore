@@ -7,3 +7,6 @@ dist/
 *.log
 .env
 .env.local
+*.crt
+*.key
+*.pem
