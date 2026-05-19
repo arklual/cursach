@@ -122,8 +122,21 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
                 </div>
               </div>
 
-              <div class="handle handle-out"
-                   (mousedown)="startDrawEdge($event, node, 'source')"></div>
+              @if (node.data.kind === 'ab') {
+                @for (variant of getAbVariants(node); track variant.key; let i = $index) {
+                  <div class="handle handle-out handle-variant"
+                       [style.top.%]="20 + i * 25"
+                       [attr.data-variant]="variant.key"
+                       [style.background-color]="getVariantColor(variant.key, i)"
+                       (mousedown)="$event.stopPropagation(); startDrawEdge($event, node, 'source', variant.key)"
+                       [title]="'Variant ' + variant.key">
+                    <span class="handle-label">{{ variant.key }}</span>
+                  </div>
+                }
+              } @else {
+                <div class="handle handle-out"
+                     (mousedown)="startDrawEdge($event, node, 'source')"></div>
+              }
             </div>
           }
         </div>
@@ -538,6 +551,34 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
       transform: translateY(-50%) translateX(50%);
     }
 
+    .handle-variant {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid var(--bg-primary);
+      cursor: crosshair;
+      z-index: 2;
+      position: absolute;
+      right: -8px;
+      transform: translateY(-50%);
+    }
+
+    .handle-variant:hover {
+      transform: translateY(-50%) scale(1.3);
+    }
+
+    .handle-label {
+      position: absolute;
+      right: 100%;
+      margin-right: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--fg-secondary);
+      line-height: 16px;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
     .info-panel {
       position: absolute;
       bottom: 10px;
@@ -631,6 +672,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
 
   private drawSource: WorkflowNode | null = null;
   private drawType: 'source' | 'target' = 'source';
+  private drawVariant: string | null = null;
   private mousePos = signal({ x: 0, y: 0 });
 
   private readonly NODE_W = 200;
@@ -643,6 +685,17 @@ export class WorkflowCanvasComponent implements AfterViewInit {
 
   formatKind(node: WorkflowNode): string {
     return node.data.__subtype ?? node.data.kind;
+  }
+
+  getAbVariants(node: WorkflowNode): Array<{ key: string; label: string }> {
+    const cfg = node.data.config as { variants?: Array<{ key: string; label?: string }> } | undefined;
+    return cfg?.variants?.map(v => ({ key: v.key, label: v.label ?? v.key })) ?? [];
+  }
+
+  private readonly variantPalette = ['#84cc16', '#3b82f6', '#f472b6', '#fb923c', '#a78bfa'];
+
+  getVariantColor(key: string, index: number): string {
+    return this.variantPalette[index % this.variantPalette.length];
   }
 
   ngAfterViewInit() {
@@ -928,9 +981,9 @@ export class WorkflowCanvasComponent implements AfterViewInit {
 
             if (!exists) {
               if (this.drawType === 'source') {
-                this.ws.addEdge(this.drawSource.id, target.id);
+                this.ws.addEdge(this.drawSource.id, target.id, undefined, this.drawVariant ?? undefined);
               } else {
-                this.ws.addEdge(target.id, this.drawSource.id);
+                this.ws.addEdge(target.id, this.drawSource.id, undefined, undefined);
               }
               this.ws.log(`Связь: ${this.drawSource.data.label} → ${target.data.label}`);
             }
@@ -942,6 +995,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     this.dragNode = null;
     this.isDrawing.set(false);
     this.drawSource = null;
+    this.drawVariant = null;
     this.dropTargetNodeId.set(null);
   }
 
@@ -1008,13 +1062,14 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     }
   }
 
-  startDrawEdge(e: MouseEvent, node: WorkflowNode, type: 'source' | 'target') {
+  startDrawEdge(e: MouseEvent, node: WorkflowNode, type: 'source' | 'target', variant?: string) {
     e.preventDefault();
     e.stopPropagation();
 
     this.isDrawing.set(true);
     this.drawSource = node;
     this.drawType = type;
+    this.drawVariant = variant ?? null;
 
     const rect = this.canvasArea()?.nativeElement.getBoundingClientRect();
     if (rect) {

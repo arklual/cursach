@@ -330,6 +330,8 @@ export class PaletteComponent {
     reduce: 'M12 5.83L15.17 9l1.41-1.41L12 3 7.41 7.59 8.83 9 12 5.83zm0 12.34L8.83 15l-1.41 1.41L12 21l4.59-4.59L15.17 15 12 18.17z',
     foreach: 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z',
     flatmap: 'M22 11V9h-3.34c-.16-.53-.41-1.03-.7-1.49L20 5.5l-1.41-1.41-2.04 2.04C16.07 6.04 15.57 5.79 15 5.63V2H9v3.63c-.57.16-1.07.41-1.55.7L5.41 4.29 4 5.71l2 2.04c-.29.46-.54.96-.7 1.49H2v2h3.31c-.05.34-.07.66-.07 1 0 .35.02.66.07 1H2v2h3.34c.16.53.41 1.03.7 1.49L4 18.29l1.41 1.41 2.04-2.04c.48.29.98.54 1.55.7V22h6v-3.63c.57-.16 1.07-.41 1.55-.7l2.04 2.04L20 18.29l-2.04-2.04c.29-.46.54-.96.7-1.49H22v-2h-3.31c.05-.34.07-.66.07-1 0-.34-.02-.66-.07-1H22z',
+    split: 'M3 6h6l4 6-4 6h-6 M14 12h7',
+    merge: 'M3 6h6l4 6-4 6h-6 M14 12h7 M14 12L8 6 M14 12L8 18',
   } as const;
 
   private readonly categories: NodeCategory[] = [
@@ -371,6 +373,15 @@ export class PaletteComponent {
         { id: 'dataflow:reduce', label: 'Reduce', kind: 'dataflow', subtype: 'reduce', iconPath: this.icons.reduce },
         { id: 'dataflow:foreach', label: 'ForEach', kind: 'dataflow', subtype: 'foreach', iconPath: this.icons.foreach },
         { id: 'dataflow:flatmap', label: 'FlatMap', kind: 'dataflow', subtype: 'flatmap', iconPath: this.icons.flatmap },
+      ],
+    },
+    {
+      id: 'branches',
+      name: 'Ветки',
+      color: 'var(--info, #f472b6)',
+      items: [
+        { id: 'ab',   label: 'Split / A·B', kind: 'ab',   iconPath: this.icons.split },
+        { id: 'join', label: 'Merge',       kind: 'join', iconPath: this.icons.merge },
       ],
     },
   ];

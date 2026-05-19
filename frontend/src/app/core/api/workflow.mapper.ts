@@ -52,12 +52,25 @@ function toBackendType(kind: NodeKind, subtype: string | undefined): string {
             : 'webhook';
         return `trigger.${sub}`;
     }
-    // ab / join: backend has no dedicated executor — map to passthrough so the run doesn't abort
+    // ab / join: dedicated branch executors on backend
+    if (kind === 'ab') {
+        return 'branch.split';
+    }
+    if (kind === 'join') {
+        return 'branch.merge';
+    }
     return 'dataflow.foreach';
 }
 
 /** backend type -> { kind, subtype? }. */
 function fromBackendType(type: string | undefined, originalKind?: NodeKind): { kind: NodeKind; subtype?: string } {
+    // New dedicated branch types (take priority over __originalKind fallback)
+    if (type === 'branch.split') {
+        return { kind: 'ab' };
+    }
+    if (type === 'branch.merge') {
+        return { kind: 'join' };
+    }
     if (type && type.startsWith('trigger.')) {
         const sub = type.substring('trigger.'.length) as TriggerSubtype;
         if ((TRIGGER_SUBTYPES as readonly string[]).includes(sub)) {

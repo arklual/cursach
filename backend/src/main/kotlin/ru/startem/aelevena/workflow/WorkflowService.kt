@@ -162,6 +162,49 @@ class WorkflowService(
             if (!nodeIdSet.contains(c.source)) throw BadRequestException("Connection source not found: ${c.source}")
             if (!nodeIdSet.contains(c.target)) throw BadRequestException("Connection target not found: ${c.target}")
         }
+
+        // Validation for branch.split nodes
+        for (node in graph.nodes) {
+            if (node.type == "branch.split") {
+                val cfg = node.data?.config
+                if (cfg == null || !cfg.isObject) {
+                    throw BadRequestException("branch.split node '${node.id}' missing config")
+                }
+                val variants = cfg.get("variants")
+                    ?: throw BadRequestException("branch.split '${node.id}' missing variants[]")
+                if (!variants.isArray || variants.size() == 0) {
+                    throw BadRequestException("branch.split '${node.id}' variants[] must be non-empty")
+                }
+                val variantKeys = variants.mapNotNull { it.get("key")?.asText() }.toSet()
+                val totalWeight = variants.sumOf { it.get("weight")?.asInt() ?: 0 }
+                if (totalWeight <= 0) {
+                    throw BadRequestException("branch.split '${node.id}' sum of weights must be > 0")
+                }
+                val strategy = cfg.get("strategy")?.asText() ?: "random"
+                if (strategy in setOf("hash", "modulo", "stratified", "percentage")) {
+                    val userIdField = cfg.get("userIdField")?.asText()
+                    if (userIdField.isNullOrBlank()) {
+                        throw BadRequestException("branch.split '${node.id}' strategy '$strategy' requires userIdField")
+                    }
+                }
+                if (strategy == "stratified" && cfg.get("stratifyBy")?.asText().isNullOrBlank()) {
+                    throw BadRequestException("branch.split '${node.id}' strategy 'stratified' requires stratifyBy")
+                }
+
+                // Each outgoing edge of split must have variant from variants[].key
+                // (fallback к sourceHandle для совместимости со старым фронт-маппером)
+                val outgoing = graph.connections.filter { it.source == node.id }
+                for (e in outgoing) {
+                    val v = e.variant ?: e.sourceHandle
+                    if (v == null) {
+                        throw BadRequestException("Edge ${e.id} from branch.split '${node.id}' missing variant")
+                    }
+                    if (v !in variantKeys) {
+                        throw BadRequestException("Edge ${e.id} variant '$v' not in variants[].key of '${node.id}'")
+                    }
+                }
+            }
+        }
     }
 
     private fun toSkeleton(graph: WorkflowGraph): GraphSkeleton {
@@ -186,6 +229,7 @@ class WorkflowService(
                 target = c.target,
                 sourceHandle = c.sourceHandle,
                 targetHandle = c.targetHandle,
+                variant = c.variant ?: c.sourceHandle,
             )
         }
 
@@ -209,6 +253,7 @@ class WorkflowService(
                 target = c.target,
                 sourceHandle = c.sourceHandle,
                 targetHandle = c.targetHandle,
+                variant = c.variant,
             )
         }
         return WorkflowGraph(versionId = versionId.toString(), nodes = nodes, connections = connections)

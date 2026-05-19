@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service
 import ru.startem.aelevena.api.NotFoundException
 import ru.startem.aelevena.blob.BlobService
 import ru.startem.aelevena.executor.NodeExecutorRegistry
+import ru.startem.aelevena.executor.SplitEnvelope
+import ru.startem.aelevena.workflow.model.ConnectionSkeleton
 import ru.startem.aelevena.workflow.model.GraphSkeleton
 import ru.startem.aelevena.workflow.persistence.WorkflowRevisionRepository
 import java.util.concurrent.CompletableFuture
@@ -114,18 +116,39 @@ class WorkflowExecutionService(
 
         val started = ConcurrentHashMap.newKeySet<String>()
         val outputs = ConcurrentHashMap<String, JsonNode>()
+        val skippedSet = ConcurrentHashMap.newKeySet<String>()
 
         val futures = mutableMapOf<String, CompletableFuture<JsonNode>>()
         topo.forEach { nodeId ->
-            val deps = incoming[nodeId]?.toList().orEmpty()
-            val depFutures = deps.mapNotNull { futures[it] }.toTypedArray()
+            val incomingEdges: List<ConnectionSkeleton> = skeleton.connections.filter { c ->
+                c.target == nodeId && reachableNodeIds.contains(c.source) && reachableNodeIds.contains(c.target)
+            }
+            val depFutures = incomingEdges.map { it.source }.mapNotNull { futures[it] }.toTypedArray()
             val ready = CompletableFuture.allOf(*depFutures)
 
             val f = ready.thenApplyAsync({
-                val node = nodeById.getValue(nodeId)
                 val nodeRunId = nodeRunIds.getValue(nodeId)
 
-                val inputNode = buildNodeInput(run.inputJson, deps, outputs)
+                val liveIncoming = incomingEdges.filter { edge ->
+                    if (skippedSet.contains(edge.source)) {
+                        return@filter false
+                    }
+                    val up = outputs[edge.source]
+                    val isPickMismatch = up != null
+                        && SplitEnvelope.isPickEnvelope(up)
+                        && edge.variant != null
+                        && SplitEnvelope.pickChosen(up) != edge.variant
+                    !isPickMismatch
+                }
+
+                if (incomingEdges.isNotEmpty() && liveIncoming.isEmpty()) {
+                    skippedSet.add(nodeId)
+                    nodeRuns.markSkipped(nodeRunId, "Branch not selected")
+                    return@thenApplyAsync NullNode.instance as JsonNode
+                }
+
+                val node = nodeById.getValue(nodeId)
+                val inputNode = buildNodeInput(run.inputJson, liveIncoming, outputs, skippedSet)
                 started.add(nodeId)
                 nodeRuns.markRunning(nodeRunId, objectMapper.writeValueAsString(inputNode))
 
@@ -138,7 +161,7 @@ class WorkflowExecutionService(
                 nodeRuns.markSuccess(nodeRunId, objectMapper.writeValueAsString(out))
                 out
             }, workflowExecutor).whenComplete { _, ex ->
-                if (ex != null) {
+                if (ex != null && !skippedSet.contains(nodeId)) {
                     val nodeRunId = nodeRunIds.getValue(nodeId)
                     if (started.contains(nodeId)) {
                         nodeRuns.markFailed(nodeRunId, rootMessage(ex))
@@ -163,16 +186,35 @@ class WorkflowExecutionService(
         workflowRuns.markFinished(runId, status = status, outputJson = outputJson)
     }
 
-    private fun buildNodeInput(runInputJson: String?, deps: List<String>, outputs: Map<String, JsonNode>): JsonNode {
+    private fun buildNodeInput(
+        runInputJson: String?,
+        incomingEdges: List<ConnectionSkeleton>,
+        outputs: Map<String, JsonNode>,
+        skipped: Set<String>,
+    ): JsonNode {
         val root = objectMapper.createObjectNode()
         val runInput = runInputJson?.let { objectMapper.readTree(it) } ?: NullNode.instance
         root.set<JsonNode>("runInput", runInput)
 
         val inputs = objectMapper.createObjectNode()
-        deps.forEach { depId ->
-            inputs.set<JsonNode>(depId, outputs[depId] ?: NullNode.instance)
+        val inputVariants = objectMapper.createObjectNode()
+        for (edge in incomingEdges) {
+            if (skipped.contains(edge.source)) {
+                continue
+            }
+            val upstreamOutput = outputs[edge.source] ?: NullNode.instance
+            val delivered = SplitEnvelope.resolveForEdge(upstreamOutput, edge.variant)
+            inputs.set<JsonNode>(edge.source, delivered)
+            if (edge.variant != null) {
+                inputVariants.put(edge.source, edge.variant)
+            } else if (SplitEnvelope.isPickEnvelope(upstreamOutput)) {
+                SplitEnvelope.pickChosen(upstreamOutput)?.let { inputVariants.put(edge.source, it) }
+            }
         }
         root.set<JsonNode>("inputs", inputs)
+        if (inputVariants.size() > 0) {
+            root.set<JsonNode>("inputVariants", inputVariants)
+        }
         return root
     }
 

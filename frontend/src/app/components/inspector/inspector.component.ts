@@ -5,11 +5,13 @@ import { WorkflowService } from '../../services/workflow.service';
 import { WorkflowNode } from '../../models/workflow.model';
 import { environment } from '../../../environments/environment';
 import type { Trigger } from '../../core/api/trigger.api';
+import { BranchSplitInspectorComponent } from './branch-split-inspector.component';
+import { BranchMergeInspectorComponent } from './branch-merge-inspector.component';
 
 @Component({
   selector: 'app-inspector',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, BranchSplitInspectorComponent, BranchMergeInspectorComponent],
   template: `
     <aside class="inspector">
       <h2>Inspector</h2>
@@ -300,6 +302,19 @@ import type { Trigger } from '../../core/api/trigger.api';
               <p class="hint">Бэк запускает <code>docker run --rm -i</code>. Требуется Docker на хосте бэка.</p>
             </fieldset>
           }
+          @if (activeNode()?.data?.kind === 'ab') {
+            <app-branch-split-inspector
+                [node]="activeNode()!"
+                (configChange)="onSplitConfigChange($event)">
+            </app-branch-split-inspector>
+          }
+          @if (activeNode()?.data?.kind === 'join') {
+            <app-branch-merge-inspector
+                [node]="activeNode()!"
+                (configChange)="onSplitConfigChange($event)">
+            </app-branch-merge-inspector>
+          }
+
           <div class="actions-row">
             <button class="ghost danger" (click)="deleteNode(node.id)">Удалить ноду</button>
           </div>
@@ -643,5 +658,13 @@ export class InspectorComponent {
       return;
     }
     this.workflowService.removeNode(nodeId);
+  }
+
+  onSplitConfigChange(cfg: Record<string, unknown>): void {
+    const node = this.activeNode();
+    if (!node) {
+      return;
+    }
+    this.workflowService.updateNodeData(node.id, data => ({ ...data, config: cfg }));
   }
 }

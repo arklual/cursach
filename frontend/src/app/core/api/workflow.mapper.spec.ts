@@ -238,4 +238,62 @@ describe('workflow.mapper', () => {
             expect(parsed.edges).toEqual([]);
         });
     });
+
+    describe('branch.split / branch.merge', () => {
+        it('frontNodeToBackend для kind=ab выдаёт type=branch.split', () => {
+            const front: FrontNode = {
+                id: 'n1', type: 'ab', position: { x: 0, y: 0 },
+                data: {
+                    id: 'n1', kind: 'ab', label: 'Split', color: '#f472b6',
+                    successProb: 0, variants: [],
+                    randomization: 'simple',
+                    metrics: { reached: 0, converted: 0, pHat: 0, variance: 0, ci: [0, 0], users: [], events: [] },
+                    config: { mode: 'split', strategy: 'random' },
+                },
+            };
+            const back = frontNodeToBackend(front);
+            expect(back.type).toBe('branch.split');
+        });
+
+        it('frontNodeToBackend для kind=join выдаёт type=branch.merge', () => {
+            const front: FrontNode = {
+                id: 'n2', type: 'join', position: { x: 0, y: 0 },
+                data: {
+                    id: 'n2', kind: 'join', label: 'Merge', color: '#c084fc',
+                    successProb: 0.5, variants: [], randomization: 'simple',
+                    metrics: { reached: 0, converted: 0, pHat: 0, variance: 0, ci: [0, 0], users: [], events: [] },
+                },
+            };
+            const back = frontNodeToBackend(front);
+            expect(back.type).toBe('branch.merge');
+        });
+
+        it('backendNodeToFront для type=branch.split возвращает kind=ab', () => {
+            const back = {
+                id: 'n3', type: 'branch.split', position: { x: 0, y: 0 },
+                data: { label: 'Split', config: { mode: 'split' } as never },
+            };
+            const front = backendNodeToFront(back as never);
+            expect(front.data.kind).toBe('ab');
+        });
+
+        it('backendNodeToFront для type=branch.merge возвращает kind=join', () => {
+            const back = {
+                id: 'n4', type: 'branch.merge', position: { x: 0, y: 0 },
+                data: { label: 'Merge', config: {} as never },
+            };
+            const front = backendNodeToFront(back as never);
+            expect(front.data.kind).toBe('join');
+        });
+
+        it('edge.data.variant пробрасывается в sourceHandle и обратно (round-trip)', () => {
+            const edges: FrontEdge[] = [
+                { id: 'e1', source: 'a', target: 'b', data: { variant: 'A' } },
+            ];
+            const graph = buildGraphForBackend('v-1', [], edges);
+            expect(graph.connections[0].sourceHandle).toBe('A');
+            const round = parseGraphFromBackend(graph);
+            expect(round.edges[0].data?.variant).toBe('A');
+        });
+    });
 });
