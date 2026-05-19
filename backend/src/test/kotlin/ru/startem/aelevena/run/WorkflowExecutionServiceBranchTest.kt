@@ -16,6 +16,7 @@ import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import ru.startem.aelevena.api.BadRequestException
 import ru.startem.aelevena.api.dto.Connection
 import ru.startem.aelevena.api.dto.Node
 import ru.startem.aelevena.api.dto.NodeData
@@ -260,7 +261,7 @@ class WorkflowExecutionServiceBranchTest {
                 Connection(id = "e1", source = "split", target = "pass"),  // нет variant
             )
         )
-        org.junit.jupiter.api.assertThrows<Exception> { workflowService.updateGraph(versionId, graph) }
+        org.junit.jupiter.api.assertThrows<BadRequestException> { workflowService.updateGraph(versionId, graph) }
     }
 
     @Test
@@ -281,7 +282,7 @@ class WorkflowExecutionServiceBranchTest {
             ),
             connections = emptyList()
         )
-        org.junit.jupiter.api.assertThrows<Exception> { workflowService.updateGraph(versionId, graph) }
+        org.junit.jupiter.api.assertThrows<BadRequestException> { workflowService.updateGraph(versionId, graph) }
     }
 
     private fun waitUntilFinished(runId: Long, timeout: Duration): WorkflowRunRepository.WorkflowRunRow {
