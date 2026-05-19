@@ -315,9 +315,11 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
             </app-branch-merge-inspector>
           }
 
-          <div class="actions-row">
-            <button class="ghost danger" (click)="deleteNode(node.id)">Удалить ноду</button>
-          </div>
+          @if (!readOnly()) {
+            <div class="actions-row">
+              <button class="ghost danger" (click)="deleteNode(node.id)">Удалить ноду</button>
+            </div>
+          }
         </div>
       } @else {
         <p>Выберите ноду для настройки.</p>
@@ -526,6 +528,7 @@ export class InspectorComponent {
 
   activeNode = input<WorkflowNode | null>(null);
   triggers = input<Trigger[]>([]);
+  readOnly = input<boolean>(false);
   readonly runFromNode = output<string>();
   readonly triggerEnabledChange = output<{ triggerId: string; enabled: boolean }>();
 
@@ -678,6 +681,7 @@ export class InspectorComponent {
   }
 
   deleteNode(nodeId: string): void {
+    if (this.readOnly()) return;
     if (!confirm('Удалить ноду?')) {
       return;
     }

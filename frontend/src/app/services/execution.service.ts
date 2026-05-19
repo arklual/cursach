@@ -34,7 +34,7 @@ export class ExecutionService {
   private stopPolling$ = new Subject<void>();
   private pollSub?: Subscription;
 
-  executeWorkflow(workflowId: string, fromNodeId?: string): Observable<WorkflowExecution | null> {
+  executeWorkflow(workflowId: string, fromNodeId?: string, input?: unknown): Observable<WorkflowExecution | null> {
     this.cancelPolling();
     this.isExecuting.set(true);
 
@@ -47,7 +47,8 @@ export class ExecutionService {
 
     const result = new Subject<WorkflowExecution | null>();
 
-    this.runApi.enqueue(workflowId, {} as never, fromNodeId).subscribe({
+    const payload = (input ?? {}) as never;
+    this.runApi.enqueue(workflowId, payload, fromNodeId).subscribe({
       next: run => {
         const runId = run.id;
         if (!runId) {

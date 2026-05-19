@@ -49,7 +49,6 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
               [value]="workflowMeta()?.name || 'Workflow'"
               (blur)="updateWorkflowName($event)"
               (keydown.enter)="$any($event.target).blur()">
-            <p>{{ workflowMeta()?.status || 'draft' }}</p>
           </div>
         </div>
         <div class="header-actions">
@@ -63,18 +62,23 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
             <span class="status-text">{{ validationResult().message }}</span>
           </div>
           @if (isMobile()) {
-            <button class="icon-btn mobile-only" type="button"
-                    (click)="toggleMobilePalette()"
-                    [class.active]="mobilePaletteOpen()"
-                    title="Палитра нод" aria-label="Палитра нод">
-              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                <path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/>
-              </svg>
+            <button class="icon-btn mobile-only primary-mobile-cta" type="button"
+                    (click)="toggleMobileRun()"
+                    [class.active]="mobileRunOpen()"
+                    [disabled]="!currentWorkflowIdValue() || isExecuting()"
+                    title="Запустить workflow" aria-label="Запустить workflow">
+              @if (isExecuting()) {
+                <span class="header-spinner" aria-hidden="true"></span>
+              } @else {
+                <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              }
             </button>
             <button class="icon-btn mobile-only" type="button"
                     (click)="toggleMobileInspector()"
                     [class.active]="mobileInspectorOpen()"
-                    title="Инспектор" aria-label="Инспектор">
+                    title="Настройки выбранной ноды" aria-label="Настройки">
               <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
                 <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94 0 .31.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
               </svg>
@@ -100,34 +104,35 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
 
       <main [style.grid-template-columns]="mainGridColumns()"
             [class.is-mobile]="isMobile()"
-            [class.has-drawer-open]="isMobile() && (mobilePaletteOpen() || mobileInspectorOpen())">
-        @if (isMobile() && (mobilePaletteOpen() || mobileInspectorOpen())) {
+            [class.has-drawer-open]="isMobile() && (mobilePaletteOpen() || mobileInspectorOpen() || mobileRunOpen())">
+        @if (isMobile() && (mobilePaletteOpen() || mobileInspectorOpen() || mobileRunOpen())) {
           <div class="mobile-drawer-backdrop" (click)="closeMobileDrawers()" aria-hidden="true"></div>
         }
-        <!-- Palette -->
-        <div class="panel-container palette-panel"
-             [class.collapsed]="paletteCollapsed() && !isMobile()"
-             [class.mobile-open]="isMobile() && mobilePaletteOpen()">
-          @if (!paletteCollapsed()) {
-            <div class="panel-content" [style.width.px]="paletteWidth()">
-              <app-palette></app-palette>
-            </div>
-            <div class="resize-handle resize-handle-right"
-                 (mousedown)="startResize($event, 'palette')"></div>
-          }
-          <button class="collapse-btn collapse-btn-right"
-                  (click)="paletteCollapsed.set(!paletteCollapsed())">
-            @if (paletteCollapsed()) {
-              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-              </svg>
-            } @else {
-              <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
-              </svg>
+        @if (!isMobile()) {
+          <!-- Palette (desktop only) -->
+          <div class="panel-container palette-panel"
+               [class.collapsed]="paletteCollapsed()">
+            @if (!paletteCollapsed()) {
+              <div class="panel-content" [style.width.px]="paletteWidth()">
+                <app-palette></app-palette>
+              </div>
+              <div class="resize-handle resize-handle-right"
+                   (mousedown)="startResize($event, 'palette')"></div>
             }
-          </button>
-        </div>
+            <button class="collapse-btn collapse-btn-right"
+                    (click)="paletteCollapsed.set(!paletteCollapsed())">
+              @if (paletteCollapsed()) {
+                <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                  <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+                </svg>
+              } @else {
+                <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                  <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                </svg>
+              }
+            </button>
+          </div>
+        }
 
         <app-workflow-canvas
           [nodes]="workflowService.nodes()"
@@ -136,6 +141,7 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
           [executionStatus]="executionStatus()"
           [isExecuting]="isExecuting()"
           [progress]="executionProgress()"
+          [readOnly]="isMobile()"
           (nodeSelected)="onNodeSelected($event)"
           (executeWorkflow)="executeWorkflow()">
         </app-workflow-canvas>
@@ -191,6 +197,7 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
                     <app-inspector
                       [activeNode]="workflowService.activeNode()"
                       [triggers]="triggers()"
+                      [readOnly]="isMobile()"
                       (runFromNode)="executeFromNode($event)"
                       (triggerEnabledChange)="setTriggerEnabled($event)">
                     </app-inspector>
@@ -200,6 +207,89 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
             </div>
           }
         </div>
+
+        @if (isMobile()) {
+          <aside class="mobile-run-drawer"
+                 [class.mobile-open]="mobileRunOpen()"
+                 role="dialog"
+                 aria-label="Запуск workflow">
+            <header class="mobile-run-header">
+              <div>
+                <h3>Запуск workflow</h3>
+                <p>Передайте JSON и нажмите «Запустить»</p>
+              </div>
+              <button class="icon-btn" type="button"
+                      (click)="closeMobileDrawers()"
+                      aria-label="Закрыть">
+                <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              </button>
+            </header>
+
+            <div class="mobile-run-body">
+              <section class="mobile-run-section">
+                <label class="mobile-run-label" for="mobile-run-payload">Входные данные (JSON)</label>
+                <textarea
+                  id="mobile-run-payload"
+                  class="mobile-run-textarea"
+                  [class.has-error]="!!mobileRunPayloadError()"
+                  rows="6"
+                  spellcheck="false"
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="off"
+                  placeholder='{ "key": "value" }'
+                  [value]="mobileRunPayload()"
+                  (input)="updateMobileRunPayload($any($event.target).value)"></textarea>
+                @if (mobileRunPayloadError(); as err) {
+                  <p class="mobile-run-error" role="alert">{{ err }}</p>
+                } @else {
+                  <p class="mobile-run-hint">Оставьте пустым для запуска без входных данных.</p>
+                }
+              </section>
+
+              @if (triggers().length > 0) {
+                <section class="mobile-run-section">
+                  <h4 class="mobile-run-subhead">Триггеры</h4>
+                  <ul class="mobile-trigger-list">
+                    @for (trigger of triggers(); track trigger.id) {
+                      <li class="mobile-trigger-item">
+                        <div class="mobile-trigger-meta">
+                          <span class="mobile-trigger-type">{{ trigger.type }}</span>
+                          <span class="mobile-trigger-detail">{{ describeTrigger(trigger) }}</span>
+                        </div>
+                        <label class="mobile-trigger-toggle">
+                          <input type="checkbox"
+                                 [checked]="!!trigger.enabled"
+                                 (change)="setTriggerEnabled({ triggerId: trigger.id, enabled: $any($event.target).checked })">
+                          <span>{{ trigger.enabled ? 'Вкл' : 'Выкл' }}</span>
+                        </label>
+                      </li>
+                    }
+                  </ul>
+                </section>
+              }
+            </div>
+
+            <footer class="mobile-run-footer">
+              <button type="button"
+                      class="mobile-run-btn"
+                      [disabled]="!currentWorkflowIdValue() || isExecuting() || !!mobileRunPayloadError()"
+                      (click)="runWorkflowFromMobile()">
+                @if (isExecuting()) {
+                  <span class="header-spinner" aria-hidden="true"></span>
+                  Запускается…
+                } @else {
+                  <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                    <path d="M8 5v14l11-7z"/>
+                  </svg>
+                  Запустить workflow
+                }
+              </button>
+            </footer>
+          </aside>
+        }
       </main>
 
       <section class="run-panel" [class.collapsed]="logPanelCollapsed()">
@@ -1006,6 +1096,241 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
       border-color: var(--accent);
     }
 
+    .icon-btn.primary-mobile-cta {
+      background: var(--accent);
+      color: var(--accent-ink);
+      border-color: var(--accent);
+      box-shadow: 0 6px 18px var(--accent-glow);
+    }
+
+    .icon-btn.primary-mobile-cta:hover:not(:disabled),
+    .icon-btn.primary-mobile-cta.active {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+
+    .icon-btn.primary-mobile-cta:disabled {
+      opacity: 0.45;
+      box-shadow: none;
+    }
+
+    .header-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.32);
+      border-top-color: var(--accent-ink);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+
+    .mobile-run-drawer {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      max-height: 88dvh;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      border-radius: 18px 18px 0 0;
+      box-shadow: 0 -24px 60px rgba(0, 0, 0, 0.55);
+      z-index: 40;
+      transform: translateY(100%);
+      transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .mobile-run-drawer.mobile-open {
+      transform: translateY(0);
+    }
+
+    .mobile-run-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 20px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mobile-run-header h3 {
+      margin: 0 0 2px;
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--fg-primary);
+    }
+
+    .mobile-run-header p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--fg-muted);
+    }
+
+    .mobile-run-body {
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      flex: 1 1 auto;
+      min-height: 0;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .mobile-run-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mobile-run-label,
+    .mobile-run-subhead {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--fg-muted);
+    }
+
+    .mobile-run-textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--fg-primary);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.5;
+      resize: vertical;
+      min-height: 120px;
+    }
+
+    .mobile-run-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .mobile-run-textarea.has-error {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 3px var(--danger-glow, rgba(239, 68, 68, 0.18));
+    }
+
+    .mobile-run-error {
+      margin: 0;
+      font-size: 12px;
+      color: var(--danger);
+    }
+
+    .mobile-run-hint {
+      margin: 0;
+      font-size: 12px;
+      color: var(--fg-muted);
+    }
+
+    .mobile-trigger-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mobile-trigger-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg-secondary);
+    }
+
+    .mobile-trigger-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .mobile-trigger-type {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--fg-primary);
+      text-transform: capitalize;
+    }
+
+    .mobile-trigger-detail {
+      font-size: 11px;
+      color: var(--fg-muted);
+      font-family: var(--font-mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mobile-trigger-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--fg-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .mobile-trigger-toggle input {
+      accent-color: var(--accent);
+      width: 18px;
+      height: 18px;
+    }
+
+    .mobile-run-footer {
+      padding: 14px 20px calc(14px + env(safe-area-inset-bottom, 0px));
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+    }
+
+    .mobile-run-btn {
+      width: 100%;
+      min-height: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 0 18px;
+      border: none;
+      border-radius: 12px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 10px 24px var(--accent-glow);
+      transition: background 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+    }
+
+    .mobile-run-btn:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+
+    .mobile-run-btn:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    .mobile-run-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
     .mobile-drawer-backdrop {
       position: fixed;
       inset: 0;
@@ -1366,6 +1691,9 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   isMobile = signal(false);
   mobilePaletteOpen = signal(false);
   mobileInspectorOpen = signal(false);
+  mobileRunOpen = signal(false);
+  mobileRunPayload = signal('');
+  mobileRunPayloadError = signal<string | null>(null);
 
   private resizing: 'palette' | 'inspector' | 'log' | null = null;
   private resizeStartX = 0;
@@ -1406,6 +1734,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     this.mobilePaletteOpen.set(next);
     if (next) {
       this.mobileInspectorOpen.set(false);
+      this.mobileRunOpen.set(false);
     }
   }
 
@@ -1414,12 +1743,53 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     this.mobileInspectorOpen.set(next);
     if (next) {
       this.mobilePaletteOpen.set(false);
+      this.mobileRunOpen.set(false);
+    }
+  }
+
+  toggleMobileRun(): void {
+    const next = !this.mobileRunOpen();
+    this.mobileRunOpen.set(next);
+    if (next) {
+      this.mobilePaletteOpen.set(false);
+      this.mobileInspectorOpen.set(false);
     }
   }
 
   closeMobileDrawers(): void {
     this.mobilePaletteOpen.set(false);
     this.mobileInspectorOpen.set(false);
+    this.mobileRunOpen.set(false);
+  }
+
+  updateMobileRunPayload(value: string): void {
+    this.mobileRunPayload.set(value);
+    if (!value.trim()) {
+      this.mobileRunPayloadError.set(null);
+      return;
+    }
+    try {
+      JSON.parse(value);
+      this.mobileRunPayloadError.set(null);
+    } catch (err) {
+      this.mobileRunPayloadError.set('Невалидный JSON');
+    }
+  }
+
+  runWorkflowFromMobile(): void {
+    const raw = this.mobileRunPayload().trim();
+    let parsed: unknown = undefined;
+    if (raw) {
+      try {
+        parsed = JSON.parse(raw);
+        this.mobileRunPayloadError.set(null);
+      } catch {
+        this.mobileRunPayloadError.set('Невалидный JSON — исправьте перед запуском');
+        return;
+      }
+    }
+    this.mobileRunOpen.set(false);
+    this.runWorkflow(undefined, parsed);
   }
 
   validationResult = signal<ValidationResult>({
@@ -1584,6 +1954,22 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     });
   }
 
+  describeTrigger(trigger: Trigger): string {
+    const cfg = (trigger.config ?? {}) as Record<string, unknown>;
+    if (trigger.type === 'cron') {
+      const expr = typeof cfg['expression'] === 'string' ? cfg['expression'] as string : '';
+      return expr || 'cron';
+    }
+    if (trigger.type === 'interval') {
+      const sec = typeof cfg['seconds'] === 'number' ? cfg['seconds'] as number : null;
+      return sec != null ? `каждые ${sec} с` : 'interval';
+    }
+    if (trigger.type === 'webhook') {
+      return trigger.token ? `token: ${trigger.token.slice(0, 8)}…` : 'webhook';
+    }
+    return '';
+  }
+
   goBack(): void {
     // Сохраняем граф ДО навигации: иначе при размонтировании компонента HTTP-запрос
     // отменяется и пользователь теряет изменения. Если save упадёт — всё равно ухо́дим,
@@ -1697,7 +2083,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     this.runWorkflow(nodeId);
   }
 
-  private runWorkflow(fromNodeId?: string): void {
+  private runWorkflow(fromNodeId?: string, input?: unknown): void {
     const workflowId = this.currentWorkflowId();
     if (!workflowId) {
       console.warn('No workflow ID selected');
@@ -1711,7 +2097,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     this.executionProgress.set(0);
     this.isExecuting.set(true);
 
-    this.executionService.executeWorkflow(workflowId, fromNodeId).subscribe({
+    this.executionService.executeWorkflow(workflowId, fromNodeId, input).subscribe({
       error: (err) => {
         console.error('Execution error:', err);
         this.isExecuting.set(false);

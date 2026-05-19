@@ -44,8 +44,13 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
            (drop)="onDrop($event)"
            (dragover)="onDragOver($event)">
 
-        @if (nodes().length === 0) {
+        @if (nodes().length === 0 && !readOnly()) {
           <app-canvas-empty (nodeAdded)="onNodeAdded($event)"></app-canvas-empty>
+        }
+        @if (nodes().length === 0 && readOnly()) {
+          <div class="canvas-readonly-empty">
+            <p>Этот workflow пока пустой. Откройте редактор на десктопе, чтобы добавить ноды.</p>
+          </div>
         }
 
         <div class="canvas-layer"
@@ -80,7 +85,7 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
           </svg>
 
           <!-- Кнопка удаления на выбранной стрелке -->
-          @if (selectedEdgeId(); as edgeId) {
+          @if (!readOnly() && selectedEdgeId(); as edgeId) {
             <button class="edge-delete-btn"
                     [style.left.px]="getDeleteBtnPos(edgeId).x"
                     [style.top.px]="getDeleteBtnPos(edgeId).y"
@@ -104,7 +109,7 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
                  (mousedown)="startDragNode($event, node)"
                  (click)="selectNode($event, node.id)">
 
-              @if (node.data.kind !== 'trigger') {
+              @if (!readOnly() && node.data.kind !== 'trigger') {
                 <div class="handle handle-in"
                      (mousedown)="startDrawEdge($event, node, 'target')"></div>
               }
@@ -123,20 +128,22 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
                 </div>
               </div>
 
-              @if (node.data.kind === 'ab') {
-                @for (variant of getAbVariants(node); track variant.key; let i = $index) {
-                  <div class="handle handle-out handle-variant"
-                       [style.top.px]="getAbHandleTop(i)"
-                       [attr.data-variant]="variant.key"
-                       [style.background-color]="getVariantColor(variant.key, i)"
-                       (mousedown)="$event.stopPropagation(); startDrawEdge($event, node, 'source', variant.key)"
-                       [title]="'Variant ' + variant.key + (variant.label && variant.label !== variant.key ? ' — ' + variant.label : '')">
-                    <span class="handle-label">{{ variant.key }}</span>
-                  </div>
+              @if (!readOnly()) {
+                @if (node.data.kind === 'ab') {
+                  @for (variant of getAbVariants(node); track variant.key; let i = $index) {
+                    <div class="handle handle-out handle-variant"
+                         [style.top.px]="getAbHandleTop(i)"
+                         [attr.data-variant]="variant.key"
+                         [style.background-color]="getVariantColor(variant.key, i)"
+                         (mousedown)="$event.stopPropagation(); startDrawEdge($event, node, 'source', variant.key)"
+                         [title]="'Variant ' + variant.key + (variant.label && variant.label !== variant.key ? ' — ' + variant.label : '')">
+                      <span class="handle-label">{{ variant.key }}</span>
+                    </div>
+                  }
+                } @else {
+                  <div class="handle handle-out"
+                       (mousedown)="startDrawEdge($event, node, 'source')"></div>
                 }
-              } @else {
-                <div class="handle handle-out"
-                     (mousedown)="startDrawEdge($event, node, 'source')"></div>
               }
             </div>
           }
@@ -304,6 +311,24 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
 
     .canvas-viewport:active {
       cursor: grabbing;
+    }
+
+    .canvas-readonly-empty {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      pointer-events: none;
+    }
+
+    .canvas-readonly-empty p {
+      max-width: 320px;
+      text-align: center;
+      color: var(--fg-muted);
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0;
     }
 
     .canvas-layer {
@@ -650,6 +675,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
   executionStatus = input<Record<string, 'pending' | 'running' | 'success' | 'error' | 'skipped'>>({});
   isExecuting = input<boolean>(false);
   progress = input<number>(0);
+  readOnly = input<boolean>(false);
 
   nodeSelected = output<string>();
   executeWorkflow = output<void>();
@@ -770,8 +796,18 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     if (!e.metaKey && !e.ctrlKey) return;
 
     e.preventDefault();
+    const oldZoom = this.zoom();
     const delta = e.deltaY > 0 ? 0.95 : 1.05;
-    const newZoom = Math.max(0.3, Math.min(2, this.zoom() * delta));
+    const newZoom = Math.max(0.3, Math.min(2, oldZoom * delta));
+    if (newZoom === oldZoom) return;
+
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const panX = this.panX();
+    const panY = this.panY();
+    this.panX.set(cx - (cx - panX) * (newZoom / oldZoom));
+    this.panY.set(cy - (cy - panY) * (newZoom / oldZoom));
     this.zoom.set(newZoom);
   }
 
@@ -800,6 +836,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
   }
 
   deleteEdge(edgeId: string): void {
+    if (this.readOnly()) return;
     this.ws.removeEdge(edgeId);
     this.ws.log('Связь удалена');
     this.selectedEdgeId.set(null);
@@ -1068,6 +1105,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
   }
 
   startDragNode(e: MouseEvent, node: WorkflowNode) {
+    if (this.readOnly()) return;
     if ((e.target as HTMLElement).classList.contains('handle')) return;
 
     e.preventDefault();
@@ -1086,6 +1124,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
   }
 
   startDrawEdge(e: MouseEvent, node: WorkflowNode, type: 'source' | 'target', variant?: string) {
+    if (this.readOnly()) return;
     e.preventDefault();
     e.stopPropagation();
 
@@ -1110,6 +1149,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
 
   onDrop(e: DragEvent) {
     e.preventDefault();
+    if (this.readOnly()) return;
     const raw = e.dataTransfer?.getData('application/workflow-node');
     if (!raw) return;
 
