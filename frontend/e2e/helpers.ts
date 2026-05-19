@@ -99,18 +99,38 @@ export async function dragPaletteNode(page: Page, kind: string, offset: { x: num
 
 /**
  * Connect two nodes by simulating a drag from the source's output handle
- * to the target's input handle.
+ * to the target's input handle. Retries a couple of times because real-mouse
+ * drag is timing-sensitive — the underlying signal-driven canvas can debounce
+ * pointer events into a node-drag if the very first mousedown isn't routed to
+ * the handle div.
  */
 export async function connectNodes(page: Page, sourceIndex: number, targetIndex: number) {
+  const expectedEdges = (await page.locator('.edge-group').count()) + 1;
   const sourceHandle = page.locator('.node-wrap').nth(sourceIndex).locator('.handle-out');
   const targetHandle = page.locator('.node-wrap').nth(targetIndex).locator('.handle-in');
-  const srcBox = await sourceHandle.boundingBox();
-  const tgtBox = await targetHandle.boundingBox();
-  if (!srcBox || !tgtBox) throw new Error('handles not found');
-  await page.mouse.move(srcBox.x + srcBox.width / 2, srcBox.y + srcBox.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(tgtBox.x + tgtBox.width / 2, tgtBox.y + tgtBox.height / 2, { steps: 8 });
-  await page.mouse.up();
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await sourceHandle.scrollIntoViewIfNeeded().catch(() => {});
+    const srcBox = await sourceHandle.boundingBox();
+    const tgtBox = await targetHandle.boundingBox();
+    if (!srcBox || !tgtBox) throw new Error('handles not found');
+
+    const srcX = srcBox.x + srcBox.width / 2;
+    const srcY = srcBox.y + srcBox.height / 2;
+    const tgtX = tgtBox.x + tgtBox.width / 2;
+    const tgtY = tgtBox.y + tgtBox.height / 2;
+
+    await page.mouse.move(srcX, srcY);
+    await page.mouse.down();
+    // Intermediate move helps Angular's signal flush before the drop.
+    await page.mouse.move(srcX + 5, srcY + 5);
+    await page.mouse.move(tgtX, tgtY, { steps: 12 });
+    await page.mouse.up();
+
+    const count = await page.locator('.edge-group').count();
+    if (count >= expectedEdges) return;
+    await page.waitForTimeout(120);
+  }
 }
 
 export async function getWorkflowViaApi(request: APIRequestContext, id: string) {

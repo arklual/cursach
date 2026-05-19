@@ -150,13 +150,13 @@ class TriggerService(
     private fun validateConfig(subtype: String, config: JsonNode?) {
         when (subtype) {
             "cron" -> {
-                val cron = config?.get("cron")?.asText()
-                if (cron.isNullOrBlank()) throw BadRequestException("cron trigger requires config.cron")
+                val cron = (config?.get("cron") ?: config?.get("expression"))?.asText()
+                if (cron.isNullOrBlank()) throw BadRequestException("cron trigger requires config.expression")
             }
 
             "interval" -> {
-                val seconds = config?.get("everySeconds")?.asLong()
-                if (seconds == null || seconds <= 0) throw BadRequestException("interval trigger requires config.everySeconds > 0")
+                val seconds = (config?.get("everySeconds") ?: config?.get("periodSeconds"))?.asLong()
+                if (seconds == null || seconds <= 0) throw BadRequestException("interval trigger requires config.periodSeconds > 0")
             }
         }
     }

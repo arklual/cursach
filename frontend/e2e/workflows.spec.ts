@@ -3,7 +3,6 @@ import {
   attachConsoleSpy,
   gotoList,
   createWorkflowViaApi,
-  deleteWorkflowViaApi,
   deleteWorkflowsByPrefix,
   suppressFirstVisitHints,
 } from './helpers';
@@ -31,12 +30,16 @@ test.describe('Workflows list page', () => {
     await expect(empty.or(anyCard)).toBeVisible();
   });
 
-  test('+ Создать workflow → navigates to editor without manual refresh', async ({ page }) => {
+  test('+ Создать workflow → modal → Создать с нуля → navigates to editor', async ({ page }) => {
     const errs = attachConsoleSpy(page);
     await gotoList(page);
     const before = page.url();
-    await page.getByRole('button', { name: /Создать workflow/i }).first().click();
-    await page.waitForURL(/\/workflow\/[0-9a-f-]{36}$/, { timeout: 8_000 });
+    // Top-right primary button (not the banner button) — use header scope to avoid ambiguity.
+    await page.locator('.page-header').getByRole('button', { name: /Создать workflow/i }).click();
+    const fromScratch = page.getByRole('button', { name: /Создать с нуля/i });
+    await expect(fromScratch).toBeVisible();
+    await fromScratch.click();
+    await page.waitForURL(/\/workflow\/[0-9a-f-]{36}$/, { timeout: 10_000 });
     expect(page.url()).not.toBe(before);
     await expect(page.locator('.app-header')).toBeVisible();
     expect(errs.errors, JSON.stringify(errs.errors, null, 2)).toEqual([]);
@@ -150,7 +153,7 @@ test.describe('Workflow editor page', () => {
     const errs = attachConsoleSpy(page);
     await page.goto(`/workflow/${createdId}`);
     await expect(page.locator('.app-header')).toBeVisible();
-    await page.getByRole('button', { name: 'Запуски' }).click();
+    await page.getByRole('tab', { name: 'Запуски' }).click();
     await expect(page.locator('app-runs-panel')).toBeVisible({ timeout: 5_000 });
     expect(errs.errors, JSON.stringify(errs.errors, null, 2)).toEqual([]);
   });
@@ -164,13 +167,12 @@ test.describe('Workflow editor page', () => {
     expect(paletteText.length).toBeGreaterThan(0);
   });
 
-  test('modals open and close', async ({ page }) => {
+  test('guide modal opens and closes', async ({ page }) => {
     await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'События' }).click();
-    await expect(page.getByRole('heading', { name: /JSON Schema/i })).toBeVisible();
-    await page.keyboard.press('Escape').catch(() => {});
-    await page.getByRole('button', { name: 'QA-чеклист' }).click();
-    await expect(page.locator('.modal-backdrop')).toBeVisible();
+    await page.locator('.guide-btn').click();
+    await expect(page.getByRole('heading', { name: 'Как пользоваться редактором' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('heading', { name: 'Как пользоваться редактором' })).toBeHidden({ timeout: 2_000 });
   });
 });
 
@@ -208,27 +210,18 @@ test.describe('Workflow editor — interactions', () => {
     await expect(page.locator('.editor-error-banner')).toBeVisible({ timeout: 5_000 });
   });
 
-  test('Simulate 500 users → execution log получает строки', async ({ page }) => {
+  test('Escape закрывает гайд-модалку', async ({ page }) => {
     await page.goto(`/workflow/${createdId}`);
-    await expect(page.locator('.app-header')).toBeVisible();
-    const logsBefore = await page.locator('.log-entry').count();
-    await page.getByRole('button', { name: /Симуляция \(500\)/i }).click();
-    await expect.poll(async () => page.locator('.log-entry').count(), { timeout: 5_000 })
-      .toBeGreaterThan(logsBefore);
-  });
-
-  test('Escape закрывает модалку', async ({ page }) => {
-    await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'События' }).click();
-    const modalTitle = page.getByRole('heading', { name: /JSON Schema/i });
+    await page.locator('.guide-btn').click();
+    const modalTitle = page.getByRole('heading', { name: 'Как пользоваться редактором' });
     await expect(modalTitle).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(modalTitle).toBeHidden({ timeout: 2_000 });
   });
 
-  test('Click по backdrop закрывает модалку', async ({ page }) => {
+  test('Click по backdrop закрывает гайд-модалку', async ({ page }) => {
     await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'QA-чеклист' }).click();
+    await page.locator('.guide-btn').click();
     await expect(page.locator('.modal-backdrop')).toBeVisible();
     await page.locator('.modal-backdrop').click({ position: { x: 5, y: 5 } });
     await expect(page.locator('.modal-backdrop')).toBeHidden({ timeout: 2_000 });
@@ -245,11 +238,11 @@ test.describe('Workflow editor — interactions', () => {
     // Sanity: убеждаемся что override применился именно в этой странице.
     const noRandomUUID = await page.evaluate(() => typeof window.crypto.randomUUID !== 'function');
     expect(noRandomUUID).toBe(true);
-    
+
     // Ждём появления палитры и канваса
     await page.waitForSelector('app-palette .palette-item', { timeout: 5000 });
     await page.waitForSelector('.canvas-viewport', { timeout: 5000 });
-    
+
     await page.evaluate(() => {
       const paletteBtn = document.querySelector('app-palette .palette-item') as HTMLElement;
       const canvas = document.querySelector('.canvas-viewport') as HTMLElement;

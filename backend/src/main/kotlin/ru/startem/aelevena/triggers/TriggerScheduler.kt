@@ -31,8 +31,8 @@ class TriggerScheduler(
         val config = trigger.configJson?.let { objectMapper.readTree(it) }
         val future = when (trigger.type) {
             "cron" -> {
-                val cron = config?.get("cron")?.asText()?.takeIf { it.isNotBlank() }
-                    ?: throw BadRequestException("cron trigger requires config.cron")
+                val cron = (config?.get("cron") ?: config?.get("expression"))?.asText()?.takeIf { it.isNotBlank() }
+                    ?: throw BadRequestException("cron trigger requires config.expression")
                 taskScheduler.schedule(
                     Runnable { fire(trigger) },
                     CronTrigger(cron),
@@ -40,8 +40,8 @@ class TriggerScheduler(
             }
 
             "interval" -> {
-                val everySeconds = config?.get("everySeconds")?.asLong()
-                    ?: throw BadRequestException("interval trigger requires config.everySeconds")
+                val everySeconds = (config?.get("everySeconds") ?: config?.get("periodSeconds"))?.asLong()
+                    ?: throw BadRequestException("interval trigger requires config.periodSeconds")
                 taskScheduler.scheduleAtFixedRate(
                     Runnable { fire(trigger) },
                     Duration.ofSeconds(everySeconds),

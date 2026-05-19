@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import {
-  attachConsoleSpy,
   createWorkflowViaApi,
   deleteWorkflowsByPrefix,
   suppressFirstVisitHints,
@@ -26,27 +25,7 @@ test.describe('Workflow editor — modal toggles', () => {
     await deleteWorkflowsByPrefix(request, 'E2E-');
   });
 
-  test('"События" opens Event Schema modal', async ({ page }) => {
-    await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'События' }).click();
-    await expect(page.getByRole('heading', { name: /JSON Schema/i })).toBeVisible();
-  });
-
-  test('"QA-чеклист" opens QA scenarios modal', async ({ page }) => {
-    await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'QA-чеклист' }).click();
-    await expect(page.getByRole('heading', { name: /QA/i }).first()).toBeVisible();
-  });
-
-  test('"Результаты A/B" opens experiment modal', async ({ page }) => {
-    const errs = attachConsoleSpy(page);
-    await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'Результаты A/B' }).click();
-    await expect(page.locator('.modal-backdrop')).toBeVisible();
-    expect(errs.errors, JSON.stringify(errs.errors, null, 2)).toEqual([]);
-  });
-
-  test('"? Гайд" opens the guide modal with all 5 steps', async ({ page }) => {
+  test('"Гайд" opens the guide modal with all 5 steps', async ({ page }) => {
     await page.goto(`/workflow/${createdId}`);
     await page.locator('.guide-btn').click();
     await expect(page.getByRole('heading', { name: 'Как пользоваться редактором' })).toBeVisible();
@@ -54,10 +33,16 @@ test.describe('Workflow editor — modal toggles', () => {
     await expect(page.locator('.guide-tips')).toBeVisible();
   });
 
-  test('Escape closes any open modal', async ({ page }) => {
+  test('"Снепшоты" opens the snapshots modal', async ({ page }) => {
     await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'События' }).click();
-    const title = page.getByRole('heading', { name: /JSON Schema/i });
+    await page.locator('.snapshots-btn').click();
+    await expect(page.getByRole('heading', { name: /Снепшоты графа/i })).toBeVisible();
+  });
+
+  test('Escape closes guide modal', async ({ page }) => {
+    await page.goto(`/workflow/${createdId}`);
+    await page.locator('.guide-btn').click();
+    const title = page.getByRole('heading', { name: 'Как пользоваться редактором' });
     await expect(title).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(title).toBeHidden({ timeout: 2_000 });
@@ -65,8 +50,8 @@ test.describe('Workflow editor — modal toggles', () => {
 
   test('Backdrop click closes modal', async ({ page }) => {
     await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'QA-чеклист' }).click();
-    const title = page.getByRole('heading', { name: /QA/i }).first();
+    await page.locator('.guide-btn').click();
+    const title = page.getByRole('heading', { name: 'Как пользоваться редактором' });
     await expect(title).toBeVisible();
     await page.locator('.modal-backdrop').click({ position: { x: 5, y: 5 } });
     await expect(title).toBeHidden({ timeout: 2_000 });
@@ -74,11 +59,11 @@ test.describe('Workflow editor — modal toggles', () => {
 
   test('only one modal is rendered at a time (re-clicking a trigger after close)', async ({ page }) => {
     await page.goto(`/workflow/${createdId}`);
-    await page.getByRole('button', { name: 'События' }).click();
+    await page.locator('.guide-btn').click();
     await expect(page.locator('.modal-backdrop')).toHaveCount(1);
     await page.keyboard.press('Escape');
     await expect(page.locator('.modal-backdrop')).toHaveCount(0);
-    await page.getByRole('button', { name: 'QA-чеклист' }).click();
+    await page.locator('.snapshots-btn').click();
     await expect(page.locator('.modal-backdrop')).toHaveCount(1);
   });
 });

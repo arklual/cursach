@@ -47,13 +47,19 @@ test.describe('Workflows list — intro banner', () => {
     await expect(page.locator('.intro-banner')).toBeHidden();
   });
 
-  test('intro banner has primary "+ Создать workflow" that navigates to editor', async ({ page }) => {
+  test('intro banner primary "+ Создать workflow" opens create modal → "Создать с нуля" navigates to editor', async ({ page }) => {
     // Fresh context → localStorage empty → banner shows by default.
     await gotoList(page);
     const banner = page.locator('.intro-banner');
     await expect(banner).toBeVisible();
     await banner.getByRole('button', { name: /Создать workflow/i }).click();
-    await page.waitForURL(/\/workflow\/[0-9a-f-]{36}$/, { timeout: 8_000 });
+
+    // Modal with create-mode choice opens.
+    const fromScratch = page.getByRole('button', { name: /Создать с нуля/i });
+    await expect(fromScratch).toBeVisible();
+    await fromScratch.click();
+
+    await page.waitForURL(/\/workflow\/[0-9a-f-]{36}$/, { timeout: 10_000 });
   });
 });
 
@@ -101,7 +107,7 @@ test.describe('Workflow editor — Guide modal first-visit', () => {
     await expect(page.getByRole('heading', { name: 'Как пользоваться редактором' })).toBeHidden();
   });
 
-  test('"? Гайд" button manually re-opens the guide modal', async ({ page }) => {
+  test('"Гайд" button manually re-opens the guide modal', async ({ page }) => {
     await page.addInitScript(() => {
       try { localStorage.setItem('fluxpilot.guideSeen', '1'); } catch { /* ignore */ }
     });

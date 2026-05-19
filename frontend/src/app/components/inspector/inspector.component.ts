@@ -264,7 +264,7 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
                   <input type="text" class="mono"
                          [ngModel]="cfg(node, 'expression', '')"
                          (ngModelChange)="setCfg(node, 'expression', $event)"
-                         placeholder="0 */5 * * * *">
+                         placeholder="* * * * * *">
                 </label>
                 <p class="hint">Формат Spring CronTrigger: sec min hour dom mon dow.</p>
               }
