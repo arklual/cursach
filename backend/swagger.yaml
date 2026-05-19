@@ -19,6 +19,8 @@ tags:
     description: Триггеры запуска workflow
   - name: Runs
     description: Запуски workflow и отдельных нод
+  - name: Analytics
+    description: Аналитика по экспериментам.
 
 paths:
   /workflows:
@@ -393,6 +395,34 @@ paths:
                   $ref: '#/components/schemas/WorkflowRun'
         '404':
           description: Workflow не найден.
+
+  /workflows/{workflowId}/ab-analytics:
+    get:
+      tags: [Analytics]
+      summary: Аналитика по выбранной A/B-ноде workflow.
+      parameters:
+        - name: workflowId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: abNodeId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AbAnalyticsResponse'
+        '400':
+          description: BAD REQUEST (node is not an A/B split, or abNodeId blank)
+        '404':
+          description: NOT FOUND (workflow or node)
 
   /workflow-runs/{runId}:
     get:
@@ -807,3 +837,37 @@ components:
             запуск не завершён или выходов нет.
           nullable: true
 
+    AbAnalyticsResponse:
+      type: object
+      required: [abNodeId, mode, totalRuns, excludedNoVariant, computedAt, variants, warnings]
+      properties:
+        abNodeId: { type: string }
+        mode: { type: string, enum: [pick, split] }
+        totalRuns: { type: integer }
+        excludedNoVariant: { type: integer }
+        computedAt: { type: string, format: date-time }
+        variants:
+          type: array
+          items: { $ref: '#/components/schemas/AbVariantRow' }
+        warnings:
+          type: array
+          items: { type: string }
+    AbVariantRow:
+      type: object
+      required: [key, label, color, runs, trafficCount, trafficPct, isBaseline, isSignificant]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        color: { type: string }
+        weight: { type: integer, nullable: true }
+        runs: { type: integer }
+        trafficCount: { type: integer }
+        trafficPct: { type: number, format: double }
+        conversions: { type: integer, nullable: true }
+        conversionPct: { type: number, format: double, nullable: true }
+        ciLow: { type: number, format: double, nullable: true }
+        ciHigh: { type: number, format: double, nullable: true }
+        liftVsBaseline: { type: number, format: double, nullable: true }
+        pValue: { type: number, format: double, nullable: true }
+        isBaseline: { type: boolean }
+        isSignificant: { type: boolean }

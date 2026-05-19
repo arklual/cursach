@@ -330,6 +330,190 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflows/{workflowId}/snapshots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Список снепшотов workflow
+         * @description Возвращает все именованные снепшоты текущего workflow (новые сверху).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Идентификатор workflow. */
+                    workflowId: components["parameters"]["WorkflowId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Список снепшотов. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowSnapshot"][];
+                    };
+                };
+                /** @description Workflow не найден. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Создать снепшот текущего графа
+         * @description Фиксирует текущую ревизию workflow под человекочитаемым именем — можно вернуться к ней позже.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Идентификатор workflow. */
+                    workflowId: components["parameters"]["WorkflowId"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CreateSnapshotRequest"];
+                };
+            };
+            responses: {
+                /** @description Снепшот создан. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowSnapshot"];
+                    };
+                };
+                /** @description Workflow не найден. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{workflowId}/snapshots/{snapshotId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Удалить снепшот
+         * @description Удаляет снепшот. Сама ревизия графа остаётся в истории (на неё могут ссылаться runs).
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Идентификатор workflow. */
+                    workflowId: components["parameters"]["WorkflowId"];
+                    snapshotId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Снепшот удалён. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Снепшот не найден. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{workflowId}/snapshots/{snapshotId}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Откатить workflow на состояние снепшота
+         * @description Создаёт новую ревизию с графом из снепшота и делает её текущей. История не теряется — откат сам становится точкой в истории, и старые runs продолжают ссылаться на свои ревизии.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Идентификатор workflow. */
+                    workflowId: components["parameters"]["WorkflowId"];
+                    snapshotId: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Граф восстановлен из снепшота. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkflowGraph"];
+                    };
+                };
+                /** @description Снепшот или workflow не найдены. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflows/{workflowId}/triggers": {
         parameters: {
             query?: never;
@@ -580,6 +764,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflows/{workflowId}/ab-analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Аналитика по выбранной A/B-ноде workflow. */
+        get: {
+            parameters: {
+                query: {
+                    abNodeId: string;
+                };
+                header?: never;
+                path: {
+                    workflowId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AbAnalyticsResponse"];
+                    };
+                };
+                /** @description BAD REQUEST (node is not an A/B split, or abNodeId blank) */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description NOT FOUND (workflow or node) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow-runs/{runId}": {
         parameters: {
             query?: never;
@@ -771,6 +1009,25 @@ export interface components {
             /** @description Дата создания версии в ISO 8601. */
             createdAt?: string;
         };
+        /** @description Именованный снепшот графа workflow — точка восстановления поверх автосейва. */
+        WorkflowSnapshot: {
+            /** @description Идентификатор снепшота. */
+            id?: string;
+            /** @description Идентификатор связанного workflow. */
+            workflowId?: string;
+            /** @description Человекочитаемое имя снепшота (например, "перед релизом v1.2"). */
+            name?: string;
+            /** @description Опциональный комментарий. */
+            description?: string | null;
+            /** @description Дата создания снепшота в ISO 8601. */
+            createdAt?: string;
+        };
+        CreateSnapshotRequest: {
+            /** @description Имя снепшота (обязательное, не пустое). */
+            name: string;
+            /** @description Опциональный комментарий. */
+            description?: string | null;
+        };
         /** @description Граф workflow, включающий ноды и связи. */
         WorkflowGraph: {
             /** @description Идентификатор версии, которой принадлежит граф. */
@@ -913,6 +1170,40 @@ export interface components {
             durationMs?: number;
             /** @description Агрегированный output пайплайна — данные терминальных нод. Если терминальная нода одна — её output как есть, иначе объект {nodeId: output}. Null, пока запуск не завершён или выходов нет. */
             output?: unknown;
+        };
+        AbAnalyticsResponse: {
+            abNodeId: string;
+            /** @enum {string} */
+            mode: "pick" | "split";
+            totalRuns: number;
+            excludedNoVariant: number;
+            /** Format: date-time */
+            computedAt: string;
+            variants: components["schemas"]["AbVariantRow"][];
+            warnings: string[];
+        };
+        AbVariantRow: {
+            key: string;
+            label: string;
+            color: string;
+            weight?: number | null;
+            runs: number;
+            trafficCount: number;
+            /** Format: double */
+            trafficPct: number;
+            conversions?: number | null;
+            /** Format: double */
+            conversionPct?: number | null;
+            /** Format: double */
+            ciLow?: number | null;
+            /** Format: double */
+            ciHigh?: number | null;
+            /** Format: double */
+            liftVsBaseline?: number | null;
+            /** Format: double */
+            pValue?: number | null;
+            isBaseline: boolean;
+            isSignificant: boolean;
         };
     };
     responses: never;

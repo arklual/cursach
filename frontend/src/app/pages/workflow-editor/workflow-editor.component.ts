@@ -13,6 +13,7 @@ import { PaletteComponent } from '../../components/palette/palette.component';
 import { InspectorComponent } from '../../components/inspector/inspector.component';
 import { ModalComponent } from '../../components/modal/modal.component';
 import { RunsPanelComponent } from '../../components/runs-panel/runs-panel.component';
+import { AnalyticsPanelComponent } from '../../components/analytics-panel/analytics-panel.component';
 import { TriggerApiService, Trigger } from '../../core/api/trigger.api';
 import { WorkflowValidatorService, ValidationResult } from '../../services/workflow-validator.service';
 import { ExecutionService } from '../../services/execution.service';
@@ -30,6 +31,7 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
     InspectorComponent,
     ModalComponent,
     RunsPanelComponent,
+    AnalyticsPanelComponent,
     ExecutionPanelComponent,
     SnapshotsPanelComponent,
   ],
@@ -318,6 +320,15 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
               </svg>
               <span>Запуски</span>
             </button>
+            <button class="tab" role="tab"
+                    [class.active]="!logPanelCollapsed() && bottomTab() === 'analytics'"
+                    (click)="selectBottomTab('analytics')"
+                    title="История запусков workflow на бэкенде">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm7 6V3l-2.29 2.29A8.96 8.96 0 0 0 13 3v2a7 7 0 0 1 3.29.83L14 8h6z"/>
+              </svg>
+              <span>Аналитика</span>
+            </button>
           </div>
           <div class="tab-actions">
             @if (!logPanelCollapsed() && bottomTab() === 'log' && workflowService.logs().length > 0) {
@@ -368,6 +379,12 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
                 <app-runs-panel [workflowId]="currentWorkflowIdValue()!"></app-runs-panel>
               } @else {
                 <div class="empty-state">Сохраните workflow, чтобы запускать его.</div>
+              }
+            </div>
+          } @else if (bottomTab() === 'analytics') {
+            <div class="bottom-content" [style.height.px]="logPanelHeight()">
+              @if (currentWorkflowIdValue()) {
+                <app-analytics-panel [workflowId]="currentWorkflowIdValue()!"></app-analytics-panel>
               }
             </div>
           }
@@ -1703,7 +1720,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   readonly currentWorkflowIdValue = this.currentWorkflowId.asReadonly();
 
   /** Вкладка нижней панели: лог / запуски / триггеры. */
-  readonly bottomTab = signal<'log' | 'runs'>('log');
+  readonly bottomTab = signal<'log' | 'runs' | 'analytics'>('log');
 
   modals = signal({
     guide: false,
@@ -2088,7 +2105,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   }
 
   /** Клик по табу нижней панели: переключает таб + раскрывает панель, если она была свёрнута. */
-  selectBottomTab(tab: 'log' | 'runs'): void {
+  selectBottomTab(tab: 'log' | 'runs' | 'analytics'): void {
     if (this.logPanelCollapsed() && this.bottomTab() === tab) {
       this.logPanelCollapsed.set(false);
       return;

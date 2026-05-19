@@ -17,6 +17,8 @@ export type WorkflowRun = Schemas['WorkflowRun'];
 export type NodeRun = Schemas['NodeRun'];
 export type WebhookAccepted = Schemas['WebhookAccepted'];
 export type WorkflowRunResult = Schemas['WorkflowRunResult'];
+export type AbAnalyticsResponse = Schemas['AbAnalyticsResponse'];
+export type AbVariantRow = Schemas['AbVariantRow'];
 
 // Inline request-bodies из paths
 export type WorkflowCreateRequest = NonNullable<
