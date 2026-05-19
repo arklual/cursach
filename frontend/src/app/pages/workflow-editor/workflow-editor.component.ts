@@ -84,11 +84,13 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
               </svg>
             </button>
           }
-          <button class="icon-btn" (click)="openSnapshots()" title="Снепшоты графа" aria-label="Снепшоты"
+          <button class="icon-btn labeled-btn snapshots-btn" (click)="openSnapshots()"
+                  title="Снепшоты и история графа" aria-label="Снепшоты"
                   [disabled]="!currentWorkflowIdValue()">
             <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-              <path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm7 6V3l-2.29 2.29A8.96 8.96 0 0 0 13 3v2a7 7 0 0 1 3.29.83L14 8h6z"/>
+              <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
             </svg>
+            <span class="btn-label">Снепшоты</span>
           </button>
           <button class="icon-btn" (click)="openModal('guide')" title="Пошаговая инструкция" aria-label="Гайд">
             <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
@@ -653,6 +655,25 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
       color: var(--fg-primary);
       transform: none;
       box-shadow: none;
+    }
+
+    .icon-btn.labeled-btn {
+      width: auto;
+      padding: 0 12px;
+      gap: 8px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .icon-btn .btn-label {
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    .icon-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     main {
@@ -1411,6 +1432,17 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
       .palette-panel .panel-content > *,
       .inspector-panel .panel-content > * {
         height: 100%;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .icon-btn.labeled-btn {
+        width: 36px;
+        padding: 0;
+        gap: 0;
+      }
+      .icon-btn .btn-label {
+        display: none;
       }
     }
 
