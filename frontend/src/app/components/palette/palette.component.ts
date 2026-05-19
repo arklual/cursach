@@ -39,57 +39,65 @@ interface NodeCategory {
           aria-label="Поиск нод">
       </header>
 
-      @for (category of filteredCategories(); track category.id) {
-        <section class="category">
-          <div class="category-header" [style.borderLeftColor]="category.color">
-            <h3>{{ category.name }}</h3>
-            <span class="category-count">{{ category.items.length }}</span>
-          </div>
-          <div class="category-items">
-            @for (item of category.items; track item.id) {
-              <button
-                class="palette-item"
-                draggable="true"
-                (dragstart)="onDragStart($event, item)"
-                [title]="item.label">
-                <span class="palette-item-icon">
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                    <path [attr.d]="item.iconPath"/>
-                  </svg>
-                </span>
-                <span class="palette-item-label">{{ item.label }}</span>
-              </button>
-            }
-          </div>
-        </section>
-      }
+      <div class="palette-body">
+        @for (category of filteredCategories(); track category.id) {
+          <section class="category">
+            <div class="category-header" [style.borderLeftColor]="category.color">
+              <h3>{{ category.name }}</h3>
+              <span class="category-count">{{ category.items.length }}</span>
+            </div>
+            <div class="category-items">
+              @for (item of category.items; track item.id) {
+                <button
+                  class="palette-item"
+                  draggable="true"
+                  (dragstart)="onDragStart($event, item)"
+                  [title]="item.label">
+                  <span class="palette-item-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                      <path [attr.d]="item.iconPath"/>
+                    </svg>
+                  </span>
+                  <span class="palette-item-label">{{ item.label }}</span>
+                </button>
+              }
+            </div>
+          </section>
+        }
 
-      @if (filteredCategories().length === 0) {
-        <div class="empty-state">
-          <span class="empty-icon" aria-hidden="true">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="10.5" cy="10.5" r="6.5"/>
-              <path d="m20 20-4.8-4.8"/>
-            </svg>
-          </span>
-          <p>Ноды не найдены</p>
-        </div>
-      }
+        @if (filteredCategories().length === 0) {
+          <div class="empty-state">
+            <span class="empty-icon" aria-hidden="true">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="10.5" cy="10.5" r="6.5"/>
+                <path d="m20 20-4.8-4.8"/>
+              </svg>
+            </span>
+            <p>Ноды не найдены</p>
+          </div>
+        }
+      </div>
 
     </aside>
   `,
   styles: [`
+    :host {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+    }
+
     .palette {
       background: var(--bg-primary);
       border: 1px solid var(--border);
       border-radius: var(--radius-xl);
-      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      height: calc(100vh - 180px);
-      overflow: auto;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
       box-shadow: var(--shadow-sm);
     }
 
@@ -97,8 +105,45 @@ interface NodeCategory {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      padding-bottom: 12px;
+      padding: 16px;
       border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--bg-primary);
+    }
+
+    .palette-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      overscroll-behavior: contain;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .palette-body::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .palette-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .palette-body::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+
+    .palette-body::-webkit-scrollbar-thumb:hover {
+      background: var(--border-light, var(--fg-muted));
+      background-clip: padding-box;
+      border: 2px solid transparent;
     }
 
     .palette-header h2 {
@@ -171,8 +216,16 @@ interface NodeCategory {
 
     .category-items {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
       gap: 6px;
+    }
+
+    @media (max-width: 640px) {
+      .palette-header { padding: 12px; gap: 10px; }
+      .palette-body { padding: 12px; gap: 12px; }
+      .category-items {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      }
     }
 
     .palette-item {
