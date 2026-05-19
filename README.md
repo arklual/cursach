@@ -3,7 +3,8 @@
 **Визуальный конструктор пайплайнов с акцентом на продуктовые эксперименты и статистику.**
 
 [![Build](https://github.com/arklual/cursach/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/arklual/cursach/actions/workflows/ci.yml)
-[![Coverage](.github/badges/jacoco.svg)](https://github.com/arklual/cursach/actions/workflows/coverage-badge.yml)
+[![Backend coverage](.github/badges/jacoco.svg)](https://github.com/arklual/cursach/actions/workflows/coverage-badge.yml)
+[![Frontend coverage](.github/badges/frontend-coverage.svg)](https://github.com/arklual/cursach/actions/workflows/frontend-coverage-badge.yml)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## 🎯 Возможности

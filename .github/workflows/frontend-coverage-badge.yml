@@ -1,0 +1,61 @@
+name: frontend / coverage badge
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - 'scripts/frontend-coverage-badge.sh'
+      - '.github/workflows/frontend-coverage-badge.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: frontend-coverage-badge
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  badge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run service unit tests with coverage
+        working-directory: ./frontend
+        run: npm run test:coverage
+
+      - name: Generate coverage badge
+        run: bash scripts/frontend-coverage-badge.sh
+
+      - name: Commit badge if changed
+        run: |
+          if [ -n "$(git status --porcelain .github/badges/frontend-coverage.svg)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .github/badges/frontend-coverage.svg
+            git commit -m "ci(coverage): refresh frontend coverage badge [skip ci]"
+            git push
+          else
+            echo "Coverage badge unchanged — no commit"
+          fi
+
+      - name: Upload coverage HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-report
+          path: frontend/coverage/fluxpilot-workflow-lab/
+          retention-days: 14
