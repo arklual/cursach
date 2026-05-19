@@ -4,5 +4,10 @@
     "outDir": "./out-tsc/spec",
     "types": ["jasmine"]
   },
-  "include": ["src/**/*.service.spec.ts", "src/**/*.d.ts", "src/polyfills.ts"]
+  "include": [
+    "src/**/*.service.spec.ts",
+    "src/**/*.component.spec.ts",
+    "src/**/*.d.ts",
+    "src/polyfills.ts"
+  ]
 }
