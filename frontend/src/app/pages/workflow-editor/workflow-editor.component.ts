@@ -109,6 +109,26 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
         <div class="editor-error-banner">{{ loadError() }}</div>
       }
 
+      @if (isDebugMode()) {
+        <div class="debug-banner" role="status" aria-live="polite">
+          <span class="debug-banner-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+              <path d="M12 2a4 4 0 014 4v1.07A6 6 0 0118 13v1h2v2h-2.05a6 6 0 01-11.9 0H4v-2h2v-1a6 6 0 012-4.93V6a4 4 0 014-4zm0 2a2 2 0 00-2 2v1h4V6a2 2 0 00-2-2z"/>
+            </svg>
+          </span>
+          <div class="debug-banner-text">
+            <strong>Просмотр запуска</strong>
+            <span class="debug-banner-meta">{{ debugRunLabel() }} · кликните по ноде, чтобы увидеть её input/output справа</span>
+          </div>
+          <button type="button" class="debug-banner-exit" (click)="exitDebugMode()">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14" aria-hidden="true">
+              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+            Вернуться к редактированию
+          </button>
+        </div>
+      }
+
       <main [style.grid-template-columns]="mainGridColumns()"
             [class.is-mobile]="isMobile()"
             [class.has-drawer-open]="isMobile() && (mobilePaletteOpen() || mobileInspectorOpen() || mobileRunOpen())">
@@ -137,25 +157,6 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
                   <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
                 </svg>
               }
-            </button>
-          </div>
-        }
-
-        @if (isDebugMode()) {
-          <div class="debug-banner" role="status">
-            <span class="debug-banner-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                <path d="M12 2a4 4 0 014 4v1.07A6 6 0 0118 13v1h2v2h-2.05a6 6 0 01-11.9 0H4v-2h2v-1a6 6 0 012-4.93V6a4 4 0 014-4zm0 2a2 2 0 00-2 2v1h4V6a2 2 0 00-2-2z"/>
-              </svg>
-            </span>
-            <div class="debug-banner-text">
-              <strong>Просмотр запуска</strong>
-              <span class="debug-banner-meta">
-                {{ debugRunLabel() }} · клик по ноде покажет input/output справа
-              </span>
-            </div>
-            <button type="button" class="debug-banner-exit" (click)="exitDebugMode()">
-              Вернуться к редактированию
             </button>
           </div>
         }
@@ -536,6 +537,75 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
       color: var(--danger);
       border: 1px solid var(--danger-glow-strong);
       font-size: 14px;
+    }
+
+    .debug-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 12px 24px 0;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: var(--accent-glow);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      font-size: 13px;
+      min-width: 0;
+    }
+
+    .debug-banner-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .debug-banner-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .debug-banner-text strong {
+      color: var(--fg-primary);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .debug-banner-meta {
+      color: var(--fg-secondary);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .debug-banner-exit {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: var(--panel);
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      flex-shrink: 0;
+      transition: background 120ms ease, color 120ms ease;
+    }
+
+    .debug-banner-exit:hover {
+      background: var(--accent);
+      color: var(--panel);
     }
 
     .brand {
@@ -1587,6 +1657,23 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
       }
     }
 
+    @media (max-width: 900px) {
+      .debug-banner {
+        margin: 8px 8px 0;
+        padding: 8px 10px;
+        gap: 8px;
+        font-size: 12px;
+      }
+      .debug-banner-meta {
+        font-size: 11px;
+      }
+      .debug-banner-exit span,
+      .debug-banner-exit {
+        font-size: 11px;
+        padding: 5px 8px;
+      }
+    }
+
     @media (max-width: 480px) {
       .editor-error-banner {
         margin: 8px 8px 0;
@@ -1788,7 +1875,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   paletteCollapsed = signal(false);
   paletteWidth = signal(300);
   inspectorCollapsed = signal(false);
-  inspectorWidth = signal(340);
+  inspectorWidth = signal(400);
   logPanelCollapsed = signal(false);
   logPanelHeight = signal(180);
 

@@ -11,7 +11,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Subscription, interval, switchMap, takeWhile } from 'rxjs';
+import { Subscription, interval, switchMap, takeWhile, timer } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 import { RunApiService } from '../../core/api/run.api';
 import type { NodeRun, WorkflowRun } from '../../core/api/api.models';
@@ -237,7 +237,10 @@ export class RunsPanelComponent implements OnInit {
         }
 
         this.pollSub?.unsubscribe();
-        this.pollSub = interval(1500).pipe(
+        // Сразу дёргаем GET /runs/{id}, чтобы получить полный run с node_runs (list-эндпойнт может
+        // возвращать сокращённую форму без них) — иначе пользователь увидит пустые input/output на
+        // 1.5 секунды, пока не сработает первый tick interval'а.
+        this.pollSub = timer(0, 1500).pipe(
             switchMap(() => this.runApi.get(runId)),
             takeWhile(run => !TERMINAL.has(normaliseStatus(run.status)), true),
             takeUntilDestroyed(this.destroyRef),
