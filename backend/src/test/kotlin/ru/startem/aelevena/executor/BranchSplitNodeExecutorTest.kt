@@ -91,4 +91,42 @@ class BranchSplitNodeExecutorTest {
         assertEquals(3, a.size())
         assertTrue(a.get(0).isInt)
     }
+
+    @Test
+    fun `pick-mode выбирает один variant и кладёт исходный payload`() {
+        val config = j("""{
+            "mode":"pick","strategy":"random","seed":42,
+            "variants":[{"key":"A","label":"A","weight":100}]
+        }""")
+        val input = j("""[{"id":1},{"id":2}]""")
+        val out = executor.execute("n1", config, input)
+        assertEquals("pick", out.get("mode").asText())
+        assertEquals("A", out.get("chosen").asText())
+        assertTrue(out.get("payload").isArray)
+        assertEquals(2, out.get("payload").size())
+    }
+
+    @Test
+    fun `pick-mode hash sticky - одинаковый input даёт одинаковый chosen`() {
+        val config = j("""{
+            "mode":"pick","strategy":"hash",
+            "userIdField":"user_id","salt":"exp",
+            "variants":[{"key":"A","label":"A","weight":50},{"key":"B","label":"B","weight":50}]
+        }""")
+        val input = j("""[{"user_id":"u-42"}]""")
+        val r1 = executor.execute("n1", config, input).get("chosen").asText()
+        val r2 = executor.execute("n1", config, input).get("chosen").asText()
+        assertEquals(r1, r2)
+    }
+
+    @Test
+    fun `pick-mode пустой input - выбирает default или первый вариант`() {
+        val config = j("""{
+            "mode":"pick","strategy":"attribute",
+            "rules":[],"defaultVariant":"B",
+            "variants":[{"key":"A","label":"A","weight":50},{"key":"B","label":"B","weight":50}]
+        }""")
+        val out = executor.execute("n1", config, mapper.createArrayNode())
+        assertEquals("B", out.get("chosen").asText())
+    }
 }
