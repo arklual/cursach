@@ -134,7 +134,9 @@ class AbAnalyticsService(
             }
             when (mode) {
                 "pick" -> {
-                    val chosen = json.path("meta").path("chosen").asText(null)
+                    // BranchSplitNodeExecutor кладёт chosen на верхний уровень output
+                    // (см. BranchSplitNodeExecutor.kt:65), meta содержит только strategy.
+                    val chosen = json.path("chosen").asText(null)
                     if (chosen == null || chosen.isBlank()) {
                         invalid++; continue
                     }
