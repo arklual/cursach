@@ -47,8 +47,8 @@ import java.util.UUID
         "spring.main.web-application-type=none",
     ],
 )
-@Import(TriggerLifecycleIT.ContainersConfig::class)
-class TriggerLifecycleIT {
+@Import(TriggerLifecycleIntegrationTest.ContainersConfig::class)
+class TriggerLifecycleIntegrationTest {
 
     companion object {
         @Container

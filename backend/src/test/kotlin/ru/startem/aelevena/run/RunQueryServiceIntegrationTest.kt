@@ -39,8 +39,8 @@ import java.util.UUID
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
-@Import(RunQueryServiceIT.ContainersConfig::class, RunQueryServiceIT.StubExecutorConfig::class)
-class RunQueryServiceIT {
+@Import(RunQueryServiceIntegrationTest.ContainersConfig::class, RunQueryServiceIntegrationTest.StubExecutorConfig::class)
+class RunQueryServiceIntegrationTest {
 
     companion object {
         @Container

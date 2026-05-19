@@ -29,8 +29,8 @@ import java.time.Duration
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = ["app.seed.demo-workflows-enabled=true"],
 )
-@Import(DemoWorkflowSeederIT.ContainersConfig::class)
-class DemoWorkflowSeederIT {
+@Import(DemoWorkflowSeederIntegrationTest.ContainersConfig::class)
+class DemoWorkflowSeederIntegrationTest {
 
     companion object {
         @Container

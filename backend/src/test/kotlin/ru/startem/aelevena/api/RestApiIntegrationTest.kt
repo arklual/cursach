@@ -40,8 +40,8 @@ import java.util.UUID
 @Testcontainers
 @SpringBootTest
 @AutoConfigureMockMvc
-@Import(RestApiIT.ContainersConfig::class, RestApiIT.StubExecutorConfig::class)
-class RestApiIT {
+@Import(RestApiIntegrationTest.ContainersConfig::class, RestApiIntegrationTest.StubExecutorConfig::class)
+class RestApiIntegrationTest {
 
     companion object {
         @Container
