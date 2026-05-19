@@ -62,31 +62,11 @@ type CreateMode = 'closed' | 'choose' | 'template';
             <div class="workflow-card">
               <a class="workflow-card-link" [routerLink]="['/workflow', workflow.id]">
                 <div class="card-header">
-                  <span class="card-icon" [style.background]="getStatusColor(workflow.status)">
-                    @switch (workflow.status) {
-                      @case ('running') {
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                          <path d="M8 5v14l11-7z"/>
-                        </svg>
-                      }
-                      @case ('completed') {
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-                        </svg>
-                      }
-                      @case ('paused') {
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                        </svg>
-                      }
-                      @default {
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
-                        </svg>
-                      }
-                    }
+                  <span class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                      <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z"/>
+                    </svg>
                   </span>
-                  <span class="card-status" [class]="workflow.status">{{ workflow.status }}</span>
                 </div>
                 <h3>{{ workflow.name }}</h3>
                 <p class="card-description">{{ workflow.description || 'Без описания' }}</p>
@@ -535,38 +515,12 @@ type CreateMode = 'closed' | 'choose' | 'template';
       border-radius: 10px;
       display: grid;
       place-items: center;
-      color: white;
+      color: var(--accent);
+      background: var(--accent-glow);
     }
 
     .card-icon svg {
       display: block;
-    }
-
-    .card-status {
-      font-size: 12px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-weight: 500;
-    }
-
-    .card-status.draft {
-      background: var(--bg-tertiary);
-      color: var(--fg-muted);
-    }
-
-    .card-status.running {
-      background: var(--success-bg);
-      color: var(--success);
-    }
-
-    .card-status.completed {
-      background: var(--accent-glow);
-      color: var(--accent);
-    }
-
-    .card-status.paused {
-      background: var(--warning-bg);
-      color: var(--warning);
     }
 
     .workflow-card h3 {
@@ -1039,15 +993,6 @@ export class WorkflowsListComponent implements OnInit {
         console.error(err);
       },
     });
-  }
-
-  getStatusColor(status: string): string {
-    switch (status) {
-      case 'running': return '#34c97c';
-      case 'completed': return '#5b8def';
-      case 'paused': return '#f5a524';
-      default: return '#6e7480';
-    }
   }
 
   formatDate(date: Date): string {
