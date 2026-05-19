@@ -70,6 +70,8 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
                       class="edge-line"
                       [class.selected]="edge.id === selectedEdgeId()"
                       [class.hovered]="edge.id === hoveredEdgeId()"
+                      [class.variant]="!!getEdgeColor(edge)"
+                      [style.stroke]="getEdgeColor(edge)"
                       fill="none"/>
                 @if (edge.label) {
                   <text [attr.x]="calcLabelPos(edge).x"
@@ -80,7 +82,9 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
             }
 
             @if (isDrawing()) {
-              <path [attr.d]="tempPath()" class="edge-temp" fill="none"/>
+              <path [attr.d]="tempPath()" class="edge-temp"
+                    [style.stroke]="getTempEdgeColor()"
+                    fill="none"/>
             }
           </svg>
 
@@ -365,14 +369,19 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
       transition: stroke 0.15s, stroke-width 0.15s;
     }
 
-    .edge-line.hovered {
-      stroke: var(--accent);
+    .edge-line.variant {
       stroke-width: 2.5;
     }
 
-    .edge-line.selected {
-      stroke: var(--danger);
+    /* hover/selected переопределяют variant-цвет, заданный inline */
+    .edge-line.hovered {
+      stroke: var(--accent) !important;
       stroke-width: 3;
+    }
+
+    .edge-line.selected {
+      stroke: var(--danger) !important;
+      stroke-width: 3.5;
     }
 
     .edge-temp {
@@ -844,7 +853,17 @@ export class WorkflowCanvasComponent implements AfterViewInit {
 
   // === Расчёт координат для стрелок ===
 
-  private getOutPoint(node: WorkflowNode): { x: number; y: number } {
+  private getOutPoint(node: WorkflowNode, variant?: string | null): { x: number; y: number } {
+    if (node.data.kind === 'ab' && variant) {
+      const variants = this.getAbVariants(node);
+      const i = variants.findIndex(v => v.key === variant);
+      if (i >= 0) {
+        return {
+          x: node.position.x + this.NODE_W,
+          y: node.position.y + this.getAbHandleTop(i),
+        };
+      }
+    }
     const h = this.getNodeHeight(node);
     return {
       x: node.position.x + this.NODE_W,
@@ -860,12 +879,34 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     };
   }
 
+  /** Resolves edge stroke colour from its variant when sourced from an A/B node. */
+  getEdgeColor(edge: WorkflowEdge): string | null {
+    const variant = edge.data?.variant;
+    if (!variant) return null;
+    const src = this.nodes().find(n => n.id === edge.source);
+    if (!src || src.data.kind !== 'ab') return null;
+    const variants = this.getAbVariants(src);
+    const idx = variants.findIndex(v => v.key === variant);
+    if (idx < 0) return null;
+    return this.getVariantColor(variant, idx);
+  }
+
+  /** Colour for the in-flight (drawing) edge — picks up current draw variant. */
+  getTempEdgeColor(): string | null {
+    if (!this.drawSource || this.drawType !== 'source' || !this.drawVariant) return null;
+    if (this.drawSource.data.kind !== 'ab') return null;
+    const variants = this.getAbVariants(this.drawSource);
+    const idx = variants.findIndex(v => v.key === this.drawVariant);
+    if (idx < 0) return null;
+    return this.getVariantColor(this.drawVariant, idx);
+  }
+
   calcPath(edge: WorkflowEdge): string {
     const src = this.nodes().find(n => n.id === edge.source);
     const tgt = this.nodes().find(n => n.id === edge.target);
     if (!src || !tgt) return '';
 
-    const p1 = this.getOutPoint(src);
+    const p1 = this.getOutPoint(src, edge.data?.variant);
     const p2 = this.getInPoint(tgt);
 
     const dx = Math.abs(p2.x - p1.x);
@@ -879,7 +920,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     const tgt = this.nodes().find(n => n.id === edge.target);
     if (!src || !tgt) return '';
 
-    const p1 = this.getOutPoint(src);
+    const p1 = this.getOutPoint(src, edge.data?.variant);
     const p2 = this.getInPoint(tgt);
 
     const dx = p2.x - p1.x;
@@ -932,7 +973,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     const tgt = this.nodes().find(n => n.id === edge.target);
     if (!src || !tgt) return { x: 0, y: 0 };
 
-    const p1 = this.getOutPoint(src);
+    const p1 = this.getOutPoint(src, edge.data?.variant);
     const p2 = this.getInPoint(tgt);
 
     return {
@@ -948,7 +989,7 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     let start: { x: number; y: number };
 
     if (this.drawType === 'source') {
-      start = this.getOutPoint(this.drawSource);
+      start = this.getOutPoint(this.drawSource, this.drawVariant);
     } else {
       start = this.getInPoint(this.drawSource);
     }
