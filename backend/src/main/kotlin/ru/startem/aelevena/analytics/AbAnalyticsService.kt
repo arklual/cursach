@@ -3,6 +3,7 @@ package ru.startem.aelevena.analytics
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import ru.startem.aelevena.api.BadRequestException
 import ru.startem.aelevena.api.NotFoundException
 import ru.startem.aelevena.workflow.WorkflowService
@@ -20,6 +21,7 @@ class AbAnalyticsService(
 
     data class ConfigVariant(val key: String, val label: String, val weight: Int?)
 
+    @Transactional(readOnly = true)
     fun compute(workflowId: UUID, abNodeId: String): AbAnalyticsResponse {
         // 1) Валидация: workflow + nodes + type=branch.split.
         val workflow = workflowService.getWorkflow(workflowId) // 404 если нет
