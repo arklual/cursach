@@ -79,6 +79,8 @@
           "options": {
             "polyfills": ["zone.js", "zone.js/testing", "src/polyfills.ts"],
             "tsConfig": "tsconfig.spec.json",
+            "karmaConfig": "karma.conf.js",
+            "include": ["**/*.service.spec.ts"],
             "assets": [
               {
                 "glob": "**/*",
@@ -86,7 +88,22 @@
               }
             ],
             "styles": ["src/styles.css"],
-            "scripts": []
+            "scripts": [],
+            "codeCoverageExclude": [
+              "src/**/*.component.ts",
+              "src/**/*.model.ts",
+              "src/**/*.api.ts",
+              "src/**/*.facade.ts",
+              "src/**/*.mapper.ts",
+              "src/**/*.types.ts",
+              "src/**/api.models.ts",
+              "src/**/pretty-output.ts",
+              "src/**/uuid.ts",
+              "src/**/environment*.ts",
+              "src/app/app.routes.ts",
+              "src/main.ts",
+              "src/polyfills.ts"
+            ]
           }
         }
       }

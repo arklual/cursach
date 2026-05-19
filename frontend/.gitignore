@@ -4,6 +4,9 @@
 # Build
 /dist
 
+# Coverage reports
+/coverage
+
 # Angular cache
 /.angular
 
