@@ -6,6 +6,7 @@ import {
   NodeTemplate,
   NodeMetrics,
   NodeData,
+  Variant,
 } from '../models/workflow.model';
 import { uuid } from '../core/uuid';
 
@@ -73,6 +74,23 @@ export class WorkflowService {
     return this.nodesSignal().find(n => n.id === id) || null;
   });
 
+  private buildDefaultConfig(kind: NodeKind): Record<string, unknown> | undefined {
+    if (kind === 'ab') {
+      return {
+        mode: 'split',
+        strategy: 'random',
+        variants: [
+          { key: 'A', label: 'Control', weight: 50 },
+          { key: 'B', label: 'Treatment', weight: 50 },
+        ],
+      };
+    }
+    if (kind === 'join') {
+      return { tagField: '_variant', preserveExistingTag: true };
+    }
+    return undefined;
+  }
+
   private createDefaultMetrics(): NodeMetrics {
     return {
       reached: 0,
@@ -95,15 +113,19 @@ export class WorkflowService {
     } else if (type === 'trigger' && subtype) {
       label = this.triggerSubtypeLabels[subtype] ?? template.label;
     }
+    const cfg = this.buildDefaultConfig(type);
+    const defaultVariants: Variant[] = (cfg?.['variants'] as Array<{ label?: string; weight: number }> | undefined)
+      ?.map(v => ({ label: v.label ?? '', weight: v.weight })) ?? [];
     const data: NodeData = {
       id,
       kind: type,
       label,
       color: template.color,
       successProb: template.success,
-      variants: [],
+      variants: defaultVariants,
       randomization: 'simple',
       metrics: this.createDefaultMetrics(),
+      config: cfg,
     };
     if (subtype) {
       data.__subtype = subtype;
