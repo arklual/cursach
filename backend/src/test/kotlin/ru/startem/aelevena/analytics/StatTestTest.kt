@@ -1,12 +1,13 @@
 package ru.startem.aelevena.analytics
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import kotlin.math.abs
 
 class StatTestTest {
     private fun assertNear(expected: Double, actual: Double, eps: Double = 1e-3) {
-        assert(abs(expected - actual) < eps) { "expected $expected, got $actual (diff=${abs(expected - actual)})" }
+        assertTrue(abs(expected - actual) < eps) { "expected $expected, got $actual (diff=${abs(expected - actual)})" }
     }
 
     @Test
@@ -34,8 +35,8 @@ class StatTestTest {
     @Test
     fun `twoProportionZ large difference gives p value below 0_001`() {
         val result = StatTest.twoProportionZ(succA = 90, nA = 100, succB = 50, nB = 100)
-        assert(result.pValue!! < 0.001) { "expected p<0.001, got ${result.pValue}" }
-        assert(abs(result.z) > 6.0) { "expected |z|>6, got ${result.z}" }
+        assertTrue(result.pValue!! < 0.001) { "expected p<0.001, got ${result.pValue}" }
+        assertTrue(abs(result.z) > 6.0) { "expected |z|>6, got ${result.z}" }
     }
 
     @Test
