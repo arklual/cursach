@@ -17,6 +17,7 @@ import { TriggerApiService, Trigger } from '../../core/api/trigger.api';
 import { WorkflowValidatorService, ValidationResult } from '../../services/workflow-validator.service';
 import { ExecutionService } from '../../services/execution.service';
 import { ExecutionPanelComponent } from '../../components/execution-panel/execution-panel.component';
+import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapshots-panel.component';
 
 @Component({
   selector: 'app-workflow-editor',
@@ -30,6 +31,7 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
     ModalComponent,
     RunsPanelComponent,
     ExecutionPanelComponent,
+    SnapshotsPanelComponent,
   ],
   template: `
     <div class="app-shell">
@@ -78,6 +80,12 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
               </svg>
             </button>
           }
+          <button class="icon-btn" (click)="openSnapshots()" title="Снепшоты графа" aria-label="Снепшоты"
+                  [disabled]="!currentWorkflowIdValue()">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+              <path d="M13 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm7 6V3l-2.29 2.29A8.96 8.96 0 0 0 13 3v2a7 7 0 0 1 3.29.83L14 8h6z"/>
+            </svg>
+          </button>
           <button class="icon-btn" (click)="openModal('guide')" title="Пошаговая инструкция" aria-label="Гайд">
             <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/>
@@ -273,6 +281,20 @@ import { ExecutionPanelComponent } from '../../components/execution-panel/execut
           }
         }
       </section>
+
+      <!-- Snapshots Modal -->
+      <app-modal
+        [open]="modals().snapshots"
+        [title]="'Снепшоты графа'"
+        [wide]="true"
+        (close)="closeModal('snapshots')">
+        @if (currentWorkflowIdValue()) {
+          <app-snapshots-panel
+            [workflowId]="currentWorkflowIdValue()!"
+            (restored)="onSnapshotRestored()">
+          </app-snapshots-panel>
+        }
+      </app-modal>
 
       <!-- Quick-start Guide Modal -->
       <app-modal
@@ -1328,6 +1350,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
 
   modals = signal({
     guide: false,
+    snapshots: false,
   });
 
   // Panel state
@@ -1591,8 +1614,12 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     }
   }
 
-  openModal(key: 'guide'): void {
+  openModal(key: 'guide' | 'snapshots'): void {
     this.modals.update(m => ({ ...m, [key]: true }));
+  }
+
+  openSnapshots(): void {
+    this.openModal('snapshots');
   }
 
   closeModal(key: string): void {
@@ -1600,6 +1627,35 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     if (key === 'guide' && isPlatformBrowser(this.platformId)) {
       try { localStorage.setItem(this.guideStorageKey, '1'); } catch { /* ignore */ }
     }
+  }
+
+  /**
+   * После успешного rollback бэкенд уже сделал новую ревизию и оповестил по WS,
+   * но опираться только на WS-эхо ненадёжно (например, при отключённом WS). Перезагружаем
+   * граф явно — это гарантированно синхронизирует UI.
+   */
+  onSnapshotRestored(): void {
+    const id = this.currentWorkflowId();
+    if (!id) {
+      return;
+    }
+    this.facade.loadWorkflow(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: loaded => {
+          this.applyingWsUpdate = true;
+          this.workflowService.setNodes(loaded.nodes);
+          this.workflowService.setEdges(loaded.edges);
+          this.workflowService.setActiveNode(loaded.nodes[0]?.id ?? null);
+          this.workflowService.log('Граф восстановлен из снепшота');
+          setTimeout(() => { this.applyingWsUpdate = false; }, 0);
+          this.refreshTriggers();
+          this.closeModal('snapshots');
+        },
+        error: err => {
+          console.error('[editor] reload after restore failed', err);
+        },
+      });
   }
 
   private maybeShowGuide(): void {

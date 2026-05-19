@@ -7,4 +7,6 @@ databaseChangeLog:
       file: db/changelog/changes/003-restore-after-drop.yaml
   - include:
       file: db/changelog/changes/004-add-is-demo.yaml
+  - include:
+      file: db/changelog/changes/005-workflow-snapshots.yaml
 

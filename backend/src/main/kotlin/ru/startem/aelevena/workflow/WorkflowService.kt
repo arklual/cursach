@@ -15,6 +15,7 @@ import ru.startem.aelevena.api.dto.WorkflowCreateRequest
 import ru.startem.aelevena.api.dto.WorkflowGraph
 import ru.startem.aelevena.api.dto.WorkflowMeta
 import ru.startem.aelevena.api.dto.WorkflowMetaUpdate
+import ru.startem.aelevena.api.dto.WorkflowSnapshot
 import ru.startem.aelevena.api.dto.WorkflowVersion
 import ru.startem.aelevena.blob.BlobService
 import ru.startem.aelevena.triggers.TriggerService
@@ -25,6 +26,7 @@ import ru.startem.aelevena.workflow.model.NodeDataSkeleton
 import ru.startem.aelevena.workflow.model.NodeSkeleton
 import ru.startem.aelevena.workflow.model.PositionSkeleton
 import ru.startem.aelevena.workflow.persistence.WorkflowRevisionRepository
+import ru.startem.aelevena.workflow.persistence.WorkflowSnapshotRepository
 import ru.startem.aelevena.workflow.persistence.WorkflowVersionRepository
 import ru.startem.aelevena.workflow.persistence.WorkflowsRepository
 import java.nio.charset.StandardCharsets
@@ -37,6 +39,7 @@ class WorkflowService(
     private val workflows: WorkflowsRepository,
     private val revisions: WorkflowRevisionRepository,
     private val versions: WorkflowVersionRepository,
+    private val snapshots: WorkflowSnapshotRepository,
     private val blobService: BlobService,
     private val canonicalJson: CanonicalJson,
     private val objectMapper: ObjectMapper,
@@ -151,6 +154,82 @@ class WorkflowService(
         return materialized
     }
 
+    @Transactional
+    fun createSnapshot(workflowId: UUID, name: String, description: String?): WorkflowSnapshot {
+        val trimmedName = name.trim()
+        if (trimmedName.isEmpty()) {
+            throw BadRequestException("Snapshot name must not be blank")
+        }
+        val workflow = workflows.findById(workflowId) ?: throw NotFoundException("Workflow not found")
+        val versionId = workflow.currentVersionId
+            ?: versions.listByWorkflow(workflowId).firstOrNull()?.id
+            ?: throw NotFoundException("Workflow has no versions")
+        val version = versions.findById(versionId) ?: throw NotFoundException("Version not found")
+
+        val snapshotId = snapshots.insert(
+            workflowId = workflowId,
+            revisionId = version.rootRevisionId,
+            name = trimmedName,
+            description = description?.takeIf { it.isNotBlank() },
+        )
+        val row = snapshots.findById(snapshotId)
+            ?: throw IllegalStateException("Just inserted snapshot not found")
+        return row.toDto()
+    }
+
+    @Transactional(readOnly = true)
+    fun listSnapshots(workflowId: UUID): List<WorkflowSnapshot> {
+        if (workflows.findById(workflowId) == null) {
+            throw NotFoundException("Workflow not found")
+        }
+        return snapshots.listByWorkflow(workflowId).map { it.toDto() }
+    }
+
+    @Transactional
+    fun deleteSnapshot(workflowId: UUID, snapshotId: Long) {
+        if (workflows.findById(workflowId) == null) {
+            throw NotFoundException("Workflow not found")
+        }
+        val snapshot = snapshots.findById(snapshotId)
+            ?: throw NotFoundException("Snapshot not found")
+        if (snapshot.workflowId != workflowId) {
+            throw NotFoundException("Snapshot not found")
+        }
+        snapshots.delete(snapshotId)
+    }
+
+    @Transactional
+    fun restoreSnapshot(workflowId: UUID, snapshotId: Long): WorkflowGraph {
+        val workflow = workflows.findById(workflowId) ?: throw NotFoundException("Workflow not found")
+        val snapshot = snapshots.findById(snapshotId) ?: throw NotFoundException("Snapshot not found")
+        if (snapshot.workflowId != workflowId) {
+            throw NotFoundException("Snapshot not found")
+        }
+
+        val versionId = workflow.currentVersionId
+            ?: versions.listByWorkflow(workflowId).firstOrNull()?.id
+            ?: throw NotFoundException("Workflow has no versions")
+
+        val sourceRevision = revisions.findById(snapshot.revisionId)
+            ?: throw NotFoundException("Snapshot revision not found")
+        val skeleton = objectMapper.readValue(sourceRevision.graphSkeletonJson, GraphSkeleton::class.java)
+
+        // Restore = append-only ревизия с тем же graph_skeleton, чтобы история откатов сохранялась
+        // и triggers/runs не теряли ссылку на старые ревизии.
+        val newRevisionId = revisions.insert(
+            workflowId = workflowId,
+            revisionNumber = revisions.nextRevisionNumber(workflowId),
+            graphSkeletonJson = sourceRevision.graphSkeletonJson,
+        )
+        versions.updateRootRevision(versionId, newRevisionId)
+        workflows.touchUpdatedAt(workflowId)
+
+        val materialized = materializeGraph(versionId, skeleton)
+        triggerService.syncFromGraph(workflowId, materialized)
+        events.publishEvent(GraphUpdatedEvent(workflowId, materialized))
+        return materialized
+    }
+
     private fun validateGraph(graph: WorkflowGraph) {
         val nodeIds = graph.nodes.map { it.id }
         if (nodeIds.size != nodeIds.toSet().size) {
@@ -233,6 +312,15 @@ class WorkflowService(
             id = this.id.toString(),
             workflowId = this.workflowId.toString(),
             tag = this.versionTag,
+            createdAt = this.createdAt.toInstant().toString(),
+        )
+
+    private fun WorkflowSnapshotRepository.WorkflowSnapshotRow.toDto(): WorkflowSnapshot =
+        WorkflowSnapshot(
+            id = this.id.toString(),
+            workflowId = this.workflowId.toString(),
+            name = this.name,
+            description = this.description,
             createdAt = this.createdAt.toInstant().toString(),
         )
 }
