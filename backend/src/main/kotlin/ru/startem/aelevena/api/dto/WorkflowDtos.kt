@@ -69,3 +69,17 @@ data class Connection(
     val variant: String? = null,
 )
 
+data class WorkflowSnapshot(
+    val id: String,
+    val workflowId: String,
+    val name: String,
+    val description: String? = null,
+    val createdAt: String,
+)
+
+data class CreateSnapshotRequest(
+    @field:NotBlank
+    val name: String,
+    val description: String? = null,
+)
+

@@ -173,6 +173,90 @@ paths:
         '404':
           description: Версия workflow не найдена.
 
+  /workflows/{workflowId}/snapshots:
+    get:
+      tags: [Workflow Snapshots]
+      summary: Список снепшотов workflow
+      description: Возвращает все именованные снепшоты текущего workflow (новые сверху).
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '200':
+          description: Список снепшотов.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkflowSnapshot'
+        '404':
+          description: Workflow не найден.
+    post:
+      tags: [Workflow Snapshots]
+      summary: Создать снепшот текущего графа
+      description: Фиксирует текущую ревизию workflow под человекочитаемым именем — можно вернуться к ней позже.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSnapshotRequest'
+      responses:
+        '201':
+          description: Снепшот создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowSnapshot'
+        '404':
+          description: Workflow не найден.
+
+  /workflows/{workflowId}/snapshots/{snapshotId}:
+    delete:
+      tags: [Workflow Snapshots]
+      summary: Удалить снепшот
+      description: Удаляет снепшот. Сама ревизия графа остаётся в истории (на неё могут ссылаться runs).
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+        - name: snapshotId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Снепшот удалён.
+        '404':
+          description: Снепшот не найден.
+
+  /workflows/{workflowId}/snapshots/{snapshotId}/restore:
+    post:
+      tags: [Workflow Snapshots]
+      summary: Откатить workflow на состояние снепшота
+      description: >
+        Создаёт новую ревизию с графом из снепшота и делает её текущей. История не теряется —
+        откат сам становится точкой в истории, и старые runs продолжают ссылаться на свои ревизии.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+        - name: snapshotId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Граф восстановлен из снепшота.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowGraph'
+        '404':
+          description: Снепшот или workflow не найдены.
+
   /workflows/{workflowId}/triggers:
     get:
       tags: [Triggers]
@@ -465,6 +549,39 @@ components:
         createdAt:
           type: string
           description: Дата создания версии в ISO 8601.
+
+    WorkflowSnapshot:
+      type: object
+      description: Именованный снепшот графа workflow — точка восстановления поверх автосейва.
+      properties:
+        id:
+          type: string
+          description: Идентификатор снепшота.
+        workflowId:
+          type: string
+          description: Идентификатор связанного workflow.
+        name:
+          type: string
+          description: Человекочитаемое имя снепшота (например, "перед релизом v1.2").
+        description:
+          type: string
+          nullable: true
+          description: Опциональный комментарий.
+        createdAt:
+          type: string
+          description: Дата создания снепшота в ISO 8601.
+
+    CreateSnapshotRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: Имя снепшота (обязательное, не пустое).
+        description:
+          type: string
+          nullable: true
+          description: Опциональный комментарий.
 
     WorkflowGraph:
       type: object

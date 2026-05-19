@@ -164,6 +164,70 @@ class MvpIntegrationTests {
         assertNotNull(dto.durationMs)
     }
 
+    @Test
+    fun `snapshot captures current revision and restore appends new revision with same graph`() {
+        val created = workflowService.createWorkflow(ru.startem.aelevena.api.dto.WorkflowCreateRequest(name = "snap-test"))
+        val workflowId = UUID.fromString(created.meta.id)
+        val versionId = created.graph.versionId.toLong()
+
+        val v1 = WorkflowGraph(
+            versionId = versionId.toString(),
+            nodes = listOf(
+                Node(id = "n1", type = "stub", position = Position(0.0, 0.0), data = NodeData(label = "first"))
+            ),
+            connections = emptyList(),
+        )
+        workflowService.updateGraph(versionId, v1)
+
+        val snapshot = workflowService.createSnapshot(workflowId, "v1", "первая стабильная версия")
+        assertEquals("v1", snapshot.name)
+
+        val v2 = WorkflowGraph(
+            versionId = versionId.toString(),
+            nodes = listOf(
+                Node(id = "n1", type = "stub", position = Position(0.0, 0.0), data = NodeData(label = "first")),
+                Node(id = "n2", type = "stub", position = Position(10.0, 10.0), data = NodeData(label = "second")),
+            ),
+            connections = emptyList(),
+        )
+        workflowService.updateGraph(versionId, v2)
+        assertEquals(2, workflowService.getWorkflow(workflowId).graph.nodes.size)
+
+        val list = workflowService.listSnapshots(workflowId)
+        assertEquals(1, list.size)
+
+        val revCountBeforeRestore = jdbc.queryForObject(
+            "select count(*) from workflow_revision where workflow_id = :wid",
+            mapOf("wid" to workflowId),
+            Long::class.java,
+        ) ?: 0L
+
+        val restored = workflowService.restoreSnapshot(workflowId, snapshot.id.toLong())
+        assertEquals(1, restored.nodes.size)
+        assertEquals("n1", restored.nodes.first().id)
+
+        val revCountAfterRestore = jdbc.queryForObject(
+            "select count(*) from workflow_revision where workflow_id = :wid",
+            mapOf("wid" to workflowId),
+            Long::class.java,
+        ) ?: 0L
+        assertEquals(1L, revCountAfterRestore - revCountBeforeRestore)
+
+        val afterRestore = workflowService.getWorkflow(workflowId)
+        assertEquals(1, afterRestore.graph.nodes.size)
+    }
+
+    @Test
+    fun `delete snapshot removes it from the list`() {
+        val created = workflowService.createWorkflow(ru.startem.aelevena.api.dto.WorkflowCreateRequest(name = "snap-delete"))
+        val workflowId = UUID.fromString(created.meta.id)
+        val snap = workflowService.createSnapshot(workflowId, "to-delete", null)
+        assertEquals(1, workflowService.listSnapshots(workflowId).size)
+
+        workflowService.deleteSnapshot(workflowId, snap.id.toLong())
+        assertEquals(0, workflowService.listSnapshots(workflowId).size)
+    }
+
     private fun waitUntilFinished(runId: Long, timeout: Duration): WorkflowRunRepository.WorkflowRunRow {
         val deadline = System.currentTimeMillis() + timeout.toMillis()
         while (System.currentTimeMillis() < deadline) {
