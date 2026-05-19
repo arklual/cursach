@@ -112,6 +112,32 @@ jobs:
           scp deploy/docker-compose.prod.yml \
               "${VPS_USER}@${VPS_HOST}:/opt/kursach/docker-compose.prod.yml"
 
+      # Кладём htpasswd ДО подъёма нового образа: новый nginx требует
+      # /etc/nginx/.htpasswd и без него крашится на старте.
+      # Креды живут в GitHub Secrets, на сервер уезжает только bcrypt-хэш.
+      - name: Generate and upload htpasswd for basic auth
+        env:
+          BASIC_AUTH_USER: ${{ secrets.FRONTEND_BASIC_AUTH_USER }}
+          BASIC_AUTH_PASS: ${{ secrets.FRONTEND_BASIC_AUTH_PASSWORD }}
+        run: |
+          if [ -z "$BASIC_AUTH_USER" ] || [ -z "$BASIC_AUTH_PASS" ]; then
+            echo "::error::FRONTEND_BASIC_AUTH_USER / FRONTEND_BASIC_AUTH_PASSWORD secrets must be set"
+            exit 1
+          fi
+          # -B bcrypt, -b пароль из CLI, -n печатать в stdout (без записи в файл).
+          docker run --rm --entrypoint htpasswd httpd:alpine \
+              -Bbn "$BASIC_AUTH_USER" "$BASIC_AUTH_PASS" > htpasswd.tmp
+          # Sanity check: непустая строка вида "user:$2y$..."
+          if ! grep -q ':\$2[aby]\$' htpasswd.tmp; then
+            echo "::error::htpasswd generation failed (unexpected output)"
+            exit 1
+          fi
+          scp htpasswd.tmp "${VPS_USER}@${VPS_HOST}:/opt/kursach/.htpasswd.new"
+          ssh "${VPS_USER}@${VPS_HOST}" \
+              "chmod 600 /opt/kursach/.htpasswd.new && \
+               mv /opt/kursach/.htpasswd.new /opt/kursach/.htpasswd"
+          rm -f htpasswd.tmp
+
       - name: Login server's Docker to GHCR
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -127,9 +153,29 @@ jobs:
                docker compose -f docker-compose.prod.yml --env-file .env up -d frontend && \
                docker image prune -f"
 
-      - name: Smoke test frontend
+      - name: Smoke test frontend (с basic auth)
+        env:
+          BASIC_AUTH_USER: ${{ secrets.FRONTEND_BASIC_AUTH_USER }}
+          BASIC_AUTH_PASS: ${{ secrets.FRONTEND_BASIC_AUTH_PASSWORD }}
         run: |
           sleep 5
-          curl --fail --retry 6 --retry-delay 3 -k \
-               "https://${VPS_HOST}/" \
-            || (echo "Health check failed" && exit 1)
+          # 1. Без креды должен быть 401 — иначе auth не работает.
+          code_no_auth=$(curl -sk -o /dev/null -w "%{http_code}" "https://${VPS_HOST}/")
+          if [ "$code_no_auth" != "401" ]; then
+            echo "::error::Expected 401 without credentials, got $code_no_auth — basic auth not enforced"
+            exit 1
+          fi
+          # 2. С кредами должен быть 200.
+          curl --fail --retry 6 --retry-delay 3 -sk \
+               -u "${BASIC_AUTH_USER}:${BASIC_AUTH_PASS}" \
+               "https://${VPS_HOST}/" -o /dev/null \
+            || (echo "Authenticated health check failed" && exit 1)
+          # 3. Webhook должен оставаться открытым (любой статус, кроме 401, нас устраивает —
+          #    реальный токен мы не знаем, 404 от бэка ожидаем).
+          code_webhook=$(curl -sk -o /dev/null -w "%{http_code}" \
+                              -X POST "https://${VPS_HOST}/v1/webhook/ci-smoke-$(date +%s)")
+          if [ "$code_webhook" = "401" ]; then
+            echo "::error::Webhook endpoint got 401 — it must be public"
+            exit 1
+          fi
+          echo "Smoke OK: /=401 без креды, /=200 с кредой, /v1/webhook/...=$code_webhook"
