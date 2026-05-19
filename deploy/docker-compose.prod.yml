@@ -110,9 +110,6 @@ services:
     volumes:
       - ${SSL_CERT_PATH:-/opt/kursach/ssl/tls.crt}:/etc/nginx/ssl/tls.crt:ro
       - ${SSL_KEY_PATH:-/opt/kursach/ssl/tls.key}:/etc/nginx/ssl/tls.key:ro
-      # Basic auth для фронта. Файл создаётся вручную на хосте, см. install-server.sh.
-      # Без него nginx упадёт — это намеренно, чтобы не задеплоить открытый фронт.
-      - ${HTPASSWD_PATH:-/opt/kursach/.htpasswd}:/etc/nginx/.htpasswd:ro
 
 volumes:
   postgres-data:
