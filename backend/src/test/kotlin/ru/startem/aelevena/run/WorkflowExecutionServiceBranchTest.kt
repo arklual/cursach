@@ -236,6 +236,54 @@ class WorkflowExecutionServiceBranchTest {
         }
     }
 
+    @Test
+    fun `saveGraph бросает 400 если split edge без variant`() {
+        val created = workflowService.createWorkflow(WorkflowCreateRequest(name = "validation-no-variant-${UUID.randomUUID()}"))
+        val versionId = created.graph.versionId.toLong()
+        val graph = WorkflowGraph(
+            versionId = versionId.toString(),
+            nodes = listOf(
+                Node(
+                    id = "split", type = "branch.split", position = Position(0.0, 0.0),
+                    data = NodeData(
+                        label = "S", config = objectMapper.readTree(
+                            """{"mode":"split","strategy":"random","variants":[{"key":"A","label":"A","weight":100}]}"""
+                        )
+                    )
+                ),
+                Node(
+                    id = "pass", type = "dataflow.foreach", position = Position(100.0, 0.0),
+                    data = NodeData(label = "P", config = null)
+                ),
+            ),
+            connections = listOf(
+                Connection(id = "e1", source = "split", target = "pass"),  // нет variant
+            )
+        )
+        org.junit.jupiter.api.assertThrows<Exception> { workflowService.updateGraph(versionId, graph) }
+    }
+
+    @Test
+    fun `saveGraph бросает 400 если hash без userIdField`() {
+        val created = workflowService.createWorkflow(WorkflowCreateRequest(name = "validation-no-uid-${UUID.randomUUID()}"))
+        val versionId = created.graph.versionId.toLong()
+        val graph = WorkflowGraph(
+            versionId = versionId.toString(),
+            nodes = listOf(
+                Node(
+                    id = "split", type = "branch.split", position = Position(0.0, 0.0),
+                    data = NodeData(
+                        label = "S", config = objectMapper.readTree(
+                            """{"mode":"split","strategy":"hash","variants":[{"key":"A","label":"A","weight":100}]}"""
+                        )
+                    )
+                ),
+            ),
+            connections = emptyList()
+        )
+        org.junit.jupiter.api.assertThrows<Exception> { workflowService.updateGraph(versionId, graph) }
+    }
+
     private fun waitUntilFinished(runId: Long, timeout: Duration): WorkflowRunRepository.WorkflowRunRow {
         val deadline = System.currentTimeMillis() + timeout.toMillis()
         while (System.currentTimeMillis() < deadline) {
