@@ -16,6 +16,7 @@ import { finalize } from 'rxjs/operators';
 import { RunApiService } from '../../core/api/run.api';
 import type { NodeRun, WorkflowRun } from '../../core/api/api.models';
 import { prettyOutput } from '../../core/pretty-output';
+import { ExecutionService } from '../../services/execution.service';
 
 type RunStatus = 'queued' | 'running' | 'success' | 'failed' | 'unknown';
 
@@ -157,6 +158,7 @@ const TERMINAL: ReadonlySet<RunStatus> = new Set(['success', 'failed']);
 })
 export class RunsPanelComponent implements OnInit {
     private readonly runApi = inject(RunApiService);
+    private readonly executionService = inject(ExecutionService);
     private readonly destroyRef = inject(DestroyRef);
 
     readonly workflowId = input.required<string>();
@@ -225,6 +227,15 @@ export class RunsPanelComponent implements OnInit {
 
     selectRun(runId: string): void {
         this.selectedRunId.set(runId);
+
+        // Применяем выбранный run в ExecutionService → канвас покрасит ноды
+        // success/error, инспектор (вкладка «Результаты») покажет input/output
+        // выбранной ноды.
+        const cached = this.runs().find(r => r.id === runId);
+        if (cached) {
+            this.executionService.setExecutionFromRun(cached);
+        }
+
         this.pollSub?.unsubscribe();
         this.pollSub = interval(1500).pipe(
             switchMap(() => this.runApi.get(runId)),
@@ -233,6 +244,10 @@ export class RunsPanelComponent implements OnInit {
         ).subscribe({
             next: run => {
                 this.runs.update(list => list.map(r => (r.id === run.id ? run : r)));
+                // Для живого запуска синхронизируем подсветку на каждом тике.
+                if (this.selectedRunId() === run.id) {
+                    this.executionService.setExecutionFromRun(run);
+                }
             },
             error: err => console.error('run polling failed', err),
         });

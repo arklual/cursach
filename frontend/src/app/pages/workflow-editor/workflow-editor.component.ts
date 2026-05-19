@@ -48,7 +48,10 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
           <div class="workflow-info">
             <input
               class="workflow-name-input"
+              [class.is-readonly]="isMobile()"
               [value]="workflowMeta()?.name || 'Workflow'"
+              [readonly]="isMobile()"
+              [title]="isMobile() ? 'Переименование доступно на компьютере' : ''"
               (blur)="updateWorkflowName($event)"
               (keydown.enter)="$any($event.target).blur()">
           </div>
@@ -134,6 +137,25 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
                   <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
                 </svg>
               }
+            </button>
+          </div>
+        }
+
+        @if (isDebugMode()) {
+          <div class="debug-banner" role="status">
+            <span class="debug-banner-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M12 2a4 4 0 014 4v1.07A6 6 0 0118 13v1h2v2h-2.05a6 6 0 01-11.9 0H4v-2h2v-1a6 6 0 012-4.93V6a4 4 0 014-4zm0 2a2 2 0 00-2 2v1h4V6a2 2 0 00-2-2z"/>
+              </svg>
+            </span>
+            <div class="debug-banner-text">
+              <strong>Просмотр запуска</strong>
+              <span class="debug-banner-meta">
+                {{ debugRunLabel() }} · клик по ноде покажет input/output справа
+              </span>
+            </div>
+            <button type="button" class="debug-banner-exit" (click)="exitDebugMode()">
+              Вернуться к редактированию
             </button>
           </div>
         }
@@ -1651,6 +1673,37 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   executionProgress = signal<number>(0);
   isExecuting = signal(false);
 
+  /**
+   * Дебаг-режим: в редактор подгружен исторический run (из панели «Запуски»),
+   * текущего активного исполнения нет. Канвас красит ноды по статусам выбранного
+   * запуска, инспектор показывает зафиксированный input/output.
+   */
+  readonly isDebugMode = computed(() => {
+    const exec = this.executionService.execution();
+    return !!exec && !this.executionService.executing();
+  });
+
+  /** Короткая метка выбранного запуска для баннера: «#abc1234 · 19.05 14:30 · success». */
+  readonly debugRunLabel = computed(() => {
+    const exec = this.executionService.execution();
+    if (!exec) return '';
+    const idShort = exec.id ? `#${exec.id.slice(0, 7)}` : '#—';
+    const when = exec.startedAt
+      ? new Date(exec.startedAt).toLocaleString('ru-RU', {
+          day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+        })
+      : '';
+    const parts = [idShort];
+    if (when) parts.push(when);
+    if (exec.status) parts.push(exec.status);
+    return parts.join(' · ');
+  });
+
+  exitDebugMode(): void {
+    this.executionService.clearExecution();
+    this.inspectorTab.set('config');
+  }
+
   // Effect для отслеживания исполнения
   constructor() {
     // Сохраняем граф через 500ms после ЛЮБОГО изменения nodes/edges. Это надёжнее, чем
@@ -1701,9 +1754,13 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
       const isRunning = Object.values(statuses).some(s => s === 'running');
       this.isExecuting.set(isRunning);
 
-      // Автопереключение на "Результаты" в начале запуска, чтобы было видно живой I/O.
-      // Делаем это только когда пользователь стоит на "Конфиг" — иначе уважаем его выбор.
-      if (isRunning && this.inspectorTab() === 'config') {
+      // Автопереключение на "Результаты":
+      //   1) в начале живого запуска — чтобы видеть live I/O;
+      //   2) при выборе исторического запуска (есть execution, но никто не running) —
+      //      чтобы клик по ноде сразу показал её зафиксированный input/output.
+      // Уважаем выбор пользователя: переключаем только если он сейчас на «Конфиг».
+      const hasExecution = !!this.executionService.execution();
+      if ((isRunning || hasExecution) && this.inspectorTab() === 'config') {
         this.inspectorTab.set('results');
       }
 
@@ -2121,6 +2178,13 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     // Делаем выбранную ноду "целью" для вкладки результатов, даже если запуска ещё не было —
     // вкладка отрисует empty-state, но при появлении данных сразу покажет их без второго клика.
     this.selectedExecutionNodeId.set(nodeId);
+    // На мобильном инспектор скрыт за drawer'ом — открываем его автоматически при выборе ноды,
+    // иначе тап по ноде воспринимался бы как «ничего не произошло».
+    if (this.isMobile()) {
+      this.mobilePaletteOpen.set(false);
+      this.mobileRunOpen.set(false);
+      this.mobileInspectorOpen.set(true);
+    }
   }
 
   executeWorkflow(): void {

@@ -13,10 +13,20 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
   standalone: true,
   imports: [CommonModule, FormsModule, BranchSplitInspectorComponent, BranchMergeInspectorComponent],
   template: `
-    <aside class="inspector">
-      <h2>Inspector</h2>
+    <aside class="inspector" [class.is-readonly]="readOnly()">
+      <div class="inspector-head">
+        <h2>Inspector</h2>
+        @if (readOnly()) {
+          <span class="readonly-badge" title="С телефона недоступно редактирование. Откройте на компьютере, чтобы менять конфигурацию нод.">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12" aria-hidden="true">
+              <path d="M12 17a2 2 0 100-4 2 2 0 000 4zm6-7h-1V8a5 5 0 10-10 0v2H6a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2v-8a2 2 0 00-2-2zM9 8a3 3 0 016 0v2H9V8z"/>
+            </svg>
+            Просмотр
+          </span>
+        }
+      </div>
       @if (activeNode(); as node) {
-        <div class="inspector-content">
+        <fieldset class="inspector-content" [disabled]="readOnly()">
           @if (node.data.purpose) {
             <section class="doc-section">
               <header class="doc-header">Что эта нода делает</header>
@@ -320,7 +330,7 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
               <button class="ghost danger" (click)="deleteNode(node.id)">Удалить ноду</button>
             </div>
           }
-        </div>
+        </fieldset>
       } @else {
         <p>Выберите ноду для настройки.</p>
       }
@@ -356,11 +366,52 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
       margin: 0;
     }
 
+    .inspector-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .readonly-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+      color: var(--fg-muted);
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px 8px;
+      cursor: help;
+      user-select: none;
+    }
+
+    .readonly-badge svg { opacity: 0.7; }
+
     .inspector-content {
       display: flex;
       flex-direction: column;
       gap: 12px;
       min-width: 0;
+      /* reset native fieldset styles */
+      border: 0;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* When the outer fieldset is disabled, give a soft visual hint that the
+       config is view-only without making text unreadable. */
+    .inspector-content[disabled] :is(input, select, textarea, button) {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    .inspector-content[disabled] :is(input, select, textarea) {
+      background: var(--bg-secondary);
     }
 
     label {
