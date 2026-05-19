@@ -99,6 +99,94 @@ export class WorkflowValidatorService {
       }
     }
 
+    // Проверка 7: Правила Split/Merge (branch nodes)
+    const splitNodes = nodes.filter(n => n.data.kind === 'ab');
+    for (const split of splitNodes) {
+      const cfg = (split.data.config ?? {}) as {
+        mode?: string;
+        strategy?: string;
+        variants?: Array<{ key: string; weight: number }>;
+        userIdField?: string;
+        stratifyBy?: string;
+      };
+      const variants = cfg.variants ?? [];
+      const variantKeys = new Set(variants.map(v => v.key));
+      const outgoing = edges.filter(e => e.source === split.id);
+
+      for (const e of outgoing) {
+        if (!e.data?.variant) {
+          issues.push({
+            severity: 'error',
+            message: `Ребро от Split "${split.data.label}" не имеет variant`,
+            nodeId: split.id,
+            fix: 'Перетащите ребро из конкретной точки variant на Split-ноде',
+          });
+        } else if (!variantKeys.has(e.data.variant)) {
+          issues.push({
+            severity: 'error',
+            message: `variant "${e.data.variant}" не объявлен в Split "${split.data.label}"`,
+            nodeId: split.id,
+            fix: 'Добавьте variant с этим key или удалите ребро',
+          });
+        }
+      }
+
+      const totalWeight = variants.reduce((s, v) => s + (v.weight ?? 0), 0);
+      if (totalWeight <= 0 && variants.length > 0) {
+        issues.push({
+          severity: 'error',
+          message: `Сумма весов Split "${split.data.label}" должна быть > 0`,
+          nodeId: split.id,
+          fix: 'Установите ненулевые weight у вариантов',
+        });
+      }
+
+      const s = cfg.strategy ?? 'random';
+      const needsUserId = s === 'hash' || s === 'modulo' || s === 'stratified' || s === 'percentage';
+      if (needsUserId && !cfg.userIdField) {
+        issues.push({
+          severity: 'error',
+          message: `Стратегия "${s}" требует userIdField у Split "${split.data.label}"`,
+          nodeId: split.id,
+          fix: 'Заполните userIdField в инспекторе',
+        });
+      }
+      if (s === 'stratified' && !cfg.stratifyBy) {
+        issues.push({
+          severity: 'error',
+          message: `Стратегия stratified требует stratifyBy у Split "${split.data.label}"`,
+          nodeId: split.id,
+          fix: 'Заполните stratifyBy в инспекторе',
+        });
+      }
+
+      // Variants без исходящих рёбер
+      const usedKeys = new Set(outgoing.map(e => e.data?.variant).filter((v): v is string => !!v));
+      for (const v of variants) {
+        if (!usedKeys.has(v.key)) {
+          issues.push({
+            severity: 'warning',
+            message: `Variant "${v.key}" Split "${split.data.label}" без исходящего ребра`,
+            nodeId: split.id,
+            fix: 'Добавьте ребро от этого variant или удалите его',
+          });
+        }
+      }
+    }
+
+    const mergeNodes = nodes.filter(n => n.data.kind === 'join');
+    for (const m of mergeNodes) {
+      const incoming = edges.filter(e => e.target === m.id).length;
+      if (incoming === 1) {
+        issues.push({
+          severity: 'warning',
+          message: `Merge "${m.data.label}" имеет только один вход — эквивалентен passthrough`,
+          nodeId: m.id,
+          fix: 'Подключите как минимум 2 ветки или удалите Merge',
+        });
+      }
+    }
+
     return this.buildResult(issues);
   }
 
