@@ -31,18 +31,23 @@ class AbAnalyticsService(
 
         // 2) Variants из config (JsonNode). Если нет — дефолтный A/B 50/50.
         val cfg: JsonNode? = node.data?.config
-        val mode = cfg?.path("mode")?.asText("split").orDefault("split")
+        val mode = (cfg?.path("mode")?.asText("split") ?: "split").ifBlank { "split" }
         val configVariants: List<ConfigVariant> = parseConfigVariants(cfg)
 
         // 3) Сырые данные из БД.
         val rows = repo.findVariantRows(workflowId, abNodeId)
         val excludedDb = repo.countRunsWithoutAbNode(workflowId, abNodeId)
 
+        // Warnings собираем по ходу: до parseRows — про неизвестный mode, после — про unknown keys и выборку.
+        val warnings = mutableListOf<String>()
+        if (mode != "pick" && mode != "split") {
+            warnings.add("Неизвестный mode ab-ноды: '$mode' (ожидался 'pick' или 'split')")
+        }
+
         // 4) Парсинг output_json по mode → counters.
         val parsed = parseRows(rows, mode)
 
         // 5) Сборка строк ответа с агрегацией + stat-test.
-        val warnings = mutableListOf<String>()
         val totalTraffic = parsed.trafficCountsByVariant.values.sum().coerceAtLeast(1)
 
         val baselineKey = configVariants.firstOrNull()?.key
@@ -90,9 +95,6 @@ class AbAnalyticsService(
             warnings = warnings,
         )
     }
-
-    private fun String?.orDefault(default: String): String =
-        if (this.isNullOrBlank()) default else this
 
     private fun parseConfigVariants(cfg: JsonNode?): List<ConfigVariant> {
         val arr = cfg?.path("variants")
@@ -147,16 +149,15 @@ class AbAnalyticsService(
                     if (!variants.isObject) {
                         invalid++; continue
                     }
-                    var hadAny = false
                     variants.fieldNames().forEach { key ->
                         val arr = variants.path(key)
                         val n = if (arr.isArray) arr.size() else 0
                         if (n > 0) {
                             trafficBy.merge(key, n, Int::plus)
-                            hadAny = true
                         }
                     }
-                    if (!hadAny) invalid++
+                    // Валидный объект variants с нулём элементов — корректное split-наблюдение,
+                    // даже если все ветки пустые. invalid++ только для не-object payload (выше).
                 }
                 else -> {
                     invalid++
