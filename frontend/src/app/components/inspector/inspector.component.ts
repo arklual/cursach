@@ -6,11 +6,12 @@ import { WorkflowNode } from '../../models/workflow.model';
 import { environment } from '../../../environments/environment';
 import type { Trigger } from '../../core/api/trigger.api';
 import { BranchSplitInspectorComponent } from './branch-split-inspector.component';
+import { BranchMergeInspectorComponent } from './branch-merge-inspector.component';
 
 @Component({
   selector: 'app-inspector',
   standalone: true,
-  imports: [CommonModule, FormsModule, BranchSplitInspectorComponent],
+  imports: [CommonModule, FormsModule, BranchSplitInspectorComponent, BranchMergeInspectorComponent],
   template: `
     <aside class="inspector">
       <h2>Inspector</h2>
@@ -306,6 +307,12 @@ import { BranchSplitInspectorComponent } from './branch-split-inspector.componen
                 [node]="activeNode()!"
                 (configChange)="onSplitConfigChange($event)">
             </app-branch-split-inspector>
+          }
+          @if (activeNode()?.data?.kind === 'join') {
+            <app-branch-merge-inspector
+                [node]="activeNode()!"
+                (configChange)="onSplitConfigChange($event)">
+            </app-branch-merge-inspector>
           }
 
           <div class="actions-row">
