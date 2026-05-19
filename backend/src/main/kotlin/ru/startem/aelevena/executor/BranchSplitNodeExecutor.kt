@@ -126,6 +126,10 @@ class BranchSplitNodeExecutor(
         if (keys.size == 1) {
             return inputs.get(keys[0])
         }
+        // Когда нет upstream-нод (inputs пуст), используем runInput если есть
+        if (keys.isEmpty() && input.has("runInput")) {
+            return input.get("runInput")
+        }
         return input
     }
 

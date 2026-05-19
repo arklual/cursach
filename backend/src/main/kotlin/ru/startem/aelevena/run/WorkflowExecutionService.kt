@@ -127,10 +127,28 @@ class WorkflowExecutionService(
             val ready = CompletableFuture.allOf(*depFutures)
 
             val f = ready.thenApplyAsync({
-                val node = nodeById.getValue(nodeId)
                 val nodeRunId = nodeRunIds.getValue(nodeId)
 
-                val inputNode = buildNodeInput(run.inputJson, incomingEdges, outputs, skippedSet)
+                val liveIncoming = incomingEdges.filter { edge ->
+                    if (skippedSet.contains(edge.source)) {
+                        return@filter false
+                    }
+                    val up = outputs[edge.source]
+                    val isPickMismatch = up != null
+                        && SplitEnvelope.isPickEnvelope(up)
+                        && edge.variant != null
+                        && SplitEnvelope.pickChosen(up) != edge.variant
+                    !isPickMismatch
+                }
+
+                if (incomingEdges.isNotEmpty() && liveIncoming.isEmpty()) {
+                    skippedSet.add(nodeId)
+                    nodeRuns.markSkipped(nodeRunId, "Branch not selected")
+                    return@thenApplyAsync NullNode.instance as JsonNode
+                }
+
+                val node = nodeById.getValue(nodeId)
+                val inputNode = buildNodeInput(run.inputJson, liveIncoming, outputs, skippedSet)
                 started.add(nodeId)
                 nodeRuns.markRunning(nodeRunId, objectMapper.writeValueAsString(inputNode))
 
@@ -143,7 +161,7 @@ class WorkflowExecutionService(
                 nodeRuns.markSuccess(nodeRunId, objectMapper.writeValueAsString(out))
                 out
             }, workflowExecutor).whenComplete { _, ex ->
-                if (ex != null) {
+                if (ex != null && !skippedSet.contains(nodeId)) {
                     val nodeRunId = nodeRunIds.getValue(nodeId)
                     if (started.contains(nodeId)) {
                         nodeRuns.markFailed(nodeRunId, rootMessage(ex))
