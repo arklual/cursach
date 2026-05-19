@@ -192,9 +192,10 @@ class WorkflowService(
                 }
 
                 // Each outgoing edge of split must have variant from variants[].key
+                // (fallback к sourceHandle для совместимости со старым фронт-маппером)
                 val outgoing = graph.connections.filter { it.source == node.id }
                 for (e in outgoing) {
-                    val v = e.variant
+                    val v = e.variant ?: e.sourceHandle
                     if (v == null) {
                         throw BadRequestException("Edge ${e.id} from branch.split '${node.id}' missing variant")
                     }
@@ -228,7 +229,7 @@ class WorkflowService(
                 target = c.target,
                 sourceHandle = c.sourceHandle,
                 targetHandle = c.targetHandle,
-                variant = c.variant,
+                variant = c.variant ?: c.sourceHandle,
             )
         }
 
