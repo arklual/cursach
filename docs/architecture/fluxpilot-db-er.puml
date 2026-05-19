@@ -1,0 +1,127 @@
+@startuml fluxpilot-db-er
+skinparam backgroundColor #FFFFFF
+skinparam roundCorner 4
+skinparam shadowing false
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 11
+skinparam linetype ortho
+
+skinparam class {
+    BorderColor #2E5C8A
+    BackgroundColor #DCE9F5
+    HeaderBackgroundColor #2E5C8A
+    HeaderFontColor #FFFFFF
+    FontColor #1A1A1A
+    ArrowColor #404040
+    AttributeFontColor #1A1A1A
+}
+
+title Схема реляционной базы данных (PostgreSQL 16)
+
+entity "workflows" as workflows {
+    * id : UUID <<PK>>
+    --
+    name : varchar
+    description : text
+    current_version_id : bigint <<FK>>
+    is_demo : boolean
+    created_at : timestamptz
+    updated_at : timestamptz
+}
+
+entity "workflow_revision" as revision {
+    * id : bigserial <<PK>>
+    --
+    workflow_id : UUID <<FK>>
+    revision_number : int
+    graph_skeleton : jsonb
+    created_at : timestamptz
+    --
+    UNIQUE (workflow_id, revision_number)
+}
+
+entity "workflow_version" as version {
+    * id : bigserial <<PK>>
+    --
+    workflow_id : UUID <<FK>>
+    root_revision_id : bigint <<FK>>
+    version_tag : varchar
+    created_at : timestamptz
+}
+
+entity "workflow_snapshot" as snapshot {
+    * id : bigserial <<PK>>
+    --
+    workflow_id : UUID <<FK>>
+    revision_id : bigint <<FK>>
+    name : varchar
+    description : text
+    created_at : timestamptz
+}
+
+entity "workflow_run" as wrun {
+    * id : bigserial <<PK>>
+    --
+    workflow_id : UUID <<FK>>
+    workflow_revision_id : bigint <<FK>>
+    status : varchar
+    trigger_type : varchar
+    started_at : timestamptz
+    finished_at : timestamptz
+    input : jsonb
+    output : jsonb
+}
+
+entity "node_run" as nrun {
+    * id : bigserial <<PK>>
+    --
+    workflow_run_id : bigint <<FK>>
+    node_id : varchar
+    node_type : varchar
+    status : varchar
+    config_hash : varchar
+    input_json : jsonb
+    output_json : jsonb
+    error_message : text
+}
+
+entity "triggers" as triggers {
+    * id : bigserial <<PK>>
+    --
+    workflow_id : UUID <<FK>>
+    type : varchar
+    config : jsonb
+    token : varchar <<UNIQUE>>
+    enabled : boolean
+    node_id : varchar
+}
+
+entity "blob_index" as blob {
+    * content_hash : varchar(64) <<PK>>
+    --
+    s3_key : varchar
+    size_bytes : bigint
+    created_at : timestamptz
+}
+
+workflows ||--o{ revision : "ON DELETE CASCADE"
+workflows ||--o{ version
+workflows ||--o{ snapshot
+workflows ||--o{ wrun : "ON DELETE CASCADE"
+workflows ||--o{ triggers
+
+revision ||--o{ version : "ON DELETE RESTRICT\n(защита версий)"
+revision ||--o{ snapshot
+revision ||--o{ wrun
+
+wrun ||--o{ nrun : "ON DELETE CASCADE"
+
+note bottom of blob
+    Контент-адресуемое хранение:
+    content_hash = SHA-256 от
+    канонизованного JSON конфига.
+    Хранится в MinIO под ключом blobs/{hash}.
+    node_run.config_hash ссылается на запись.
+end note
+
+@enduml

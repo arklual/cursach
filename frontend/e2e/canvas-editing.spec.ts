@@ -186,11 +186,19 @@ test.describe('Canvas editing', () => {
   });
 
   test('can connect trigger → http → filter in a valid chain', async ({ page, request }) => {
+    page.on('console', msg => {
+      const t = msg.text();
+      if (t.includes('[DEBUG')) console.log('PAGE>', t);
+    });
     await page.goto(`/workflow/${createdId}`);
     await dragPaletteNode(page, 'trigger', { x: 200, y: 200 });
     await dragPaletteNode(page, 'http', { x: 200, y: 320 });
     await dragPaletteNode(page, 'filter', { x: 200, y: 440 });
     await expect(page.locator('.node-wrap')).toHaveCount(3);
+
+    const httpOutBB = await page.locator('.node-wrap').nth(1).locator('.handle-out').boundingBox();
+    const filterInBB = await page.locator('.node-wrap').nth(2).locator('.handle-in').boundingBox();
+    console.log('PAGE> [BB] http.out=', httpOutBB, 'filter.in=', filterInBB);
 
     await connectNodes(page, 0, 1);
     await expect(page.locator('.edge-group')).toHaveCount(1);

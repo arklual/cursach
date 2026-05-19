@@ -1,0 +1,76 @@
+@startuml fluxpilot-workflow-execution
+skinparam backgroundColor #FFFFFF
+skinparam roundCorner 6
+skinparam shadowing false
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 11
+skinparam sequenceArrowThickness 1
+skinparam sequenceMessageAlign center
+
+skinparam sequence {
+    ParticipantBorderColor #2E5C8A
+    ParticipantBackgroundColor #DCE9F5
+    ParticipantFontColor #1A1A1A
+    LifeLineBorderColor #6C757D
+    ArrowColor #404040
+    ActorBorderColor #2E5C8A
+    ActorBackgroundColor #DCE9F5
+}
+
+title Алгоритм исполнения workflow-графа
+
+actor "Триггер\n(manual / cron / webhook)" as Trigger
+participant "RunEnqueueService" as Enqueue
+participant "WorkflowExecutionService" as Exec
+participant "WorkflowExecutor\nThreadPool (16)" as Pool
+database "PostgreSQL" as DB
+database "MinIO" as S3
+participant "NodeExecutorRegistry" as Reg
+participant "GraphBroadcastListener" as WS
+actor "Клиент\n(подписка на топик)" as Client
+
+Trigger -> Enqueue : enqueueRun(workflowId, input)
+Enqueue -> DB : INSERT workflow_run\n(status = pending)
+Enqueue --> Trigger : runId
+
+Enqueue -> Exec : RunEnqueuedEvent
+activate Exec
+Exec -> DB : SELECT graph_skeleton\nFROM workflow_revision
+
+Exec -> Exec : topologicalOrder(inDegree, outgoing)\n— алгоритм Кана
+
+alt граф ацикличен
+    Exec -> DB : INSERT node_run × N\n(status = queued)
+    Exec -> DB : UPDATE workflow_run\nSET status = running
+    Exec -> WS : workflow_started
+    WS --> Client : STOMP /topic/workflows/{id}/graph
+
+    loop по топологическому порядку
+        Exec -> Pool : allOf(deps).thenApplyAsync(execNode)
+        activate Pool
+        Pool -> S3 : getJsonTree(configHash)
+        S3 --> Pool : node config (JSON)
+        Pool -> Reg : execute(input, config)
+        Reg --> Pool : NodeRunResult
+
+        alt success
+            Pool -> DB : UPDATE node_run\nstatus = success, output
+            Pool -> WS : node_exited(success)
+        else failure
+            Pool -> DB : UPDATE node_run\nstatus = failed, error
+            Pool -> WS : node_exited(failed)
+            note right of Pool: потомки получают\nstatus = skipped\n(транзитивно)
+        end
+        deactivate Pool
+        WS --> Client : node_exited
+    end
+
+    Exec -> DB : UPDATE workflow_run\nstatus = success|failed
+    Exec -> WS : workflow_finished
+    WS --> Client : workflow_finished
+else обнаружен цикл
+    Exec -> DB : UPDATE workflow_run\nstatus = failed,\nerror = "Cycle detected"
+end
+deactivate Exec
+
+@enduml

@@ -1,0 +1,63 @@
+@startuml fluxpilot-c4-container
+skinparam backgroundColor #FFFFFF
+skinparam roundCorner 8
+skinparam shadowing false
+skinparam defaultFontName "Times New Roman"
+skinparam defaultFontSize 11
+skinparam ArrowColor #404040
+skinparam ArrowFontSize 9
+skinparam nodesep 35
+skinparam ranksep 30
+
+skinparam rectangle {
+    BorderColor #2E5C8A
+    BackgroundColor #DCE9F5
+    FontColor #1A1A1A
+}
+skinparam database {
+    BorderColor #2E5C8A
+    BackgroundColor #DCE9F5
+}
+skinparam cloud {
+    BorderColor #6C757D
+    BackgroundColor #F1F3F5
+}
+skinparam actor {
+    BorderColor #2E5C8A
+    BackgroundColor #DCE9F5
+}
+
+left to right direction
+
+actor "Пользователь" as User
+cloud "Внешние\nweb-системы" as Ext
+
+rectangle "Nginx\nTLS, reverse proxy\nfluxpilot.ru" as Nginx
+
+package "Серверная инфраструктура (Docker Compose)" {
+    rectangle "Frontend\nAngular 19.2 + TypeScript 5.6\nSPA на статическом бандле" as Front
+
+    rectangle "Backend\nKotlin 2.2 + Spring Boot 3.5.3 (JDK 24)\nREST /v1, WebSocket /v1/ws\nДвижок исполнения workflow\n(модульный монолит, 11 пакетов;\nпул потоков WorkflowExecutor = 16)" as Back
+
+    database "PostgreSQL 16\nmetadata, graph_skeleton (jsonb)\nworkflow_run, node_run\ntriggers, blob_index" as PG
+
+    database "MinIO\nobject storage\ncontent-addressed (SHA-256)\nbucket: a11a-blobs" as S3
+
+    rectangle "docker-socket-proxy" as Proxy
+}
+
+rectangle "Docker daemon (host)" as Docker
+rectangle "Sandbox containers\npython:3.11-slim / node:20-alpine\n--network none --read-only\n--memory 256m --cpus 1\n--cap-drop ALL" as Sandbox
+
+User --> Nginx : HTTPS (браузер)
+Ext --> Nginx : POST /v1/webhook/\n{token}
+Nginx --> Front : статика
+Nginx --> Back : /v1/* (REST + WS)
+Front --> Back : REST + STOMP/SockJS
+Back --> PG : JDBC, Liquibase
+Back --> S3 : AWS SDK v2
+Back --> Proxy : Docker API\n(unix socket)
+Proxy --> Docker : ограниченный API
+Docker --> Sandbox : docker run --rm
+
+@enduml
