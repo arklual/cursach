@@ -325,6 +325,13 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
     </aside>
   `,
   styles: [`
+    :host {
+      display: block;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+    }
+
     .inspector {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -334,8 +341,13 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
       flex-direction: column;
       gap: 12px;
       height: 100%;
+      width: 100%;
       min-height: 0;
-      overflow: auto;
+      min-width: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      box-sizing: border-box;
+      overscroll-behavior: contain;
     }
 
     .inspector h2 {
@@ -346,6 +358,7 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
       display: flex;
       flex-direction: column;
       gap: 12px;
+      min-width: 0;
     }
 
     label {
@@ -353,14 +366,23 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
       flex-direction: column;
       font-size: 12px;
       gap: 4px;
+      min-width: 0;
     }
 
     input, select, textarea {
+      width: 100%;
+      min-width: 0;
+      max-width: 100%;
       border-radius: 8px;
       border: 1px solid var(--border);
       padding: 6px 8px;
       font-family: inherit;
       font-size: 13px;
+      box-sizing: border-box;
+    }
+
+    textarea {
+      resize: vertical;
     }
 
     textarea.mono, input.mono {
@@ -376,6 +398,7 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
       flex-direction: column;
       gap: 8px;
       margin: 0;
+      min-width: 0;
     }
 
     .doc-section {
@@ -386,6 +409,7 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
       display: flex;
       flex-direction: column;
       gap: 4px;
+      min-width: 0;
     }
 
     .doc-header {

@@ -109,7 +109,8 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
                      (mousedown)="startDrawEdge($event, node, 'target')"></div>
               }
 
-              <div class="node-content" [style.borderColor]="node.data.color + '55'">
+              <div class="node-content" [style.borderColor]="node.data.color + '55'"
+                   [style.minHeight.px]="node.data.kind === 'ab' ? getAbMinHeight(node) : null">
                 <div class="node-header" [style.background]="node.data.color + '20'">
                   <span class="node-kind">{{ formatKind(node) }}</span>
                   <span class="node-label">{{ node.data.label }}</span>
@@ -125,11 +126,11 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
               @if (node.data.kind === 'ab') {
                 @for (variant of getAbVariants(node); track variant.key; let i = $index) {
                   <div class="handle handle-out handle-variant"
-                       [style.top.%]="20 + i * 25"
+                       [style.top.px]="getAbHandleTop(i)"
                        [attr.data-variant]="variant.key"
                        [style.background-color]="getVariantColor(variant.key, i)"
                        (mousedown)="$event.stopPropagation(); startDrawEdge($event, node, 'source', variant.key)"
-                       [title]="'Variant ' + variant.key">
+                       [title]="'Variant ' + variant.key + (variant.label && variant.label !== variant.key ? ' — ' + variant.label : '')">
                     <span class="handle-label">{{ variant.key }}</span>
                   </div>
                 }
@@ -552,19 +553,21 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
     }
 
     .handle-variant {
-      width: 16px;
-      height: 16px;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
       border: 2px solid var(--bg-primary);
       cursor: crosshair;
-      z-index: 2;
       position: absolute;
-      right: -8px;
+      right: -9px;
+      top: auto;
       transform: translateY(-50%);
+      z-index: 11;
     }
 
     .handle-variant:hover {
-      transform: translateY(-50%) scale(1.3);
+      transform: translateY(-50%) scale(1.25);
+      z-index: 12;
     }
 
     .handle-label {
@@ -679,9 +682,29 @@ export class WorkflowCanvasComponent implements AfterViewInit {
   private readonly NODE_H = 70;
   private readonly HANDLE_RADIUS = 14;
 
-  private getNodeHeight(_node: WorkflowNode): number {
+  private getNodeHeight(node: WorkflowNode): number {
+    if (node.data.kind === 'ab') {
+      return this.getAbMinHeight(node);
+    }
     return this.NODE_H;
   }
+
+  /** Vertical offset (px from top of node-wrap) of variant handle #i. */
+  getAbHandleTop(i: number): number {
+    return this.AB_FIRST_HANDLE_OFFSET + i * this.AB_HANDLE_STRIDE;
+  }
+
+  /** Minimum height (px) of an ab node so all variant handles fit comfortably. */
+  getAbMinHeight(node: WorkflowNode): number {
+    const n = Math.max(2, this.getAbVariants(node).length);
+    // Last handle center + bottom padding
+    const lastCenter = this.AB_FIRST_HANDLE_OFFSET + (n - 1) * this.AB_HANDLE_STRIDE;
+    return Math.max(this.NODE_H, lastCenter + this.AB_BOTTOM_PADDING);
+  }
+
+  private readonly AB_FIRST_HANDLE_OFFSET = 42;
+  private readonly AB_HANDLE_STRIDE = 26;
+  private readonly AB_BOTTOM_PADDING = 16;
 
   formatKind(node: WorkflowNode): string {
     return node.data.__subtype ?? node.data.kind;

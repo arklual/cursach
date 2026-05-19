@@ -20,27 +20,70 @@ import { WorkflowService } from '../../services/workflow.service';
         </label>
 
         <h4>Источники → variant</h4>
-        <table class="sources">
-            <thead><tr><th>upstream node</th><th>variant</th></tr></thead>
-            <tbody>
-                @for (s of sources(); track s.depId) {
-                    <tr><td>{{ s.depId }}</td><td>{{ s.variant ?? '—' }}</td></tr>
-                }
-                @if (sources().length === 0) {
-                    <tr><td colspan="2" class="empty">нет входящих рёбер</td></tr>
-                }
-            </tbody>
-        </table>
+        <div class="sources-wrapper">
+            <table class="sources">
+                <thead><tr><th>upstream node</th><th>variant</th></tr></thead>
+                <tbody>
+                    @for (s of sources(); track s.depId) {
+                        <tr>
+                            <td [title]="s.depId">{{ s.depId }}</td>
+                            <td>{{ s.variant ?? '—' }}</td>
+                        </tr>
+                    }
+                    @if (sources().length === 0) {
+                        <tr><td colspan="2" class="empty">нет входящих рёбер</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     </section>
     `,
     styles: [`
-        .branch-merge-inspector { display: flex; flex-direction: column; gap: 8px; }
-        label { display: flex; flex-direction: column; font-size: 12px; }
+        :host { display: block; width: 100%; min-width: 0; }
+        .branch-merge-inspector {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+        }
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 12px;
+            min-width: 0;
+        }
         label.checkbox { flex-direction: row; align-items: center; gap: 8px; }
-        input[type="text"], input:not([type]) { padding: 4px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; }
-        table { width: 100%; font-size: 12px; border-collapse: collapse; }
-        th, td { text-align: left; padding: 4px; border-bottom: 1px solid var(--border); }
-        td.empty { text-align: center; color: var(--fg-muted); }
+        input[type="text"], input:not([type]) {
+            width: 100%;
+            min-width: 0;
+            padding: 4px 6px;
+            font-size: 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-secondary, transparent);
+            color: var(--fg-primary, inherit);
+            box-sizing: border-box;
+        }
+        .sources-wrapper {
+            width: 100%;
+            min-width: 0;
+            overflow-x: auto;
+        }
+        table { width: 100%; font-size: 12px; border-collapse: collapse; table-layout: fixed; }
+        th, td {
+            text-align: left;
+            padding: 4px;
+            border-bottom: 1px solid var(--border);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        th:first-child, td:first-child { width: 65%; }
+        th:last-child, td:last-child { width: 35%; }
+        td.empty { text-align: center; color: var(--fg-muted); white-space: normal; }
         h3 { margin: 0 0 8px; font-size: 14px; }
         h4 { margin: 8px 0 4px; font-size: 12px; color: var(--fg-secondary); }
     `]

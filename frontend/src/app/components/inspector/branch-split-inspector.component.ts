@@ -94,11 +94,57 @@ type SplitConfig = {
     </section>
     `,
     styles: [`
-        .branch-split-inspector { display: flex; flex-direction: column; gap: 8px; }
-        label { display: flex; flex-direction: column; font-size: 12px; }
-        .rule, .variant { display: grid; grid-template-columns: 1fr 1fr 80px 1fr 24px; gap: 4px; }
-        input, select { padding: 4px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; }
-        button { padding: 2px 8px; cursor: pointer; }
+        :host { display: block; width: 100%; min-width: 0; }
+        .branch-split-inspector {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+        }
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 12px;
+            min-width: 0;
+        }
+        .rules { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+        .rule {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 64px minmax(0, 1fr) 26px;
+            gap: 4px;
+            min-width: 0;
+        }
+        .variant {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) 56px 26px;
+            gap: 4px;
+            min-width: 0;
+        }
+        input, select {
+            width: 100%;
+            min-width: 0;
+            padding: 4px 6px;
+            font-size: 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--bg-secondary, transparent);
+            color: var(--fg-primary, inherit);
+            box-sizing: border-box;
+        }
+        button {
+            padding: 2px 6px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: transparent;
+            color: var(--fg-secondary);
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+        button:hover { background: var(--bg-secondary); color: var(--fg-primary); }
         h3 { margin: 0 0 8px; font-size: 14px; }
         h4 { margin: 8px 0 4px; font-size: 12px; color: var(--fg-secondary); }
     `]
