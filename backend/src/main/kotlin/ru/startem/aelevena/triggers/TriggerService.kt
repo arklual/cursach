@@ -152,6 +152,11 @@ class TriggerService(
             "cron" -> {
                 val cron = (config?.get("cron") ?: config?.get("expression"))?.asText()
                 if (cron.isNullOrBlank()) throw BadRequestException("cron trigger requires config.expression")
+                try {
+                    CronExpressions.normalize(cron)
+                } catch (ex: IllegalArgumentException) {
+                    throw BadRequestException(ex.message ?: "Invalid cron expression")
+                }
             }
 
             "interval" -> {

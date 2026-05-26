@@ -33,9 +33,14 @@ class TriggerScheduler(
             "cron" -> {
                 val cron = (config?.get("cron") ?: config?.get("expression"))?.asText()?.takeIf { it.isNotBlank() }
                     ?: throw BadRequestException("cron trigger requires config.expression")
+                val normalized = try {
+                    CronExpressions.normalize(cron)
+                } catch (ex: IllegalArgumentException) {
+                    throw BadRequestException(ex.message ?: "Invalid cron expression")
+                }
                 taskScheduler.schedule(
                     Runnable { fire(trigger) },
-                    CronTrigger(cron),
+                    CronTrigger(normalized),
                 )
             }
 

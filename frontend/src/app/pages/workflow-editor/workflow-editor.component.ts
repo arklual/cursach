@@ -19,6 +19,8 @@ import { WorkflowValidatorService, ValidationResult } from '../../services/workf
 import { ExecutionService } from '../../services/execution.service';
 import { ExecutionPanelComponent } from '../../components/execution-panel/execution-panel.component';
 import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapshots-panel.component';
+import { DebugPanelComponent } from '../../components/debug-panel/debug-panel.component';
+import { DebugSessionService } from '../../services/debug-session.service';
 
 @Component({
   selector: 'app-workflow-editor',
@@ -34,6 +36,7 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
     AnalyticsPanelComponent,
     ExecutionPanelComponent,
     SnapshotsPanelComponent,
+    DebugPanelComponent,
   ],
   template: `
     <div class="app-shell">
@@ -352,6 +355,18 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
               </svg>
               <span>Аналитика</span>
             </button>
+            <button class="tab" role="tab"
+                    [class.active]="!logPanelCollapsed() && bottomTab() === 'debug'"
+                    (click)="selectBottomTab('debug')"
+                    title="Пошаговая отладка: исполнение нод по одной с просмотром переменных">
+              <svg class="tab-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M20 8h-2.81a5.985 5.985 0 0 0-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63A5.985 5.985 0 0 0 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/>
+              </svg>
+              <span>Debug</span>
+              @if (debugSession.isActive()) {
+                <span class="tab-badge">●</span>
+              }
+            </button>
           </div>
           <div class="tab-actions">
             @if (!logPanelCollapsed() && bottomTab() === 'log' && workflowService.logs().length > 0) {
@@ -408,6 +423,17 @@ import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapsh
             <div class="bottom-content" [style.height.px]="logPanelHeight()">
               @if (currentWorkflowIdValue()) {
                 <app-analytics-panel [workflowId]="currentWorkflowIdValue()!"></app-analytics-panel>
+              }
+            </div>
+          } @else if (bottomTab() === 'debug') {
+            <div class="bottom-content" [style.height.px]="logPanelHeight()">
+              @if (currentWorkflowIdValue()) {
+                <app-debug-panel
+                  [workflowId]="currentWorkflowIdValue()!"
+                  (highlightChange)="onDebugHighlightChange($event)">
+                </app-debug-panel>
+              } @else {
+                <div class="empty-state">Сохраните workflow, чтобы запустить отладку.</div>
               }
             </div>
           }
@@ -1849,18 +1875,18 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
       const isRunning = Object.values(statuses).some(s => s === 'running');
       this.isExecuting.set(isRunning);
 
-      // Автопереключение на "Результаты":
-      //   1) в начале живого запуска — чтобы видеть live I/O;
-      //   2) при выборе исторического запуска (есть execution, но никто не running) —
-      //      чтобы клик по ноде сразу показал её зафиксированный input/output.
-      // Уважаем выбор пользователя: переключаем только если он сейчас на «Конфиг».
-      const hasExecution = !!this.executionService.execution();
-      if ((isRunning || hasExecution) && this.inspectorTab() === 'config') {
+      // Автопереключение на "Результаты" только во время ЖИВОГО запуска,
+      // чтобы пользователь видел live I/O. При открытии пайплайна со старым
+      // execution в стейте редактор должен оставаться в режиме конфигурации.
+      if (isRunning && this.inspectorTab() === 'config') {
         this.inspectorTab.set('results');
       }
 
-      // Автоматически показываем нижнюю панель после завершения
-      if (!isRunning && completed > 0) {
+      // Автоматически показываем нижнюю панель после завершения только если
+      // пользователь сам запустил пайп в этой сессии (isExecuting перешло
+      // false→true→false). Открытие готового пайплайна с историческим run
+      // не должно вытеснять режим редактирования.
+      if (!isRunning && completed > 0 && this.runStartedInSession) {
         setTimeout(() => {
           this.logPanelCollapsed.set(false);
         }, 500);
@@ -1872,7 +1898,8 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   readonly currentWorkflowIdValue = this.currentWorkflowId.asReadonly();
 
   /** Вкладка нижней панели: лог / запуски / триггеры. */
-  readonly bottomTab = signal<'log' | 'runs' | 'analytics'>('log');
+  readonly bottomTab = signal<'log' | 'runs' | 'analytics' | 'debug'>('log');
+  readonly debugSession = inject(DebugSessionService);
 
   modals = signal({
     guide: false,
@@ -1884,7 +1911,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   paletteWidth = signal(300);
   inspectorCollapsed = signal(false);
   inspectorWidth = signal(400);
-  logPanelCollapsed = signal(false);
+  logPanelCollapsed = signal(true);
   logPanelHeight = signal(180);
 
   // Mobile drawer state
@@ -1901,6 +1928,9 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   private resizeStartY = 0;
   private resizeStartValue = 0;
   private autoSaveInterval: ReturnType<typeof setInterval> | null = null;
+  /** True, если пользователь запустил пайплайн в текущей сессии редактора —
+   *  только тогда после завершения автоматически разворачиваем нижнюю панель. */
+  private runStartedInSession = false;
 
   mainGridColumns = computed(() => {
     if (this.isMobile()) {
@@ -2276,7 +2306,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   }
 
   /** Клик по табу нижней панели: переключает таб + раскрывает панель, если она была свёрнута. */
-  selectBottomTab(tab: 'log' | 'runs' | 'analytics'): void {
+  selectBottomTab(tab: 'log' | 'runs' | 'analytics' | 'debug'): void {
     if (this.logPanelCollapsed() && this.bottomTab() === tab) {
       this.logPanelCollapsed.set(false);
       return;
@@ -2323,6 +2353,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     this.executionStatus.set({});
     this.executionProgress.set(0);
     this.isExecuting.set(true);
+    this.runStartedInSession = true;
 
     this.executionService.executeWorkflow(workflowId, fromNodeId, input).subscribe({
       error: (err) => {
@@ -2339,6 +2370,17 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     this.executionStatus.set({});
     this.executionProgress.set(0);
     this.isExecuting.set(false);
+  }
+
+  /** Подсветка нод по debug-состоянию. Канвас рендерит их теми же цветами,
+   *  что и обычный run: pending (для ready) / success / skipped / error. */
+  onDebugHighlightChange(state: { ready: string[]; completed: string[]; skipped: string[]; failed: string[] }): void {
+    const status: Record<string, 'pending' | 'running' | 'success' | 'error' | 'skipped'> = {};
+    state.completed.forEach(id => { status[id] = 'success'; });
+    state.skipped.forEach(id => { status[id] = 'skipped'; });
+    state.failed.forEach(id => { status[id] = 'error'; });
+    state.ready.forEach(id => { if (!(id in status)) status[id] = 'pending'; });
+    this.executionStatus.set(status);
   }
 
   // Resize handlers

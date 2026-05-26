@@ -1,0 +1,280 @@
+package ru.startem.aelevena.run
+
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.node.NullNode
+import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Service
+import ru.startem.aelevena.api.BadRequestException
+import ru.startem.aelevena.api.NotFoundException
+import ru.startem.aelevena.api.dto.DebugFailedNode
+import ru.startem.aelevena.api.dto.DebugSessionDto
+import ru.startem.aelevena.blob.BlobService
+import ru.startem.aelevena.executor.NodeExecutorRegistry
+import ru.startem.aelevena.executor.SplitEnvelope
+import ru.startem.aelevena.workflow.model.ConnectionSkeleton
+import ru.startem.aelevena.workflow.model.GraphSkeleton
+import ru.startem.aelevena.workflow.model.NodeSkeleton
+import ru.startem.aelevena.workflow.persistence.WorkflowVersionRepository
+import ru.startem.aelevena.workflow.persistence.WorkflowRevisionRepository
+import ru.startem.aelevena.workflow.persistence.WorkflowsRepository
+import java.time.Instant
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
+
+/**
+ * Пошаговый отладчик пайплайнов. Сессия хранится в памяти, не пишется в `workflow_runs`
+ * (отладка — это интерактивная игра, а не "production run"). На каждый шаг — синхронно
+ * исполняем одну готовую ноду и возвращаем обновлённый снапшот переменных, чтобы фронт
+ * показал, что именно поменялось.
+ *
+ * Сессии живут до явного `close()` или TTL (см. [DebugSessionService.gc]).
+ */
+@Service
+class DebugSessionService(
+    private val workflows: WorkflowsRepository,
+    private val versions: WorkflowVersionRepository,
+    private val revisions: WorkflowRevisionRepository,
+    private val blobService: BlobService,
+    private val executors: NodeExecutorRegistry,
+    private val objectMapper: ObjectMapper,
+) {
+    private val log = LoggerFactory.getLogger(javaClass)
+    private val sessions = ConcurrentHashMap<String, Session>()
+
+    companion object {
+        /** TTL для незатронутых сессий — час. Защищает от утечек по забытым в браузере вкладкам. */
+        private const val TTL_MILLIS = 60L * 60_000L
+    }
+
+    fun start(workflowId: UUID, input: JsonNode?, startNodeId: String? = null): DebugSessionDto {
+        val workflow = workflows.findById(workflowId) ?: throw NotFoundException("Workflow not found")
+        val versionId = workflow.currentVersionId
+            ?: versions.listByWorkflow(workflowId).firstOrNull()?.id
+            ?: throw NotFoundException("Workflow has no versions")
+        val version = versions.findById(versionId) ?: throw NotFoundException("Version not found")
+        val revision = revisions.findById(version.rootRevisionId)
+            ?: throw NotFoundException("Revision not found")
+        val skeleton = objectMapper.readValue(revision.graphSkeletonJson, GraphSkeleton::class.java)
+
+        val reachable = reachableNodeIds(skeleton, startNodeId)
+        if (reachable.isEmpty()) {
+            throw BadRequestException("Workflow has no reachable nodes")
+        }
+
+        val session = Session(
+            sessionId = UUID.randomUUID().toString(),
+            workflowId = workflowId,
+            versionId = versionId,
+            skeleton = skeleton,
+            reachable = reachable,
+            input = input,
+        )
+        sessions[session.sessionId] = session
+        gc()
+        return session.toDto()
+    }
+
+    fun get(sessionId: String): DebugSessionDto {
+        val session = sessions[sessionId] ?: throw NotFoundException("Debug session not found")
+        return session.snapshotDto()
+    }
+
+    /**
+     * Шаг: один ready-узел исполняется синхронно. Если [nodeId] явно не указан — берём первый.
+     */
+    fun step(sessionId: String, nodeId: String? = null): DebugSessionDto {
+        val session = sessions[sessionId] ?: throw NotFoundException("Debug session not found")
+        session.lock.withLock {
+            val ready = session.computeReady()
+            if (ready.isEmpty()) {
+                return session.toDto()
+            }
+            val target = nodeId?.also { id ->
+                if (id !in ready) throw BadRequestException(
+                    "Node $id is not ready. Ready: $ready",
+                )
+            } ?: ready.first()
+            session.executeOne(target)
+            return session.toDto()
+        }
+    }
+
+    /**
+     * Дополнительный шаг: исполнить все оставшиеся ноды одну за другой. Полезно
+     * "доехать до конца" из текущего состояния отладки. Каждая нода — отдельная
+     * запись в outputs/completed.
+     */
+    fun runToEnd(sessionId: String, maxSteps: Int = 1000): DebugSessionDto {
+        val session = sessions[sessionId] ?: throw NotFoundException("Debug session not found")
+        session.lock.withLock {
+            var i = 0
+            while (i < maxSteps) {
+                val ready = session.computeReady()
+                if (ready.isEmpty()) break
+                session.executeOne(ready.first())
+                i++
+            }
+            return session.toDto()
+        }
+    }
+
+    fun close(sessionId: String) {
+        sessions.remove(sessionId)
+    }
+
+    private fun gc() {
+        val now = System.currentTimeMillis()
+        sessions.entries.removeIf { (_, s) -> now - s.updatedAtMs > TTL_MILLIS }
+    }
+
+    private fun reachableNodeIds(skeleton: GraphSkeleton, startNodeId: String?): Set<String> {
+        val all = skeleton.nodes.map { it.id }.toSet()
+        if (startNodeId == null) return all
+        if (startNodeId !in all) return emptySet()
+        val out = mutableMapOf<String, MutableSet<String>>()
+        all.forEach { out[it] = mutableSetOf() }
+        skeleton.connections.forEach { c ->
+            if (c.source in all && c.target in all) out.getValue(c.source).add(c.target)
+        }
+        val visited = mutableSetOf(startNodeId)
+        val q = ArrayDeque<String>().apply { add(startNodeId) }
+        while (q.isNotEmpty()) {
+            val cur = q.removeFirst()
+            out[cur].orEmpty().forEach { if (visited.add(it)) q.add(it) }
+        }
+        return visited
+    }
+
+    private inner class Session(
+        val sessionId: String,
+        val workflowId: UUID,
+        val versionId: Long,
+        val skeleton: GraphSkeleton,
+        val reachable: Set<String>,
+        val input: JsonNode?,
+    ) {
+        val lock = ReentrantLock()
+        val createdAt: Instant = Instant.now()
+        @Volatile var updatedAt: Instant = createdAt
+        val updatedAtMs: Long get() = updatedAt.toEpochMilli()
+
+        val outputs: MutableMap<String, JsonNode> = ConcurrentHashMap()
+        val completed: MutableSet<String> = ConcurrentHashMap.newKeySet()
+        val skipped: MutableSet<String> = ConcurrentHashMap.newKeySet()
+        val failed: MutableMap<String, String> = ConcurrentHashMap()
+
+        private val nodeById: Map<String, NodeSkeleton> = skeleton.nodes.associateBy { it.id }
+        private val incomingByNode: Map<String, List<ConnectionSkeleton>> = skeleton.nodes
+            .associate { node ->
+                node.id to skeleton.connections.filter {
+                    it.target == node.id && it.source in reachable && it.target in reachable
+                }
+            }
+
+        /** Готовые к исполнению ноды: все дедушки завершены, нода ещё не выполнена. */
+        fun computeReady(): List<String> {
+            if (failed.isNotEmpty()) return emptyList()
+            return reachable.filter { id ->
+                if (id in completed || id in skipped) return@filter false
+                val incoming = incomingByNode[id].orEmpty()
+                incoming.all { edge -> edge.source in completed || edge.source in skipped }
+            }
+        }
+
+        fun toDto(): DebugSessionDto {
+            val ready = computeReady()
+            val previews = ready.associateWith { nodeId ->
+                buildNodeInput(input, incomingByNode[nodeId].orEmpty(), outputs, skipped)
+            }
+            val status = when {
+                failed.isNotEmpty() -> "failed"
+                ready.isEmpty() -> "done"
+                completed.isEmpty() && skipped.isEmpty() -> "ready"
+                else -> "stepping"
+            }
+            return DebugSessionDto(
+                sessionId = sessionId,
+                workflowId = workflowId.toString(),
+                versionId = versionId.toString(),
+                status = status,
+                input = input,
+                outputs = outputs.toMap(),
+                completed = completed.toList().sorted(),
+                skipped = skipped.toList().sorted(),
+                failed = failed.entries.map { DebugFailedNode(it.key, it.value) },
+                ready = ready,
+                createdAt = createdAt,
+                updatedAt = updatedAt,
+                readyInputs = previews,
+            )
+        }
+
+        fun snapshotDto(): DebugSessionDto = toDto()
+
+        fun executeOne(nodeId: String) {
+            require(nodeId in reachable) { "Node $nodeId is not reachable in this debug session" }
+            val incoming = incomingByNode[nodeId].orEmpty()
+            val liveIncoming = incoming.filter { edge ->
+                if (edge.source in skipped) return@filter false
+                val up = outputs[edge.source]
+                val pickMismatch = up != null
+                    && SplitEnvelope.isPickEnvelope(up)
+                    && edge.variant != null
+                    && SplitEnvelope.pickChosen(up) != edge.variant
+                !pickMismatch
+            }
+            if (incoming.isNotEmpty() && liveIncoming.isEmpty()) {
+                skipped.add(nodeId)
+                updatedAt = Instant.now()
+                return
+            }
+            val node = nodeById.getValue(nodeId)
+            val inputNode = buildNodeInput(input, liveIncoming, outputs, skipped)
+            val config = node.data?.configHash?.let { blobService.getJsonTree(it) }
+            val executor = executors.get(node.type)
+                ?: throw BadRequestException("Unsupported node type: ${node.type}")
+            try {
+                val out = executor.execute(nodeId, config, inputNode)
+                outputs[nodeId] = out
+                completed.add(nodeId)
+            } catch (ex: Throwable) {
+                val msg = (ex.cause ?: ex).message ?: ex.toString()
+                failed[nodeId] = msg
+                log.warn("Debug session {} node {} failed: {}", sessionId, nodeId, msg)
+            } finally {
+                updatedAt = Instant.now()
+            }
+        }
+    }
+
+    private fun buildNodeInput(
+        runInput: JsonNode?,
+        incomingEdges: List<ConnectionSkeleton>,
+        outputs: Map<String, JsonNode>,
+        skipped: Set<String>,
+    ): JsonNode {
+        val root = objectMapper.createObjectNode()
+        root.set<JsonNode>("runInput", runInput ?: NullNode.instance)
+        val inputs = objectMapper.createObjectNode()
+        val inputVariants = objectMapper.createObjectNode()
+        for (edge in incomingEdges) {
+            if (edge.source in skipped) continue
+            val upstream = outputs[edge.source] ?: NullNode.instance
+            val delivered = SplitEnvelope.resolveForEdge(upstream, edge.variant)
+            inputs.set<JsonNode>(edge.source, delivered)
+            if (edge.variant != null) {
+                inputVariants.put(edge.source, edge.variant)
+            } else if (SplitEnvelope.isPickEnvelope(upstream)) {
+                SplitEnvelope.pickChosen(upstream)?.let { inputVariants.put(edge.source, it) }
+            }
+        }
+        root.set<JsonNode>("inputs", inputs)
+        if (inputVariants.size() > 0) {
+            root.set<JsonNode>("inputVariants", inputVariants)
+        }
+        return root
+    }
+}

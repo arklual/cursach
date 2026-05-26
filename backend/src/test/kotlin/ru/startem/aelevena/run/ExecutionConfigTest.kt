@@ -1,7 +1,10 @@
 package ru.startem.aelevena.run
 
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
@@ -24,16 +27,28 @@ class ExecutionConfigTest {
     }
 
     @Test
+    fun `nodeExecutor is a separate pool with own thread prefix`() {
+        val cfg = ExecutionConfig()
+        val node = cfg.nodeExecutor()
+        val orch = cfg.workflowExecutor()
+        try {
+            assertNotSame(node, orch, "node and orchestrator pools must be distinct")
+            val name = node.submit<String> { Thread.currentThread().name }.get(2, TimeUnit.SECONDS)
+            assertTrue(name.startsWith("node-exec-"), "name=$name")
+            val tpe = node as ThreadPoolExecutor
+            assertTrue(tpe.maximumPoolSize >= 16, "node pool max should be >= 16, was ${tpe.maximumPoolSize}")
+        } finally {
+            node.shutdownNow()
+            orch.shutdownNow()
+        }
+    }
+
+    @Test
     fun `uncaught exception handler logs without crashing the pool`() {
         val cfg = ExecutionConfig()
         val executor = cfg.workflowExecutor()
         try {
-            val t = Thread {
-                throw RuntimeException("boom")
-            }.apply { name = "workflow-exec-test" }
-            // Use the factory's handler indirectly: spawn a thread through the executor that throws.
             val future = executor.submit { throw RuntimeException("inside-task") }
-            // ExecutorService swallows the exception inside Future; cancel it to clean up.
             try {
                 future.get(1, TimeUnit.SECONDS)
             } catch (_: Exception) {
@@ -41,9 +56,47 @@ class ExecutionConfigTest {
             }
             // Executor must remain usable for further work.
             val pong = executor.submit<String> { "pong" }.get(1, TimeUnit.SECONDS)
-            assertTrue(pong == "pong")
+            assertEquals("pong", pong)
         } finally {
             executor.shutdownNow()
+        }
+    }
+
+    /**
+     * Regression: до правки orchestrator-поток сам блокировался на `.join()` ожидая ноды,
+     * для которых пулу уже не хватало слотов. Здесь моделируем то же — много "оркестраторов",
+     * каждый ждёт долгую "ноду". На разделённых пулах это уже не должно дедлочить.
+     */
+    @Test
+    fun `orchestrator pool does not deadlock when many tasks await nodeExecutor`() {
+        val cfg = ExecutionConfig(orchestratorPoolSize = 2)
+        val orch = cfg.workflowExecutor()
+        val node = cfg.nodeExecutor()
+        try {
+            val runs = 20
+            val nodeStarted = CountDownLatch(runs)
+            val allDone = CountDownLatch(runs)
+            repeat(runs) {
+                orch.submit {
+                    val f = java.util.concurrent.CompletableFuture.supplyAsync({
+                        nodeStarted.countDown()
+                        Thread.sleep(120)
+                        "ok"
+                    }, node)
+                    f.whenCompleteAsync({ _, _ -> allDone.countDown() }, orch)
+                }
+            }
+            assertTrue(
+                nodeStarted.await(10, TimeUnit.SECONDS),
+                "node-exec pool stalled: started=${runs - nodeStarted.count}/$runs",
+            )
+            assertTrue(
+                allDone.await(10, TimeUnit.SECONDS),
+                "finalize stalled: done=${runs - allDone.count}/$runs",
+            )
+        } finally {
+            orch.shutdownNow()
+            node.shutdownNow()
         }
     }
 }

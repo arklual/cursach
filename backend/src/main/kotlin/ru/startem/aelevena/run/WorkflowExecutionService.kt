@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.NullNode
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Service
 import ru.startem.aelevena.api.NotFoundException
 import ru.startem.aelevena.blob.BlobService
@@ -26,7 +27,10 @@ class WorkflowExecutionService(
     private val blobService: BlobService,
     private val executors: NodeExecutorRegistry,
     private val objectMapper: ObjectMapper,
+    /** Лёгкий пул для оркестрации (setup / финализация). Не блокируется на ноды. */
     private val workflowExecutor: ExecutorService,
+    /** Тяжёлый пул для собственно исполнения нод (HTTP/Python/Dataflow). */
+    @Qualifier("nodeExecutor") private val nodeExecutor: ExecutorService,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -41,12 +45,20 @@ class WorkflowExecutionService(
                 }
             }
         } catch (ex: RejectedExecutionException) {
+            // Не должно случиться: пул использует CallerRunsPolicy + неограниченную очередь.
             log.error("Workflow executor rejected run {}", runId, ex)
             runCatching { workflowRuns.markFinished(runId, "failed", outputJson = null) }
             throw ex
         }
     }
 
+    /**
+     * Полностью non-blocking. После сборки графа фьючерсов метод возвращается, освобождая
+     * orchestrator-поток. Финализация runа произойдёт в `whenCompleteAsync(workflowExecutor)`
+     * после того как все node-фьючерсы добегут. Это устраняет thread-pool starvation deadlock,
+     * который был при синхронном `allOf().join()` (orchestrator занимал слот и ждал ноды,
+     * для которых уже не было свободных слотов).
+     */
     fun execute(runId: Long) {
         val run = workflowRuns.findById(runId) ?: throw NotFoundException("Run not found")
         val revision = revisions.findById(run.workflowRevisionId) ?: throw NotFoundException("Revision not found")
@@ -126,6 +138,7 @@ class WorkflowExecutionService(
             val depFutures = incomingEdges.map { it.source }.mapNotNull { futures[it] }.toTypedArray()
             val ready = CompletableFuture.allOf(*depFutures)
 
+            // Ноды бегут на тяжёлом nodeExecutor; orchestrator-пулу остаётся только координация.
             val f = ready.thenApplyAsync({
                 val nodeRunId = nodeRunIds.getValue(nodeId)
 
@@ -160,7 +173,7 @@ class WorkflowExecutionService(
                 outputs[nodeId] = out
                 nodeRuns.markSuccess(nodeRunId, objectMapper.writeValueAsString(out))
                 out
-            }, workflowExecutor).whenComplete { _, ex ->
+            }, nodeExecutor).whenComplete { _, ex ->
                 if (ex != null && !skippedSet.contains(nodeId)) {
                     val nodeRunId = nodeRunIds.getValue(nodeId)
                     if (started.contains(nodeId)) {
@@ -174,16 +187,19 @@ class WorkflowExecutionService(
             futures[nodeId] = f
         }
 
+        // Финализация — асинхронно. Orchestrator-поток здесь освобождается; результат записывается
+        // на orchestrator-пуле в callback, когда все node-фьючерсы будут завершены.
         val all = CompletableFuture.allOf(*futures.values.toTypedArray())
-        val status = try {
-            all.join()
-            "success"
-        } catch (_: Exception) {
-            "failed"
-        }
-
-        val outputJson = objectMapper.writeValueAsString(outputsToJson(outputs))
-        workflowRuns.markFinished(runId, status = status, outputJson = outputJson)
+        all.whenCompleteAsync({ _, ex ->
+            try {
+                val status = if (ex == null) "success" else "failed"
+                val outputJson = objectMapper.writeValueAsString(outputsToJson(outputs))
+                workflowRuns.markFinished(runId, status = status, outputJson = outputJson)
+            } catch (finalEx: Throwable) {
+                log.error("Run {} finalize failed", runId, finalEx)
+                runCatching { workflowRuns.markFinished(runId, "failed", outputJson = null) }
+            }
+        }, workflowExecutor)
     }
 
     private fun buildNodeInput(
@@ -254,4 +270,3 @@ class WorkflowExecutionService(
         return root.message ?: root.toString()
     }
 }
-

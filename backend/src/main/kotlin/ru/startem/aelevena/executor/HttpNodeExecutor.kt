@@ -20,13 +20,16 @@ class HttpNodeExecutor(
         .build()
 
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode {
-        val url = config?.get("url")?.asText()?.takeIf { it.isNotBlank() }
+        // URL / body / headers могут содержать `${inputs.someNode.field}` — раскрываем перед запросом,
+        // чтобы пользователь мог собрать запрос из upstream-данных без Code-ноды посредника.
+        val rawUrl = config?.get("url")?.asText()?.takeIf { it.isNotBlank() }
             ?: throw IllegalArgumentException("http node requires config.url")
+        val url = InputTemplate.render(rawUrl, input, objectMapper)
 
         val method = config?.get("method")?.asText()?.uppercase() ?: "GET"
         val timeoutMs = config?.get("timeoutMs")?.asLong() ?: 30_000L
 
-        val bodyNode = config?.get("body")
+        val bodyNode = config?.get("body")?.let { InputTemplate.renderNode(it, input, objectMapper) }
         val bodyPublisher = when {
             bodyNode == null || bodyNode.isNull -> HttpRequest.BodyPublishers.noBody()
             bodyNode.isTextual -> HttpRequest.BodyPublishers.ofString(bodyNode.asText())
@@ -37,7 +40,7 @@ class HttpNodeExecutor(
             .uri(URI.create(url))
             .timeout(Duration.ofMillis(timeoutMs))
 
-        val headersNode = config?.get("headers")
+        val headersNode = config?.get("headers")?.let { InputTemplate.renderNode(it, input, objectMapper) }
         if (headersNode != null && headersNode.isObject) {
             headersNode.fields().forEachRemaining { (k, v) ->
                 if (v.isTextual) {

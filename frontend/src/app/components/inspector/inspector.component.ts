@@ -43,6 +43,32 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
             Название
             <input type="text" [ngModel]="node.data.label" (ngModelChange)="updateLabel($event)">
           </label>
+
+          @if (upstreamRefs(node); as refs) {
+            @if (refs.length > 0) {
+              <section class="upstream-section" aria-label="Параметры от других нод">
+                <header class="upstream-header">
+                  <strong>Входы от {{ refs.length }} ноды</strong>
+                  <span class="upstream-hint">Эти выходы доступны на входе. В Code-ноде — через <code>input.inputs["id"]</code>, в HTTP — через <code>&#36;&#123;inputs.id.поле&#125;</code> в URL/body.</span>
+                </header>
+                <ul class="upstream-list">
+                  @for (ref of refs; track ref.id) {
+                    <li class="upstream-item">
+                      <span class="upstream-id" [title]="ref.label">{{ ref.id }}</span>
+                      <span class="upstream-label">{{ ref.label }}</span>
+                      <button class="ghost small" type="button" (click)="copyToClipboard(codeRef(ref.id))" title="Скопировать ссылку для Code-ноды">
+                        code ref
+                      </button>
+                      <button class="ghost small" type="button" (click)="copyToClipboard(templateRef(ref.id))" title="Скопировать шаблонную ссылку для HTTP-ноды">
+                        http ref
+                      </button>
+                    </li>
+                  }
+                </ul>
+              </section>
+            }
+          }
+
           @if (node.data.kind === 'http') {
             <fieldset class="config-section">
               <legend>HTTP request</legend>
@@ -264,9 +290,14 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
                   <input type="text" class="mono"
                          [ngModel]="cfg(node, 'expression', '')"
                          (ngModelChange)="setCfg(node, 'expression', $event)"
-                         placeholder="* * * * * *">
+                         placeholder="*/5 * * * *">
                 </label>
-                <p class="hint">Формат Spring CronTrigger: sec min hour dom mon dow.</p>
+                <p class="hint">
+                  Поддерживается классический 5-полевой <code>min hour dom mon dow</code>
+                  (например <code>*/5 * * * *</code> — каждые 5 минут)
+                  и расширенный 6-полевой <code>sec min hour dom mon dow</code>.
+                  Также работают макросы <code>&#64;hourly</code>, <code>&#64;daily</code>, <code>&#64;weekly</code>.
+                </p>
               }
               @if (getSubtype(node) === 'interval') {
                 <label>
@@ -420,6 +451,59 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
       font-size: 12px;
       gap: 4px;
       min-width: 0;
+    }
+
+    .upstream-section {
+      background: var(--bg-secondary, #1a1d28);
+      border: 1px solid var(--border, #303644);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .upstream-header { display: flex; flex-direction: column; gap: 2px; }
+    .upstream-hint { font-size: 11px; color: var(--fg-muted, #8a92a6); }
+    .upstream-hint code {
+      font-family: monospace;
+      font-size: 10px;
+      background: var(--panel, #2a2f3a);
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+    .upstream-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+    .upstream-item {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+    }
+    .upstream-id {
+      font-family: monospace;
+      font-weight: 600;
+      color: var(--fg, #d8dde9);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .upstream-label {
+      color: var(--fg-muted, #8a92a6);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .upstream-item button.ghost.small {
+      font-size: 10px;
+      padding: 2px 6px;
+      border: 1px solid var(--border, #303644);
+      background: transparent;
+      color: var(--fg, #d8dde9);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .upstream-item button.ghost.small:hover {
+      border-color: var(--accent, #3b82f6);
     }
 
     input, select, textarea {
@@ -583,6 +667,31 @@ export class InspectorComponent {
   readonly runFromNode = output<string>();
   readonly triggerEnabledChange = output<{ triggerId: string; enabled: boolean }>();
 
+  /** Список upstream-нод, чей output попадает на вход активной. Используется в верхней
+   *  «Входы от других нод» — позволяет быстро скопировать ссылку в нужном синтаксисе
+   *  (для Code или для HTTP-шаблона), а не угадывать nodeId по графу. */
+  protected readonly upstreamRefs = (active: WorkflowNode | null): { id: string; label: string }[] => {
+    if (!active) return [];
+    const sources = this.workflowService.edges()
+      .filter(e => e.target === active.id)
+      .map(e => e.source);
+    const unique = Array.from(new Set(sources));
+    const byId = new Map(this.workflowService.nodes().map(n => [n.id, n] as const));
+    return unique
+      .map(id => ({ id, label: byId.get(id)?.data.label ?? id }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  };
+
+  /** JS/Python: input.inputs["nodeId"] — внутри Code-ноды бэк кладёт upstream сюда. */
+  codeRef(nodeId: string): string {
+    return `input.inputs["${nodeId}"]`;
+  }
+
+  /** HTTP-шаблон: ${inputs.nodeId} — будет подставлено в URL/body/headers перед запросом. */
+  templateRef(nodeId: string): string {
+    return '${inputs.' + nodeId + '}';
+  }
+
   onEnabledToggle(trigger: Trigger, enabled: boolean): void {
     this.triggerEnabledChange.emit({ triggerId: trigger.id, enabled });
   }
@@ -651,9 +760,26 @@ export class InspectorComponent {
 
   codePlaceholder(node: WorkflowNode): string {
     if (this.isJs(node)) {
-      return 'async function run(input) {\n  return { sum: (input?.xs ?? []).reduce((a, b) => a + b, 0) };\n}';
+      return [
+        '// input.runInput   — JSON, переданный в запуск (или null)',
+        '// input.inputs     — {nodeId: output} от upstream-нод (см. секцию «Входы» выше)',
+        '// input.inputVariants — если ноды-родители являются split-branchами',
+        'async function run(input) {',
+        '  const upstream = input.inputs ?? {};',
+        '  // пример: возьмём первого upstream и пробросим его дальше',
+        '  const firstKey = Object.keys(upstream)[0];',
+        '  return { received: firstKey ? upstream[firstKey] : input.runInput };',
+        '}',
+      ].join('\n');
     }
-    return 'def run(input):\n    return {"sum": sum(input.get("xs", []))}';
+    return [
+      '# input["runInput"] — JSON, переданный в запуск (или None)',
+      '# input["inputs"]   — {node_id: output} от upstream-нод (см. секцию «Входы» выше)',
+      'def run(input):',
+      '    upstream = input.get("inputs", {})',
+      '    first_key = next(iter(upstream), None)',
+      '    return {"received": upstream[first_key] if first_key else input.get("runInput")}',
+    ].join('\n');
   }
 
   /** Determine which map-mode is active from the stored config. */
