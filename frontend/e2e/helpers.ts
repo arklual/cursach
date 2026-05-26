@@ -99,56 +99,51 @@ export async function dragPaletteNode(page: Page, kind: string, offset: { x: num
 
 /**
  * Connect two nodes by simulating a drag from the source's output handle
- * to the target's input handle. Retries a couple of times because real-mouse
- * drag is timing-sensitive — the underlying signal-driven canvas can debounce
- * pointer events into a node-drag if the very first mousedown isn't routed to
- * the handle div.
+ * to the target's input handle.
+ *
+ * The canvas auto-centers via setTimeout(200ms) in ngAfterViewInit — if the
+ * drag straddles that timer, the cursor lands at the OLD on-screen position
+ * while the target handle has shifted in viewport coords. We work around it
+ * by (a) waiting past the auto-center horizon before the first attempt and
+ * (b) re-resolving the target bounding box AFTER the source mousedown so the
+ * final move tracks any reflow that happens mid-drag.
  */
 export async function connectNodes(page: Page, sourceIndex: number, targetIndex: number) {
   const expectedEdges = (await page.locator('.edge-group').count()) + 1;
   const sourceHandle = page.locator('.node-wrap').nth(sourceIndex).locator('.handle-out');
   const targetHandle = page.locator('.node-wrap').nth(targetIndex).locator('.handle-in');
 
-  for (let attempt = 0; attempt < 5; attempt++) {
-    // Park the cursor far away first — a previous attempt may have left it inside the
-    // source node's body, which can route the first mousedown to startDragNode instead
-    // of startDrawEdge on the handle.
-    await page.mouse.move(0, 0);
-    await sourceHandle.scrollIntoViewIfNeeded().catch(() => {});
-    await targetHandle.scrollIntoViewIfNeeded().catch(() => {});
+  // Let any pending centerView() fire before reading handle positions.
+  await page.waitForTimeout(260);
 
-    // Re-resolve bounding boxes every attempt — earlier drag attempts may have
-    // nudged the node via accidental mousedown-then-drag if the handle was missed.
+  for (let attempt = 0; attempt < 5; attempt++) {
     const srcBox = await sourceHandle.boundingBox();
-    const tgtBox = await targetHandle.boundingBox();
-    if (!srcBox || !tgtBox) {
+    if (!srcBox) {
       await page.waitForTimeout(150);
       continue;
     }
-
     const srcX = srcBox.x + srcBox.width / 2;
     const srcY = srcBox.y + srcBox.height / 2;
+
+    await page.mouse.move(srcX, srcY);
+    await page.mouse.down();
+    // Tiny nudge inside the source — Angular registers startDrawEdge and
+    // wakes the document:mousemove listener that tracks the temp path.
+    await page.mouse.move(srcX + 5, srcY + 5);
+
+    // Re-resolve target AFTER mousedown — guards against centerView reflow.
+    const tgtBox = await targetHandle.boundingBox();
+    if (!tgtBox) {
+      await page.mouse.up();
+      await page.waitForTimeout(150);
+      continue;
+    }
     const tgtX = tgtBox.x + tgtBox.width / 2;
     const tgtY = tgtBox.y + tgtBox.height / 2;
 
-    // Hover the handle first so Angular's hover signal flips before mousedown.
-    await page.mouse.move(srcX, srcY);
-    await page.waitForTimeout(30);
-    await page.mouse.down();
-    // Two intermediate moves: one tiny nudge to let Angular register the draw,
-    // one waypoint outside the source node body so the cursor unambiguously
-    // exits the source's findNodeAt zone before approaching the target.
-    await page.mouse.move(srcX + 8, srcY + 8, { steps: 2 });
-    const waypointX = (srcX + tgtX) / 2;
-    const waypointY = (srcY + tgtY) / 2;
-    await page.mouse.move(waypointX, waypointY, { steps: 8 });
     await page.mouse.move(tgtX, tgtY, { steps: 12 });
-    // Brief hold over target so dropTargetNodeId latches before mouseup.
-    await page.waitForTimeout(30);
     await page.mouse.up();
 
-    // Edge creation is synchronous in the signal, but the DOM update needs one tick.
-    await page.waitForTimeout(60);
     const count = await page.locator('.edge-group').count();
     if (count >= expectedEdges) return;
     await page.waitForTimeout(150);
