@@ -1748,6 +1748,14 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   /** Флаг "сейчас применяем граф из WebSocket" — чтобы не зациклиться: save→WS-эхо→setNodes→save→… */
   private applyingWsUpdate = false;
 
+  /**
+   * Сколько save-запросов сейчас в полёте. Пока > 0, WS-эхо может оказаться устаревшим
+   * относительно локального состояния (например, edge2 успели создать после старта save'а с
+   * edge1; эхо с edge1 не должно затирать edge2). Для in-flight окна применяем WS аддитивно:
+   * добавляем недостающие ноды/связи, но НЕ удаляем то, чего нет в эхе.
+   */
+  private saveRequestsInFlight = 0;
+
   // Inject services
   private validator = inject(WorkflowValidatorService);
   private executionService = inject(ExecutionService);
@@ -2092,8 +2100,21 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
       // (иначе цикл: save → WS-echo → setNodes → save → …).
       this.applyingWsUpdate = true;
       try {
-        this.workflowService.setNodes(nodes);
-        this.workflowService.setEdges(edges);
+        if (this.saveRequestsInFlight > 0) {
+          // Эхо нашего же save'а пришло, пока мы уже успели поменять граф локально.
+          // Применяем аддитивно: добавляем то, чего ещё нет, но НЕ удаляем локальные ноды/связи.
+          const localNodes = this.workflowService.nodes();
+          const localEdges = this.workflowService.edges();
+          const localNodeIds = new Set(localNodes.map(n => n.id));
+          const localEdgeIds = new Set(localEdges.map(e => e.id));
+          const mergedNodes = [...localNodes, ...nodes.filter(n => !localNodeIds.has(n.id))];
+          const mergedEdges = [...localEdges, ...edges.filter(e => !localEdgeIds.has(e.id))];
+          this.workflowService.setNodes(mergedNodes);
+          this.workflowService.setEdges(mergedEdges);
+        } else {
+          this.workflowService.setNodes(nodes);
+          this.workflowService.setEdges(edges);
+        }
       } finally {
         // Сбрасываем флаг в следующем тике, чтобы реактивные сигналы успели проинвалидироваться.
         setTimeout(() => { this.applyingWsUpdate = false; }, 0);
@@ -2111,12 +2132,18 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     const nodes = this.workflowService.nodes();
     const edges = this.workflowService.edges();
     console.debug(`[editor] saveGraph PUT versionId=${versionId} nodes=${nodes.length} edges=${edges.length}`);
+    this.saveRequestsInFlight += 1;
+    const onSettle = () => { this.saveRequestsInFlight = Math.max(0, this.saveRequestsInFlight - 1); };
     this.facade.saveGraph(versionId, nodes, edges).subscribe({
       next: () => {
         console.debug(`[editor] saveGraph OK nodes=${nodes.length}`);
+        onSettle();
         this.refreshTriggers();
       },
-      error: err => console.error('[editor] saveGraph FAILED', err),
+      error: err => {
+        console.error('[editor] saveGraph FAILED', err);
+        onSettle();
+      },
     });
   }
 
