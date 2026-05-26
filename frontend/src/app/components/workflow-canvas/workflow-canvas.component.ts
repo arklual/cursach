@@ -1060,7 +1060,6 @@ export class WorkflowCanvasComponent implements AfterViewInit {
       return;
     }
 
-    console.log('[DEBUG mouseup]', { isDrawing: this.isDrawing(), drawSource: this.drawSource?.id, clientX: e.clientX, clientY: e.clientY });
     if (this.isDrawing() && this.drawSource) {
       const rect = this.canvasArea()?.nativeElement.getBoundingClientRect();
       if (rect) {
@@ -1069,7 +1068,6 @@ export class WorkflowCanvasComponent implements AfterViewInit {
         const canvas = this.viewToCanvas(viewX, viewY);
 
         const target = this.findNodeAt(canvas.x, canvas.y);
-        console.log('[DEBUG mouseup detail]', { viewX, viewY, canvasX: canvas.x, canvasY: canvas.y, targetId: target?.id, targetKind: target?.data.kind, drawSourceId: this.drawSource.id, panX: this.panX(), panY: this.panY(), zoom: this.zoom() });
 
         if (target && target.id !== this.drawSource.id) {
           // Determine which node would be the edge target (incoming side)
@@ -1171,7 +1169,6 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     e.preventDefault();
     e.stopPropagation();
 
-    console.log('[DEBUG startDrawEdge]', { nodeId: node.id, kind: node.data.kind, type, variant, clientX: e.clientX, clientY: e.clientY });
     this.isDrawing.set(true);
     this.drawSource = node;
     this.drawType = type;
