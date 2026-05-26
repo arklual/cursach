@@ -109,27 +109,49 @@ export async function connectNodes(page: Page, sourceIndex: number, targetIndex:
   const sourceHandle = page.locator('.node-wrap').nth(sourceIndex).locator('.handle-out');
   const targetHandle = page.locator('.node-wrap').nth(targetIndex).locator('.handle-in');
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    // Park the cursor far away first — a previous attempt may have left it inside the
+    // source node's body, which can route the first mousedown to startDragNode instead
+    // of startDrawEdge on the handle.
+    await page.mouse.move(0, 0);
     await sourceHandle.scrollIntoViewIfNeeded().catch(() => {});
+    await targetHandle.scrollIntoViewIfNeeded().catch(() => {});
+
+    // Re-resolve bounding boxes every attempt — earlier drag attempts may have
+    // nudged the node via accidental mousedown-then-drag if the handle was missed.
     const srcBox = await sourceHandle.boundingBox();
     const tgtBox = await targetHandle.boundingBox();
-    if (!srcBox || !tgtBox) throw new Error('handles not found');
+    if (!srcBox || !tgtBox) {
+      await page.waitForTimeout(150);
+      continue;
+    }
 
     const srcX = srcBox.x + srcBox.width / 2;
     const srcY = srcBox.y + srcBox.height / 2;
     const tgtX = tgtBox.x + tgtBox.width / 2;
     const tgtY = tgtBox.y + tgtBox.height / 2;
 
+    // Hover the handle first so Angular's hover signal flips before mousedown.
     await page.mouse.move(srcX, srcY);
+    await page.waitForTimeout(30);
     await page.mouse.down();
-    // Intermediate move helps Angular's signal flush before the drop.
-    await page.mouse.move(srcX + 5, srcY + 5);
+    // Two intermediate moves: one tiny nudge to let Angular register the draw,
+    // one waypoint outside the source node body so the cursor unambiguously
+    // exits the source's findNodeAt zone before approaching the target.
+    await page.mouse.move(srcX + 8, srcY + 8, { steps: 2 });
+    const waypointX = (srcX + tgtX) / 2;
+    const waypointY = (srcY + tgtY) / 2;
+    await page.mouse.move(waypointX, waypointY, { steps: 8 });
     await page.mouse.move(tgtX, tgtY, { steps: 12 });
+    // Brief hold over target so dropTargetNodeId latches before mouseup.
+    await page.waitForTimeout(30);
     await page.mouse.up();
 
+    // Edge creation is synchronous in the signal, but the DOM update needs one tick.
+    await page.waitForTimeout(60);
     const count = await page.locator('.edge-group').count();
     if (count >= expectedEdges) return;
-    await page.waitForTimeout(120);
+    await page.waitForTimeout(150);
   }
 }
 
