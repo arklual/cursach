@@ -28,16 +28,7 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
       @if (activeNode(); as node) {
         <fieldset class="inspector-content" [disabled]="readOnly()">
           @if (node.data.purpose) {
-            <section class="doc-section">
-              <header class="doc-header">Что эта нода делает</header>
-              <p class="doc-body">{{ node.data.purpose }}</p>
-            </section>
-          }
-          @if (node.data.inputsHint) {
-            <section class="doc-section">
-              <header class="doc-header">Что принимает на вход</header>
-              <pre class="doc-body inputs">{{ node.data.inputsHint }}</pre>
-            </section>
+            <p class="doc-line">{{ node.data.purpose }}</p>
           }
           <label>
             Название
@@ -46,22 +37,14 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
 
           @if (upstreamRefs(node); as refs) {
             @if (refs.length > 0) {
-              <section class="upstream-section" aria-label="Параметры от других нод">
-                <header class="upstream-header">
-                  <strong>Входы от {{ refs.length }} ноды</strong>
-                  <span class="upstream-hint">Эти выходы доступны на входе. В Code-ноде — через <code>input.inputs["id"]</code>, в HTTP — через <code>&#36;&#123;inputs.id.поле&#125;</code> в URL/body.</span>
-                </header>
+              <section class="upstream-section" aria-label="Входы">
+                <header class="upstream-header">Вход</header>
                 <ul class="upstream-list">
                   @for (ref of refs; track ref.id) {
                     <li class="upstream-item">
                       <span class="upstream-id" [title]="ref.label">{{ ref.id }}</span>
-                      <span class="upstream-label">{{ ref.label }}</span>
-                      <button class="ghost small" type="button" (click)="copyToClipboard(codeRef(ref.id))" title="Скопировать ссылку для Code-ноды">
-                        code ref
-                      </button>
-                      <button class="ghost small" type="button" (click)="copyToClipboard(templateRef(ref.id))" title="Скопировать шаблонную ссылку для HTTP-ноды">
-                        http ref
-                      </button>
+                      <button class="ghost small" type="button" (click)="copyToClipboard(codeRef(ref.id))" title="code: input.inputs['id']">code</button>
+                      <button class="ghost small" type="button" (click)="copyToClipboard(templateRef(ref.id))" title="http: &#36;{inputs.id}">http</button>
                     </li>
                   }
                 </ul>
@@ -71,7 +54,7 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
 
           @if (node.data.kind === 'http') {
             <fieldset class="config-section">
-              <legend>HTTP request</legend>
+              <legend>HTTP</legend>
               <label>
                 URL
                 <input type="text"
@@ -96,14 +79,14 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
                        (ngModelChange)="setCfg(node, 'timeoutMs', +$event)">
               </label>
               <label>
-                Headers (JSON, key→value)
+                Headers
                 <textarea rows="3" class="mono"
                           [ngModel]="cfgJson(node, 'headers')"
                           (ngModelChange)="setCfgJson(node, 'headers', $event)"
                           placeholder='{"Authorization": "Bearer ..."}'></textarea>
               </label>
               <label>
-                Body (raw)
+                Body
                 <textarea rows="4" class="mono"
                           [ngModel]="cfg(node, 'body', '')"
                           (ngModelChange)="setCfg(node, 'body', $event)"
@@ -113,9 +96,25 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
           }
 
           @if (node.data.kind === 'dataflow') {
-            @if (getSubtype(node) === 'filter') {
-              <fieldset class="config-section">
-                <legend>Filter</legend>
+            <fieldset class="config-section">
+              <legend>{{ dataflowLegend(node) }}</legend>
+
+              @if (upstreamRefs(node); as refs) {
+                @if (refs.length > 1) {
+                  <label>
+                    Input
+                    <select [ngModel]="cfg(node, 'from', '')"
+                            (ngModelChange)="setCfg(node, 'from', $event)">
+                      <option value="">Авто</option>
+                      @for (ref of refs; track ref.id) {
+                        <option [value]="ref.id">{{ ref.id }}</option>
+                      }
+                    </select>
+                  </label>
+                }
+              }
+
+              @if (getSubtype(node) === 'filter') {
                 <label>
                   Field
                   <input type="text"
@@ -136,64 +135,53 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
                   </select>
                 </label>
                 <label>
-                  Value (JSON)
+                  Value
                   <input type="text"
                          [ngModel]="cfgJson(node, 'value')"
                          (ngModelChange)="setCfgJson(node, 'value', $event)"
-                         placeholder='100 или "pro"'>
+                         placeholder='100'>
                 </label>
-                <p class="hint">Если поле пустое — сравнивается сам элемент. Op gt/gte/lt/lte работают только для чисел.</p>
-              </fieldset>
-            }
+              }
 
-            @if (getSubtype(node) === 'map') {
-              <fieldset class="config-section">
-                <legend>Map</legend>
+              @if (getSubtype(node) === 'map') {
                 <label>
                   Режим
                   <select [ngModel]="mapMode(node)" (ngModelChange)="setMapMode(node, $event)">
-                    <option value="select">Select fields</option>
+                    <option value="select">Select</option>
                     <option value="rename">Rename</option>
                     <option value="wrap">Wrap</option>
                   </select>
                 </label>
-
                 @if (mapMode(node) === 'select') {
                   <label>
-                    Поля через запятую
+                    Fields
                     <input type="text"
                            [ngModel]="cfgList(node, 'select')"
                            (ngModelChange)="setCfgList(node, 'select', $event)"
                            placeholder="id, amount">
                   </label>
-                  <p class="hint">Оставляет только перечисленные ключи у каждого объекта.</p>
                 }
                 @if (mapMode(node) === 'rename') {
                   <label>
-                    Rename (JSON: новое имя → старое)
+                    Mapping
                     <textarea rows="3" class="mono"
                               [ngModel]="cfgJson(node, 'rename')"
                               (ngModelChange)="setCfgJson(node, 'rename', $event)"
                               placeholder='{"newName": "oldName"}'></textarea>
                   </label>
-                  <p class="hint">Переименовывает поля каждого объекта в массиве.</p>
                 }
                 @if (mapMode(node) === 'wrap') {
                   <label>
-                    Имя поля-обёртки
+                    Wrap key
                     <input type="text"
                            [ngModel]="cfg(node, 'wrap', '')"
                            (ngModelChange)="setCfg(node, 'wrap', $event)"
                            placeholder="value">
                   </label>
-                  <p class="hint">Превращает каждый элемент x в &#123; "fieldName": x &#125;.</p>
                 }
-              </fieldset>
-            }
+              }
 
-            @if (getSubtype(node) === 'reduce') {
-              <fieldset class="config-section">
-                <legend>Reduce</legend>
+              @if (getSubtype(node) === 'reduce') {
                 <label>
                   Op
                   <select [ngModel]="cfg(node, 'op', 'count')"
@@ -213,41 +201,29 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
                            (ngModelChange)="setCfg(node, 'field', $event)"
                            placeholder="amount">
                   </label>
-                  <p class="hint">Поле, по которому считается агрегат. Если пусто — берётся сам элемент.</p>
-                } @else {
-                  <p class="hint">Count возвращает длину входного массива. Поле не используется.</p>
                 }
-                <p class="hint">Возвращает &#123; "result": &lt;число&gt; &#125;.</p>
-              </fieldset>
-            }
+              }
 
-            @if (getSubtype(node) === 'flatmap') {
-              <fieldset class="config-section">
-                <legend>FlatMap</legend>
+              @if (getSubtype(node) === 'flatmap') {
                 <label>
-                  Поле-массив для разворачивания
+                  Field
                   <input type="text"
                          [ngModel]="cfg(node, 'field', '')"
                          (ngModelChange)="setCfg(node, 'field', $event)"
                          placeholder="items">
                 </label>
-                <p class="hint">Берёт массив из этого поля каждого элемента и склеивает всё в один плоский массив. Если пусто — на вход должен прийти массив массивов.</p>
-              </fieldset>
-            }
+              }
 
-            @if (getSubtype(node) === 'foreach') {
-              <fieldset class="config-section">
-                <legend>ForEach</legend>
-                <p class="hint">Passthrough: output = input (как массив). Настоящий fan-out по нодам пока не реализован — используйте как маркер «итерация по элементам».</p>
-              </fieldset>
-            }
+              @if (getSubtype(node) === 'foreach') {
+                <p class="hint">Passthrough.</p>
+              }
+            </fieldset>
           }
 
           @if (node.data.kind === 'trigger') {
             <fieldset class="config-section">
               <legend>{{ triggerLegend(node) }}</legend>
               @if (getSubtype(node) === 'manual') {
-                <p class="hint">Запускает workflow только с этой ноды по нажатию кнопки. Без расписания и токена.</p>
                 <div class="actions-row">
                   <button class="primary" (click)="runFromNode.emit(node.id)">Запустить отсюда</button>
                 </div>
@@ -261,43 +237,31 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
                     <span>Активен</span>
                   </label>
                   @if (trigger.enabled === false) {
-                    @if (getSubtype(node) === 'webhook') {
-                      <p class="hint warn">Webhook остановлен — вызовы по токену возвращают 404.</p>
-                    } @else {
-                      <p class="hint warn">Триггер остановлен — запуски по расписанию не происходят.</p>
-                    }
+                    <p class="hint warn">Остановлен.</p>
                   }
                 } @else {
-                  <p class="hint">Активность будет доступна после сохранения графа.</p>
+                  <p class="hint">Доступно после сохранения.</p>
                 }
               }
               @if (getSubtype(node) === 'webhook') {
                 @if (webhookUrl(node); as url) {
                   <label>
-                    Webhook URL
+                    URL
                     <input type="text" class="mono" readonly [value]="url" (click)="$any($event.target).select()">
                   </label>
                   <div class="actions-row">
-                    <button class="ghost" (click)="copyToClipboard(url)">Скопировать URL</button>
+                    <button class="ghost" (click)="copyToClipboard(url)">Копировать</button>
                   </div>
-                } @else {
-                  <p class="hint">URL появится после сохранения графа.</p>
                 }
               }
               @if (getSubtype(node) === 'cron') {
                 <label>
-                  Cron expression
+                  Cron
                   <input type="text" class="mono"
                          [ngModel]="cfg(node, 'expression', '')"
                          (ngModelChange)="setCfg(node, 'expression', $event)"
                          placeholder="*/5 * * * *">
                 </label>
-                <p class="hint">
-                  Поддерживается классический 5-полевой <code>min hour dom mon dow</code>
-                  (например <code>*/5 * * * *</code> — каждые 5 минут)
-                  и расширенный 6-полевой <code>sec min hour dom mon dow</code>.
-                  Также работают макросы <code>&#64;hourly</code>, <code>&#64;daily</code>, <code>&#64;weekly</code>.
-                </p>
               }
               @if (getSubtype(node) === 'interval') {
                 <label>
@@ -306,16 +270,15 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
                          [ngModel]="cfg(node, 'periodSeconds', 30)"
                          (ngModelChange)="setCfg(node, 'periodSeconds', +$event)">
                 </label>
-                <p class="hint">Запуск повторяется каждые N секунд после сохранения графа.</p>
               }
             </fieldset>
           }
 
           @if (node.data.kind === 'code') {
             <fieldset class="config-section">
-              <legend>{{ isJs(node) ? 'JavaScript sandbox' : 'Python sandbox' }}</legend>
+              <legend>{{ isJs(node) ? 'JavaScript' : 'Python' }}</legend>
               <label>
-                Docker image (опционально)
+                Image
                 <input type="text"
                        [ngModel]="cfg(node, 'image', '')"
                        (ngModelChange)="setCfg(node, 'image', $event)"
@@ -334,13 +297,12 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
                        (ngModelChange)="setCfg(node, 'memoryMb', +$event)">
               </label>
               <label>
-                Code (определите <code>run(input)</code> — он получит JSON со входа)
+                Code
                 <textarea rows="8" class="mono"
                           [ngModel]="cfg(node, 'code', '')"
                           (ngModelChange)="setCfg(node, 'code', $event)"
                           [placeholder]="codePlaceholder(node)"></textarea>
               </label>
-              <p class="hint">Бэк запускает <code>docker run --rm -i</code>. Требуется Docker на хосте бэка.</p>
             </fieldset>
           }
           @if (activeNode()?.data?.kind === 'ab') {
@@ -465,19 +427,17 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
       flex-direction: column;
       gap: 6px;
     }
-    .upstream-header { display: flex; flex-direction: column; gap: 2px; }
-    .upstream-hint { font-size: 11px; color: var(--fg-muted, #8a92a6); }
-    .upstream-hint code {
-      font-family: monospace;
+    .upstream-header {
       font-size: 10px;
-      background: var(--panel, #2a2f3a);
-      padding: 1px 4px;
-      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--fg-muted, #8a92a6);
+      font-weight: 600;
     }
     .upstream-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
     .upstream-item {
       display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto auto;
+      grid-template-columns: minmax(0, 1fr) auto auto;
       align-items: center;
       gap: 6px;
       font-size: 11px;
@@ -486,12 +446,6 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
       font-family: monospace;
       font-weight: 600;
       color: var(--fg, #d8dde9);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .upstream-label {
-      color: var(--fg-muted, #8a92a6);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -507,6 +461,12 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
     }
     .upstream-item button.ghost.small:hover {
       border-color: var(--accent, #3b82f6);
+    }
+    .doc-line {
+      margin: 0;
+      font-size: 12px;
+      color: var(--fg-muted);
+      line-height: 1.4;
     }
 
     input, select, textarea {
@@ -539,39 +499,6 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
       gap: 8px;
       margin: 0;
       min-width: 0;
-    }
-
-    .doc-section {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-width: 0;
-    }
-
-    .doc-header {
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--fg-muted);
-      font-weight: 600;
-    }
-
-    .doc-body {
-      margin: 0;
-      font-size: 12px;
-      color: var(--fg-secondary);
-      line-height: 1.45;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .doc-body.inputs {
-      font-family: var(--font-mono);
-      font-size: 11px;
     }
 
     .config-section legend {
@@ -804,25 +731,25 @@ export class InspectorComponent {
   codePlaceholder(node: WorkflowNode): string {
     if (this.isJs(node)) {
       return [
-        '// input.runInput   — JSON, переданный в запуск (или null)',
-        '// input.inputs     — {nodeId: output} от upstream-нод (см. секцию «Входы» выше)',
-        '// input.inputVariants — если ноды-родители являются split-branchами',
         'async function run(input) {',
-        '  const upstream = input.inputs ?? {};',
-        '  // пример: возьмём первого upstream и пробросим его дальше',
-        '  const firstKey = Object.keys(upstream)[0];',
-        '  return { received: firstKey ? upstream[firstKey] : input.runInput };',
+        '  return input.runInput;',
         '}',
       ].join('\n');
     }
     return [
-      '# input["runInput"] — JSON, переданный в запуск (или None)',
-      '# input["inputs"]   — {node_id: output} от upstream-нод (см. секцию «Входы» выше)',
       'def run(input):',
-      '    upstream = input.get("inputs", {})',
-      '    first_key = next(iter(upstream), None)',
-      '    return {"received": upstream[first_key] if first_key else input.get("runInput")}',
+      '    return input.get("runInput")',
     ].join('\n');
+  }
+
+  dataflowLegend(node: WorkflowNode): string {
+    const sub = this.getSubtype(node);
+    if (sub === 'filter') return 'Filter';
+    if (sub === 'map') return 'Map';
+    if (sub === 'reduce') return 'Reduce';
+    if (sub === 'flatmap') return 'FlatMap';
+    if (sub === 'foreach') return 'ForEach';
+    return 'Dataflow';
   }
 
   /** Determine which map-mode is active from the stored config. */

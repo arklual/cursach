@@ -62,7 +62,7 @@ import { DebugSessionService } from '../../services/debug-session.service';
                     <section class="ready-section">
                         <h4>Готовые ноды ({{ s.ready.length }})</h4>
                         @if (s.ready.length === 0) {
-                            <p class="hint">Все ноды отработали — пайплайн завершён.</p>
+                            <p class="hint">Готово.</p>
                         } @else {
                             <ul class="ready-list">
                                 @for (id of s.ready; track id) {
@@ -78,7 +78,7 @@ import { DebugSessionService } from '../../services/debug-session.service';
                             </ul>
                             @if (selectedReadyInput(); as preview) {
                                 <details open class="preview-details">
-                                    <summary>Что прилетит в <code>{{ selectedReady() }}</code></summary>
+                                    <summary>Вход <code>{{ selectedReady() }}</code></summary>
                                     <pre class="mono">{{ preview }}</pre>
                                 </details>
                             }
@@ -99,7 +99,7 @@ import { DebugSessionService } from '../../services/debug-session.service';
                             </span>
                         </h4>
                         @if (variableEntries().length === 0) {
-                            <p class="hint">После первого шага здесь появятся выходы нод.</p>
+                            <p class="hint">Пусто.</p>
                         }
                         <div class="vars-list">
                             @for (entry of variableEntries(); track entry.nodeId) {
@@ -109,7 +109,7 @@ import { DebugSessionService } from '../../services/debug-session.service';
                                         <code class="var-ref">inputs["{{ entry.nodeId }}"]</code>
                                         <button class="ghost small"
                                                 (click)="copyRef(entry.nodeId); $event.stopPropagation(); $event.preventDefault()">
-                                            Копировать ref
+                                            Копировать
                                         </button>
                                     </summary>
                                     <pre class="mono">{{ pretty(entry.value) }}</pre>
