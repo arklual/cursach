@@ -1,4 +1,4 @@
-import { Component, input, output, inject, computed, PLATFORM_ID } from '@angular/core';
+import { Component, input, output, inject, computed, signal, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { WorkflowService } from '../../services/workflow.service';
@@ -365,6 +365,9 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
       } @else {
         <p>Выберите ноду для настройки.</p>
       }
+      @if (toastVisible()) {
+        <div class="copy-toast" role="status" aria-live="polite">{{ toastMessage() }}</div>
+      }
     </aside>
   `,
   styles: [`
@@ -655,6 +658,27 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
     button.ghost:hover {
       background: var(--panel-hover);
     }
+
+    .copy-toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      background: var(--panel);
+      color: var(--fg-primary);
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      z-index: 1000;
+      pointer-events: none;
+      animation: copy-toast-in 0.18s ease-out;
+    }
+
+    @keyframes copy-toast-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
   `]
 })
 export class InspectorComponent {
@@ -666,6 +690,11 @@ export class InspectorComponent {
   readOnly = input<boolean>(false);
   readonly runFromNode = output<string>();
   readonly triggerEnabledChange = output<{ triggerId: string; enabled: boolean }>();
+
+  /** Текст и видимость всплывающей плашки после копирования в буфер. */
+  readonly toastMessage = signal<string>('');
+  readonly toastVisible = signal<boolean>(false);
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** Список upstream-нод, чей output попадает на вход активной. Используется в верхней
    *  «Входы от других нод» — позволяет быстро скопировать ссылку в нужном синтаксисе
@@ -735,7 +764,21 @@ export class InspectorComponent {
     if (!isPlatformBrowser(this.platformId) || typeof navigator === 'undefined' || !navigator.clipboard) {
       return;
     }
-    navigator.clipboard.writeText(text).catch(err => console.error('clipboard write failed', err));
+    navigator.clipboard.writeText(text)
+      .then(() => this.showToast('Скопировано в буфер обмена'))
+      .catch(err => console.error('clipboard write failed', err));
+  }
+
+  private showToast(message: string): void {
+    this.toastMessage.set(message);
+    this.toastVisible.set(true);
+    if (this.toastTimer) {
+      clearTimeout(this.toastTimer);
+    }
+    this.toastTimer = setTimeout(() => {
+      this.toastVisible.set(false);
+      this.toastTimer = null;
+    }, 1800);
   }
 
   updateLabel(label: string): void {
