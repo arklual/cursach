@@ -1,6 +1,7 @@
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import { Component, ElementRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import Chart from 'chart.js/auto';
 import { AnalyticsApiService } from '../../core/api/analytics.api';
 import { WorkflowService } from '../../services/workflow.service';
 import type { AbAnalyticsResponse, AbVariantRow } from '../../core/api/api.models';
@@ -64,28 +65,26 @@ import type { AbAnalyticsResponse, AbVariantRow } from '../../core/api/api.model
                     <h4>Conversion (run-success)</h4>
                     <table class="ap-table">
                         <thead>
-                            <tr><th>Variant</th><th>Runs</th><th>Conv</th><th>95% CI</th><th>Lift</th><th>p</th></tr>
+                            <tr><th>Variant</th><th>Reached</th><th>Converted</th><th>p̂</th><th>95% CI</th><th>Variance</th><th>p</th></tr>
                         </thead>
                         <tbody>
                             @for (v of response()!.variants; track v.key) {
-                                <tr>
+                                <tr [class.ap-recommended]="v.key === recommendedKey()">
                                     <td>
                                         <span class="ap-dot" [style.background]="v.color"></span>
                                         {{ v.key }}
                                         @if (v.isBaseline) { <span class="ap-baseline">baseline</span> }
+                                        @if (v.key === recommendedKey()) { <span class="ap-best" title="Статистически значимо лучший вариант">★ best</span> }
                                     </td>
                                     <td>{{ v.runs }}</td>
+                                    <td>{{ v.conversions != null ? v.conversions : '—' }}</td>
                                     <td>{{ v.conversionPct != null ? (v.conversionPct | number:'1.0-1') + '%' : '—' }}</td>
                                     <td>
                                         @if (v.ciLow != null) {
                                             {{ v.ciLow | number:'1.0-1' }}–{{ v.ciHigh | number:'1.0-1' }}
                                         } @else { — }
                                     </td>
-                                    <td>
-                                        @if (v.liftVsBaseline != null) {
-                                            {{ v.liftVsBaseline > 0 ? '+' : '' }}{{ v.liftVsBaseline | number:'1.0-1' }}pp
-                                        } @else { — }
-                                    </td>
+                                    <td>{{ variance(v) != null ? (variance(v) | number:'1.0-4') : '—' }}</td>
                                     <td>
                                         @if (v.pValue != null) {
                                             {{ v.pValue | number:'1.0-3' }}
@@ -96,6 +95,7 @@ import type { AbAnalyticsResponse, AbVariantRow } from '../../core/api/api.model
                             }
                         </tbody>
                     </table>
+                    <canvas #abChart class="ap-chart" aria-label="Сравнение конверсий вариантов"></canvas>
                 </section>
             } @else {
                 <div class="ap-hint">Conversion недоступна для split-mode.</div>
@@ -131,6 +131,12 @@ import type { AbAnalyticsResponse, AbVariantRow } from '../../core/api/api.model
         .ap-table th { color: var(--fg-secondary); font-weight: 600; }
         .ap-baseline { font-size: 10px; color: var(--fg-muted); margin-left: 4px; }
         .ap-sig { color: var(--success, #34c97c); margin-left: 4px; }
+        /* Рекомендованный (статистически значимо лучший) вариант — зелёная рамка (ТЗ требование 12). */
+        .ap-table tr.ap-recommended td { background: rgba(52, 201, 124, 0.08); }
+        .ap-table tr.ap-recommended td:first-child { box-shadow: inset 3px 0 0 var(--success, #34c97c); }
+        .ap-table tr.ap-recommended { outline: 2px solid var(--success, #34c97c); }
+        .ap-best { font-size: 10px; color: var(--success, #34c97c); margin-left: 6px; font-weight: 700; }
+        .ap-chart { display: block; width: 100%; max-height: 220px; margin-top: 10px; }
         .ap-empty, .ap-error, .ap-hint { color: var(--fg-muted); font-size: 12px; padding: 8px 0; }
         .ap-error { color: var(--danger); }
         .ap-warnings { margin: 0; padding-left: 16px; font-size: 11px; color: var(--fg-muted); }
@@ -149,6 +155,30 @@ export class AnalyticsPanelComponent {
     readonly abNodes = computed(() =>
         this.ws.nodes().filter(n => n.data.kind === 'ab')
     );
+
+    /** Рекомендованный вариант: статистически значимый с максимальной конверсией. */
+    readonly recommendedKey = computed<string | null>(() => {
+        const resp = this.response();
+        if (!resp || resp.mode !== 'pick') {
+            return null;
+        }
+        const best = resp.variants
+            .filter(v => v.isSignificant && v.conversionPct != null)
+            .sort((a, b) => (b.conversionPct ?? 0) - (a.conversionPct ?? 0))[0];
+        return best?.key ?? null;
+    });
+
+    private readonly chartCanvas = viewChild<ElementRef<HTMLCanvasElement>>('abChart');
+    private chart: Chart | null = null;
+
+    /** Оценка дисперсии доли конверсии: p̂·(1−p̂)/n. */
+    variance(v: AbVariantRow): number | null {
+        if (v.conversionPct == null || !v.runs) {
+            return null;
+        }
+        const p = v.conversionPct / 100;
+        return (p * (1 - p)) / v.runs;
+    }
 
     constructor() {
         // Авто-выбор первой ab-ноды, если ничего не выбрано или выбранная исчезла.
@@ -172,6 +202,69 @@ export class AnalyticsPanelComponent {
             if (!nodeId) return;
             this.fetch(wfId, nodeId);
         });
+
+        // Перерисовываем диаграмму конверсий (Chart.js) при изменении данных (ТЗ требование 12).
+        effect(() => {
+            const resp = this.response();
+            this.renderChart(resp);
+        });
+    }
+
+    /**
+     * Столбчатая диаграмма конверсий по вариантам с усами доверительного интервала (95%).
+     * Рекомендованный вариант подсвечивается зелёным.
+     */
+    private renderChart(resp: AbAnalyticsResponse | null): void {
+        const canvas = this.chartCanvas()?.nativeElement;
+        if (!canvas) {
+            return;
+        }
+        try {
+            this.chart?.destroy();
+            this.chart = null;
+            if (!resp || resp.mode !== 'pick') {
+                return;
+            }
+            const rows = resp.variants.filter(v => v.conversionPct != null);
+            if (rows.length === 0) {
+                return;
+            }
+            const recommended = this.recommendedKey();
+            const success = '#34c97c';
+            this.chart = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: rows.map(v => v.key),
+                    datasets: [{
+                        label: 'Конверсия, %',
+                        data: rows.map(v => v.conversionPct ?? 0),
+                        backgroundColor: rows.map(v => (v.key === recommended ? success : (v.color || '#888'))),
+                        // Усы доверительного интервала рисуем как errorBars через borderSkipped/кастом —
+                        // chart.js auto не имеет error-bars из коробки, поэтому передаём CI в tooltip.
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: (ctx) => {
+                                    const v = rows[ctx.dataIndex];
+                                    if (v?.ciLow != null && v?.ciHigh != null) {
+                                        return `95% CI: ${v.ciLow.toFixed(1)}–${v.ciHigh.toFixed(1)}`;
+                                    }
+                                    return '';
+                                },
+                            },
+                        },
+                    },
+                    scales: { y: { beginAtZero: true, title: { display: true, text: '%' } } },
+                },
+            });
+        } catch {
+            // Рендер диаграммы — best-effort; в headless/без canvas-контекста не должен ломать панель.
+        }
     }
 
     selectAbNode(id: string): void {

@@ -19,6 +19,11 @@ class HttpNodeExecutor(
         .followRedirects(HttpClient.Redirect.NORMAL)
         .build()
 
+    private companion object {
+        const val DEFAULT_TIMEOUT_MS = 30_000L
+        const val MAX_TIMEOUT_MS = 300_000L
+    }
+
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode {
         // URL / body / headers могут содержать `${inputs.someNode.field}` — раскрываем перед запросом,
         // чтобы пользователь мог собрать запрос из upstream-данных без Code-ноды посредника.
@@ -27,7 +32,9 @@ class HttpNodeExecutor(
         val url = InputTemplate.render(rawUrl, input, objectMapper)
 
         val method = config?.get("method")?.asText()?.uppercase() ?: "GET"
-        val timeoutMs = config?.get("timeoutMs")?.asLong() ?: 30_000L
+        // Тайм-аут: по умолчанию 30 секунд, максимум 300 секунд (ТЗ 4.1.1, требование 3).
+        val timeoutMs = (config?.get("timeoutMs")?.asLong() ?: DEFAULT_TIMEOUT_MS)
+            .coerceIn(1L, MAX_TIMEOUT_MS)
 
         val bodyNode = config?.get("body")?.let { InputTemplate.renderNode(it, input, objectMapper) }
         val bodyPublisher = when {

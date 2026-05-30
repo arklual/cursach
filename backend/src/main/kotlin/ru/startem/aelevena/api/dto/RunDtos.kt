@@ -12,6 +12,7 @@ data class WorkflowRun(
     val input: JsonNode? = null,
     val output: JsonNode? = null,
     val startNodeId: String? = null,
+    val isDebug: Boolean = false,
     val nodes: List<NodeRun> = emptyList(),
 )
 

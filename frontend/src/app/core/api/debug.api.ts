@@ -36,6 +36,17 @@ export interface DebugStepRequest {
     nodeId?: string;
 }
 
+/** Результат отладочного запуска одной ноды (требование 14). */
+export interface DebugNodeRunResult {
+    runId: string;
+    workflowId: string;
+    nodeId: string;
+    status: 'success' | 'failed';
+    input?: unknown;
+    output?: unknown;
+    errorMessage?: string;
+}
+
 /**
  * REST для пошагового дебаггера. Сессии живут на бэке в памяти, поэтому каждое
  * действие возвращает полный снапшот (UI не пытается клеить дельты).
@@ -44,6 +55,17 @@ export interface DebugStepRequest {
 export class DebugApiService {
     private readonly http = inject(HttpClient);
     private readonly base = environment.apiBaseUrl;
+
+    /**
+     * Отладочный запуск одной выбранной ноды с произвольным входом, без прогона графа
+     * (требование 14). Результат возвращается синхронно и фиксируется в истории запусков.
+     */
+    runNode(workflowId: string, nodeId: string, input: unknown): Observable<DebugNodeRunResult> {
+        return this.http.post<DebugNodeRunResult>(
+            `${this.base}/workflows/${workflowId}/nodes/${encodeURIComponent(nodeId)}/debug-run`,
+            { input },
+        );
+    }
 
     start(workflowId: string, body: DebugStartRequest = {}): Observable<DebugSessionDto> {
         return this.http.post<DebugSessionDto>(

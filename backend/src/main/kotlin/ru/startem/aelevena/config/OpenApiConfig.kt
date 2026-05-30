@@ -13,9 +13,9 @@ class OpenApiConfig {
         return OpenAPI()
             .info(
                 Info()
-                    .title("FlowForge Workflow BFF API")
+                    .title("FluxPilot API")
                     .version("1.0.0")
-                    .description("BFF API для управления workflow, их версиями, триггерами и запусками.")
+                    .description("REST API платформы FluxPilot для управления workflow, их версиями, снапшотами, триггерами, запусками и A/B-аналитикой.")
             )
             .servers(
                 listOf(

@@ -62,11 +62,14 @@ export class WorkflowService {
   private nodesSignal = signal<WorkflowNode[]>([]);
   private edgesSignal = signal<WorkflowEdge[]>([]);
   private activeNodeIdSignal = signal<string | null>(null);
+  /** Множественное выделение нод (групповая селекция, ТЗ требование 1). */
+  private selectedNodeIdsSignal = signal<ReadonlySet<string>>(new Set());
   private logsSignal = signal<string[]>([]);
 
   readonly nodes = this.nodesSignal.asReadonly();
   readonly edges = this.edgesSignal.asReadonly();
   readonly activeNodeId = this.activeNodeIdSignal.asReadonly();
+  readonly selectedNodeIds = this.selectedNodeIdsSignal.asReadonly();
   readonly logs = this.logsSignal.asReadonly();
 
   readonly activeNode = computed(() => {
@@ -144,6 +147,41 @@ export class WorkflowService {
 
   setActiveNode(id: string | null): void {
     this.activeNodeIdSignal.set(id);
+    this.selectedNodeIdsSignal.set(id ? new Set([id]) : new Set());
+  }
+
+  /** Добавить/убрать ноду из группового выделения (Shift/Ctrl-клик). */
+  toggleNodeSelection(id: string): void {
+    const next = new Set(this.selectedNodeIdsSignal());
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    this.selectedNodeIdsSignal.set(next);
+    this.activeNodeIdSignal.set(next.size > 0 ? id : null);
+  }
+
+  clearSelection(): void {
+    this.activeNodeIdSignal.set(null);
+    this.selectedNodeIdsSignal.set(new Set());
+  }
+
+  /** Удалить все выделенные ноды (групповое удаление по Delete). Возвращает число удалённых. */
+  removeSelectedNodes(): number {
+    const selected = this.selectedNodeIdsSignal();
+    const active = this.activeNodeIdSignal();
+    const targets: string[] = selected.size > 0
+      ? Array.from(selected)
+      : (active ? [active] : []);
+    if (targets.length === 0) {
+      return 0;
+    }
+    const targetSet = new Set(targets);
+    this.nodesSignal.update(nodes => nodes.filter(n => !targetSet.has(n.id)));
+    this.edgesSignal.update(edges => edges.filter(e => !targetSet.has(e.source) && !targetSet.has(e.target)));
+    this.clearSelection();
+    return targets.length;
   }
 
   addNode(type: NodeKind, position: { x: number; y: number }, subtype?: string): string {

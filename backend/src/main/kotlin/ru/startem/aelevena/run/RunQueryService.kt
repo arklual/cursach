@@ -130,6 +130,7 @@ class RunQueryService(
             input = this.inputJson?.let(::parseJson),
             output = this.outputJson?.let(::parseJson),
             startNodeId = this.startNodeId,
+            isDebug = this.isDebug,
             nodes = nodes,
         )
     }

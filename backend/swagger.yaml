@@ -1,873 +1,1127 @@
-
-openapi: 3.1.0
+openapi: 3.0.1
 info:
-  title: FlowForge Workflow BFF API
+  title: FluxPilot API
+  description: "REST API платформы FluxPilot для управления workflow, их версиями\
+    , снапшотами, триггерами, запусками и A/B-аналитикой."
   version: 1.0.0
-  description: >
-    BFF API для управления workflow, их версиями, триггерами и запусками.
-
 servers:
-  - url: https://api.flowforge.local/v1
-    description: Основной API сервер
-
+- url: /v1
+  description: Основной API сервер
 tags:
-  - name: Workflows
-    description: CRUD по workflow
-  - name: Workflow Versions
-    description: Версионирование workflow и работа с графом
-  - name: Triggers
-    description: Триггеры запуска workflow
-  - name: Runs
-    description: Запуски workflow и отдельных нод
-  - name: Analytics
-    description: Аналитика по экспериментам.
-
+- name: Workflows
+  description: "Создание, чтение, обновление workflow и управление их версиями"
+- name: Triggers
+  description: "Управление триггерами (manual, scheduler, webhook) и приём webhook-з\
+    апросов"
+- name: Runs
+  description: Запуск workflow и просмотр истории/деталей запусков
+- name: Analytics
+  description: "Сводная A/B-аналитика workflow (конверсии, доверительные интервалы\
+    , z-тест)"
+- name: Debug
+  description: Пошаговая отладка workflow
+- name: Versions
+  description: Редактирование графа рабочей версии workflow
+- name: Snapshots
+  description: Именованные снапшоты workflow уровня документа
 paths:
-  /workflows:
-    post:
-      tags: [Workflows]
-      summary: Создать workflow
-      description: Создаёт новый workflow без привязки к проекту.
-      requestBody:
-        required: true
-        description: Данные для создания workflow.
-        content:
-          application/json:
-            schema:
-              type: object
-              description: Тело запроса на создание workflow.
-              properties:
-                name:
-                  type: string
-                  description: Название workflow.
-                description:
-                  type: string
-                  description: Описание workflow.
-              required: [name]
-      responses:
-        '201':
-          description: Workflow успешно создан.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Workflow'
-    get:
-      tags: [Workflows]
-      summary: Список workflow
-      description: Возвращает список всех workflow.
-      responses:
-        '200':
-          description: Список workflow.
-          content:
-            application/json:
-              schema:
-                type: array
-                description: Массив workflow.
-                items:
-                  $ref: '#/components/schemas/WorkflowMeta'
-
   /workflows/{workflowId}:
     get:
-      tags: [Workflows]
-      summary: Получить workflow
-      description: Возвращает метаданные и актуальный граф workflow.
+      tags:
+      - Workflows
+      operationId: get
       parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-      responses:
-        '200':
-          description: Информация о workflow.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Workflow'
-        '404':
-          description: Workflow не найден.
-    put:
-      tags: [Workflows]
-      summary: Обновить метаданные workflow
-      description: Обновляет базовые поля workflow (название, описание).
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-      requestBody:
+      - name: workflowId
+        in: path
         required: true
-        description: Новые метаданные workflow.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/WorkflowMetaUpdate'
+        schema:
+          type: string
+          format: uuid
       responses:
-        '200':
-          description: Метаданные workflow обновлены.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WorkflowMeta'
-        '404':
-          description: Workflow не найден.
-    delete:
-      tags: [Workflows]
-      summary: Удалить workflow
-      description: Полностью удаляет workflow и связанные данные.
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-      responses:
-        '204':
-          description: Workflow удалён.
-        '404':
-          description: Workflow не найден.
-
-  /workflows/{workflowId}/versions:
-    post:
-      tags: [Workflow Versions]
-      summary: Создать версию workflow
-      description: Создаёт логическую версию workflow и привязывает её к текущему графу.
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-      responses:
-        '201':
-          description: Версия workflow создана.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WorkflowVersion'
-        '404':
-          description: Workflow не найден.
-    get:
-      tags: [Workflow Versions]
-      summary: Получить список версий workflow
-      description: Возвращает все логические версии указанного workflow.
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-      responses:
-        '200':
-          description: Список версий для workflow.
-          content:
-            application/json:
-              schema:
-                type: array
-                description: Массив версий workflow.
-                items:
-                  $ref: '#/components/schemas/WorkflowVersion'
-        '404':
-          description: Workflow не найден.
-
-  /workflow-versions/{versionId}/graph:
-    put:
-      tags: [Workflow Versions]
-      summary: Обновить граф версии workflow
-      description: Полностью заменяет граф (ноды и связи) для указанной версии workflow.
-      parameters:
-        - $ref: '#/components/parameters/VersionId'
-      requestBody:
-        required: true
-        description: Новый граф workflow.
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/WorkflowGraph'
-      responses:
-        '200':
-          description: Граф для версии workflow обновлён.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WorkflowGraph'
-        '404':
-          description: Версия workflow не найдена.
-
-  /workflows/{workflowId}/snapshots:
-    get:
-      tags: [Workflow Snapshots]
-      summary: Список снепшотов workflow
-      description: Возвращает все именованные снепшоты текущего workflow (новые сверху).
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-      responses:
-        '200':
-          description: Список снепшотов.
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/WorkflowSnapshot'
-        '404':
-          description: Workflow не найден.
-    post:
-      tags: [Workflow Snapshots]
-      summary: Создать снепшот текущего графа
-      description: Фиксирует текущую ревизию workflow под человекочитаемым именем — можно вернуться к ней позже.
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateSnapshotRequest'
-      responses:
-        '201':
-          description: Снепшот создан.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WorkflowSnapshot'
-        '404':
-          description: Workflow не найден.
-
-  /workflows/{workflowId}/snapshots/{snapshotId}:
-    delete:
-      tags: [Workflow Snapshots]
-      summary: Удалить снепшот
-      description: Удаляет снепшот. Сама ревизия графа остаётся в истории (на неё могут ссылаться runs).
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-        - name: snapshotId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '204':
-          description: Снепшот удалён.
-        '404':
-          description: Снепшот не найден.
-
-  /workflows/{workflowId}/snapshots/{snapshotId}/restore:
-    post:
-      tags: [Workflow Snapshots]
-      summary: Откатить workflow на состояние снепшота
-      description: >
-        Создаёт новую ревизию с графом из снепшота и делает её текущей. История не теряется —
-        откат сам становится точкой в истории, и старые runs продолжают ссылаться на свои ревизии.
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-        - name: snapshotId
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        '200':
-          description: Граф восстановлен из снепшота.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WorkflowGraph'
-        '404':
-          description: Снепшот или workflow не найдены.
-
-  /workflows/{workflowId}/triggers:
-    get:
-      tags: [Triggers]
-      summary: Список триггеров workflow
-      description: >
-        Возвращает все триггеры workflow. Триггеры создаются/удаляются автоматически
-        при сохранении графа (по нодам с type trigger.webhook/cron/interval).
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-      responses:
-        '200':
-          description: Список триггеров для workflow.
-          content:
-            application/json:
-              schema:
-                type: array
-                description: Массив триггеров.
-                items:
-                  $ref: '#/components/schemas/Trigger'
-        '404':
-          description: Workflow не найден.
-
-  /workflows/{workflowId}/triggers/{triggerId}:
-    patch:
-      tags: [Triggers]
-      summary: Включить/выключить триггер
-      description: >
-        Переключает поле `enabled` у триггера. Для cron/interval включение пере-планирует таск,
-        выключение — отменяет. Для webhook отключённый триггер возвращает 404 при вызове по токену.
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-        - name: triggerId
-          in: path
-          required: true
-          description: Идентификатор триггера.
-          schema:
-            type: integer
-            format: int64
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TriggerUpdate'
-      responses:
-        '200':
-          description: Обновлённый триггер.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Trigger'
-        '404':
-          description: Триггер или workflow не найден.
-
-  /webhook/{token}:
-    post:
-      tags: [Triggers]
-      summary: Запуск workflow по webhook
-      description: Принимает входящий webhook и инициирует запуск связанного workflow.
-      parameters:
-        - $ref: '#/components/parameters/Token'
-      requestBody:
-        required: false
-        description: Необязательное тело запроса, которое будет передано в workflow.
-        content:
-          application/json:
-            schema:
-              type: object
-              description: Произвольный JSON-пейлоуд webhook-а.
-      responses:
-        '202':
-          description: Запуск workflow принят в обработку.
-          headers:
-            Location:
-              description: Абсолютный URL для опроса итогового результата запуска (GET /workflow-runs/{runId}/result).
-              schema:
-                type: string
-                format: uri
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WebhookAccepted'
-        '404':
-          description: Webhook с таким токеном не найден.
-
-  /workflows/{workflowId}/runs:
-    post:
-      tags: [Runs]
-      summary: Ручной запуск workflow
-      description: >
-        Запускает выполнение workflow вручную. Принимает произвольный JSON в теле — он будет
-        доступен нодам как `runInput`. Опционально через `startNodeId` можно стартовать только
-        подграф, достижимый из конкретной ноды.
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-        - name: startNodeId
-          in: query
-          required: false
-          description: Если указан — исполняем только subgraph, достижимый из этой ноды.
-          schema:
-            type: string
-      requestBody:
-        required: false
-        description: Произвольный JSON-payload, прокидывается в `runInput` для нод без входов.
-        content:
-          application/json:
-            schema:
-              type: object
-              description: Произвольный контекст запуска.
-      responses:
-        '202':
-          description: Запуск workflow принят.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/WorkflowRun'
-        '404':
-          description: Workflow не найден.
-    get:
-      tags: [Runs]
-      summary: Список запусков workflow
-      description: Возвращает историю запусков указанного workflow.
-      parameters:
-        - $ref: '#/components/parameters/WorkflowId'
-      responses:
-        '200':
-          description: Список запусков для workflow.
-          content:
-            application/json:
-              schema:
-                type: array
-                description: Массив запусков workflow.
-                items:
-                  $ref: '#/components/schemas/WorkflowRun'
-        '404':
-          description: Workflow не найден.
-
-  /workflows/{workflowId}/ab-analytics:
-    get:
-      tags: [Analytics]
-      summary: Аналитика по выбранной A/B-ноде workflow.
-      parameters:
-        - name: workflowId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - name: abNodeId
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
+        "200":
           description: OK
           content:
-            application/json:
+            '*/*':
               schema:
-                $ref: '#/components/schemas/AbAnalyticsResponse'
-        '400':
-          description: BAD REQUEST (node is not an A/B split, or abNodeId blank)
-        '404':
-          description: NOT FOUND (workflow or node)
-
+                $ref: "#/components/schemas/Workflow"
+    put:
+      tags:
+      - Workflows
+      operationId: updateMeta
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowMetaUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowMeta"
+    delete:
+      tags:
+      - Workflows
+      operationId: delete
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /workflow-versions/{versionId}/graph:
+    put:
+      tags:
+      - Versions
+      operationId: putGraph
+      parameters:
+      - name: versionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowGraph"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowGraph"
+  /workflows:
+    get:
+      tags:
+      - Workflows
+      operationId: list
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowMeta"
+    post:
+      tags:
+      - Workflows
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowCreateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Workflow"
+  /workflows/{workflowId}/versions:
+    get:
+      tags:
+      - Workflows
+      summary: Список версий workflow
+      operationId: listVersions
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowVersion"
+    post:
+      tags:
+      - Workflows
+      summary: Создать именованную версию
+      description: Фиксирует текущую ревизию как именованную версию (тег опционален)
+      operationId: createVersion
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowVersionCreateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowVersion"
+  /workflows/{workflowId}/versions/{versionId}/restore:
+    post:
+      tags:
+      - Workflows
+      summary: Откат к версии
+      description: Создаёт новую (append-only) ревизию с графом указанной версии
+      operationId: restoreVersion
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: versionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowGraph"
+  /workflows/{workflowId}/snapshots:
+    get:
+      tags:
+      - Snapshots
+      operationId: list_1
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowSnapshot"
+    post:
+      tags:
+      - Snapshots
+      operationId: create_1
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSnapshotRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowSnapshot"
+  /workflows/{workflowId}/snapshots/{snapshotId}/restore:
+    post:
+      tags:
+      - Snapshots
+      operationId: restore
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: snapshotId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowGraph"
+  /workflows/{workflowId}/runs:
+    get:
+      tags:
+      - Runs
+      operationId: listRuns
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowRun"
+    post:
+      tags:
+      - Runs
+      operationId: runWorkflow
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: startNodeId
+        in: query
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonNode"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowRun"
+  /workflows/{workflowId}/nodes/{nodeId}/debug-run:
+    post:
+      tags:
+      - Debug
+      summary: Отладочный запуск одной ноды
+      description: Исполняет одну выбранную ноду с произвольным входом без прогона
+        графа; результат возвращается синхронно и фиксируется в истории как отладочный
+        запуск.
+      operationId: debugRunNode
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: nodeId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DebugNodeRunRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DebugNodeRunResult"
+  /workflows/{workflowId}/debug-sessions:
+    post:
+      tags:
+      - Debug
+      operationId: start
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DebugStartRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DebugSessionDto"
+  /webhook/{token}:
+    post:
+      tags:
+      - Triggers
+      operationId: webhook
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonNode"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WebhookAccepted"
+  /debug-sessions/{sessionId}/step:
+    post:
+      tags:
+      - Debug
+      operationId: step
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DebugStepRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DebugSessionDto"
+  /debug-sessions/{sessionId}/run-to-end:
+    post:
+      tags:
+      - Debug
+      operationId: runToEnd
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DebugSessionDto"
+  /workflows/{workflowId}/triggers/{triggerId}:
+    patch:
+      tags:
+      - Triggers
+      operationId: update
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: triggerId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriggerUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Trigger"
+  /workflows/{workflowId}/triggers:
+    get:
+      tags:
+      - Triggers
+      operationId: list_2
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Trigger"
+  /workflows/{workflowId}/ab-analytics:
+    get:
+      tags:
+      - Analytics
+      operationId: get_1
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: abNodeId
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AbAnalyticsResponse"
   /workflow-runs/{runId}:
     get:
-      tags: [Runs]
-      summary: Получить запуск workflow
-      description: Возвращает статус и информацию о конкретном запуске workflow.
+      tags:
+      - Runs
+      operationId: getRun
       parameters:
-        - $ref: '#/components/parameters/RunId'
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
       responses:
-        '200':
-          description: Информация о запуске workflow.
+        "200":
+          description: OK
           content:
-            application/json:
+            '*/*':
               schema:
-                $ref: '#/components/schemas/WorkflowRun'
-        '404':
-          description: Запуск не найден.
-
+                $ref: "#/components/schemas/WorkflowRun"
   /workflow-runs/{runId}/result:
     get:
-      tags: [Runs]
-      summary: Получить агрегированный результат запуска
-      description: >
-        Возвращает только итог пайплайна (без поноды-разбивки): статус, тайминги и output
-        терминальных нод. Если терминальная нода одна — её output как есть, иначе объект
-        {nodeId: output} по терминальным.
+      tags:
+      - Runs
+      operationId: getRunResult
       parameters:
-        - $ref: '#/components/parameters/RunId'
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
       responses:
-        '200':
-          description: Итоговый результат запуска.
+        "200":
+          description: OK
           content:
-            application/json:
+            '*/*':
               schema:
-                $ref: '#/components/schemas/WorkflowRunResult'
-        '404':
-          description: Запуск не найден.
-
+                $ref: "#/components/schemas/WorkflowRunResult"
   /node-runs/{nodeRunId}:
     get:
-      tags: [Runs]
-      summary: Получить запуск ноды
-      description: Возвращает детали выполнения отдельной ноды.
+      tags:
+      - Runs
+      operationId: getNodeRun
       parameters:
-        - $ref: '#/components/parameters/NodeRunId'
-      responses:
-        '200':
-          description: Информация о выполнении ноды.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NodeRun'
-        '404':
-          description: Запуск ноды не найден.
-
-components:
-  parameters:
-    WorkflowId:
-      name: workflowId
-      in: path
-      required: true
-      description: Идентификатор workflow.
-      schema:
-        type: string
-    VersionId:
-      name: versionId
-      in: path
-      required: true
-      description: Идентификатор версии workflow.
-      schema:
-        type: string
-    Token:
-      name: token
-      in: path
-      required: true
-      description: Публичный токен webhook-триггера.
-      schema:
-        type: string
-    RunId:
-      name: runId
-      in: path
-      required: true
-      description: Идентификатор запуска workflow.
-      schema:
-        type: string
-    NodeRunId:
-      name: nodeRunId
-      in: path
-      required: true
-      description: Идентификатор запуска отдельной ноды.
-      schema:
-        type: string
-
-  schemas:
-    Workflow:
-      type: object
-      description: Полное представление workflow, включающее метаданные и граф.
-      properties:
-        meta:
-          $ref: '#/components/schemas/WorkflowMeta'
-        graph:
-          $ref: '#/components/schemas/WorkflowGraph'
-
-    WorkflowMeta:
-      type: object
-      description: Метаданные workflow.
-      properties:
-        id:
-          type: string
-          description: Идентификатор workflow.
-        name:
-          type: string
-          description: Название workflow.
-        description:
-          type: string
-          description: Описание workflow.
-        isDemo:
-          type: boolean
-          description: Признак демонстрационного workflow (создан seeder'ом на старте).
-        nodesCount:
+      - name: nodeRunId
+        in: path
+        required: true
+        schema:
           type: integer
-          description: Количество нод в текущей ревизии workflow.
-        createdAt:
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NodeRun"
+  /debug-sessions/{sessionId}:
+    get:
+      tags:
+      - Debug
+      operationId: get_2
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
           type: string
-          description: Время создания в ISO 8601.
-        updatedAt:
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DebugSessionDto"
+    delete:
+      tags:
+      - Debug
+      operationId: close
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
           type: string
-          description: Время последнего изменения в ISO 8601.
-
+      responses:
+        "200":
+          description: OK
+  /workflows/{workflowId}/snapshots/{snapshotId}:
+    delete:
+      tags:
+      - Snapshots
+      operationId: delete_1
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: snapshotId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
     WorkflowMetaUpdate:
       type: object
-      description: Изменяемые поля метаданных workflow.
       properties:
         name:
           type: string
-          description: Новое название workflow.
         description:
           type: string
-          description: Новое описание workflow.
-
-    WorkflowVersion:
+    WorkflowMeta:
+      required:
+      - createdAt
+      - id
+      - isDemo
+      - name
+      - nodesCount
+      - updatedAt
       type: object
-      description: Логическая версия workflow.
       properties:
         id:
           type: string
-          description: Идентификатор версии workflow.
-        workflowId:
+        name:
           type: string
-          description: Идентификатор связанного workflow.
-        tag:
+        description:
           type: string
-          description: Опциональный тег версии (например, v1.0.0).
+        isDemo:
+          type: boolean
+        nodesCount:
+          type: integer
+          format: int32
         createdAt:
           type: string
-          description: Дата создания версии в ISO 8601.
-
-    WorkflowSnapshot:
+        updatedAt:
+          type: string
+    Connection:
+      required:
+      - id
+      - source
+      - target
       type: object
-      description: Именованный снепшот графа workflow — точка восстановления поверх автосейва.
       properties:
         id:
           type: string
-          description: Идентификатор снепшота.
-        workflowId:
+        source:
           type: string
-          description: Идентификатор связанного workflow.
-        name:
+        target:
           type: string
-          description: Человекочитаемое имя снепшота (например, "перед релизом v1.2").
-        description:
+        sourceHandle:
           type: string
-          nullable: true
-          description: Опциональный комментарий.
-        createdAt:
+        targetHandle:
           type: string
-          description: Дата создания снепшота в ISO 8601.
-
-    CreateSnapshotRequest:
+        variant:
+          type: string
+    JsonNode:
       type: object
-      required: [name]
+    Node:
+      required:
+      - id
+      - type
+      type: object
       properties:
-        name:
+        id:
           type: string
-          description: Имя снепшота (обязательное, не пустое).
-        description:
+        type:
           type: string
-          nullable: true
-          description: Опциональный комментарий.
-
+        position:
+          $ref: "#/components/schemas/Position"
+        data:
+          $ref: "#/components/schemas/NodeData"
+    NodeData:
+      type: object
+      properties:
+        label:
+          type: string
+        config:
+          $ref: "#/components/schemas/JsonNode"
+        abConfig:
+          $ref: "#/components/schemas/JsonNode"
+    Position:
+      required:
+      - x
+      - "y"
+      type: object
+      properties:
+        x:
+          type: number
+          format: double
+        "y":
+          type: number
+          format: double
     WorkflowGraph:
+      required:
+      - connections
+      - nodes
+      - versionId
       type: object
-      description: Граф workflow, включающий ноды и связи.
       properties:
         versionId:
           type: string
-          description: Идентификатор версии, которой принадлежит граф.
         nodes:
           type: array
-          description: Список нод workflow.
           items:
-            $ref: '#/components/schemas/Node'
+            $ref: "#/components/schemas/Node"
         connections:
           type: array
-          description: Список соединений между нодами.
           items:
-            $ref: '#/components/schemas/Connection'
-      required: [nodes, connections]
-
-    Node:
+            $ref: "#/components/schemas/Connection"
+    WorkflowCreateRequest:
+      required:
+      - name
       type: object
-      description: Нода workflow.
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    Workflow:
+      required:
+      - graph
+      - meta
+      type: object
+      properties:
+        meta:
+          $ref: "#/components/schemas/WorkflowMeta"
+        graph:
+          $ref: "#/components/schemas/WorkflowGraph"
+    WorkflowVersionCreateRequest:
+      type: object
+      properties:
+        versionTag:
+          type: string
+    WorkflowVersion:
+      required:
+      - createdAt
+      - id
+      - workflowId
+      type: object
       properties:
         id:
           type: string
-          description: Идентификатор ноды.
-        type:
-          type: string
-          description: Тип ноды (trigger, http, ab-fork и т.д.).
-        position:
-          type: object
-          description: Координаты ноды в редакторе графа.
-          properties:
-            x:
-              type: number
-              description: Координата X.
-            y:
-              type: number
-              description: Координата Y.
-        data:
-          type: object
-          description: Конфигурация ноды и дополнительные данные.
-          properties:
-            label:
-              type: string
-              description: Человекочитаемое название ноды.
-            config:
-              type: object
-              description: Произвольная конфигурация ноды.
-            abConfig:
-              type: object
-              description: Конфигурация A/B-теста для ноды, если применимо.
-
-    Connection:
-      type: object
-      description: Соединение между двумя нодами workflow.
-      properties:
-        id:
-          type: string
-          description: Идентификатор соединения.
-        source:
-          type: string
-          description: ID исходной ноды.
-        target:
-          type: string
-          description: ID целевой ноды.
-        sourceHandle:
-          type: string
-          description: Метка исходящего порта (например, 'A' или 'B').
-        targetHandle:
-          type: string
-          description: Метка входящего порта.
-      required: [id, source, target]
-
-    Trigger:
-      type: object
-      description: Триггер запуска workflow, привязанный к ноде в графе.
-      properties:
-        id:
-          type: string
-          description: Идентификатор триггера.
         workflowId:
           type: string
-          description: Идентификатор workflow.
-        nodeId:
+        tag:
           type: string
-          description: Идентификатор ноды в графе, к которой привязан триггер.
-        type:
+        createdAt:
           type: string
-          description: Тип триггера (webhook, cron, interval).
-        config:
-          type: object
-          description: Конфигурация триггера (например, cron-выражение, everySeconds).
-        token:
-          type: string
-          description: Публичный токен для webhook-триггера (генерируется на бэке).
-        enabled:
-          type: boolean
-          description: >
-            Активен ли триггер. Для cron/interval отключённый триггер не запускается по расписанию.
-            Для webhook отключённый триггер возвращает 404 при попытке вызова.
-
-    TriggerUpdate:
+    CreateSnapshotRequest:
+      required:
+      - name
       type: object
-      description: Тело для PATCH триггера — переключение активности.
-      required: [enabled]
       properties:
-        enabled:
-          type: boolean
-          description: Включить (true) или выключить (false) триггер.
-
-    WorkflowRun:
+        name:
+          type: string
+        description:
+          type: string
+    WorkflowSnapshot:
+      required:
+      - createdAt
+      - id
+      - name
+      - workflowId
       type: object
-      description: Один запуск workflow.
       properties:
         id:
           type: string
-          description: Идентификатор запуска.
         workflowId:
           type: string
-          description: Идентификатор workflow.
-        status:
+        name:
           type: string
-          description: Статус запуска (queued, running, success, failed).
-        startedAt:
+        description:
           type: string
-          description: Время старта запуска (ISO-8601).
-        finishedAt:
+        createdAt:
           type: string
-          description: Время завершения запуска (ISO-8601).
-        durationMs:
-          type: integer
-          format: int64
-          description: Длительность запуска в миллисекундах. Заполнено только для завершённых запусков.
-        input:
-          type: object
-          description: Входные параметры запуска (что было передано в POST как payload).
-        output:
-          type: object
-          description: Агрегированный результат выполнения workflow.
-        startNodeId:
-          type: string
-          description: Если запуск стартован с конкретной ноды (subgraph) — её id.
-        nodes:
-          type: array
-          description: Состояние каждой ноды этого запуска в порядке создания node_run-записей.
-          items:
-            $ref: '#/components/schemas/NodeRun'
-
     NodeRun:
+      required:
+      - id
+      - nodeId
+      - status
+      - workflowRunId
       type: object
-      description: Результат выполнения отдельной ноды.
       properties:
         id:
           type: string
-          description: Идентификатор запуска ноды.
         workflowRunId:
           type: string
-          description: Идентификатор запуска workflow.
         nodeId:
           type: string
-          description: Идентификатор ноды.
         status:
           type: string
-          description: Статус выполнения ноды.
         startedAt:
           type: string
-          description: Время старта ноды.
         finishedAt:
           type: string
-          description: Время завершения ноды.
         input:
-          type: object
-          description: Входные данные ноды.
+          $ref: "#/components/schemas/JsonNode"
         output:
-          type: object
-          description: Выходные данные ноды.
+          $ref: "#/components/schemas/JsonNode"
         errorMessage:
           type: string
-          description: Текст ошибки, если выполнение завершилось неуспешно.
-
-    WebhookAccepted:
+    WorkflowRun:
+      required:
+      - id
+      - isDebug
+      - nodes
+      - status
+      - workflowId
       type: object
-      description: Подтверждение приёма webhook-а с ссылкой на итоговый результат запуска.
-      required: [run, pollUrl]
-      properties:
-        run:
-          $ref: '#/components/schemas/WorkflowRun'
-        pollUrl:
-          type: string
-          format: uri
-          description: Абсолютный URL для опроса итогового результата запуска (GET /workflow-runs/{runId}/result).
-
-    WorkflowRunResult:
-      type: object
-      description: Итоговый результат пайплайна без поноды-разбивки.
-      required: [id, workflowId, status]
       properties:
         id:
           type: string
-          description: Идентификатор запуска.
         workflowId:
           type: string
-          description: Идентификатор workflow.
         status:
           type: string
-          description: Статус запуска (queued/running/success/failed).
         startedAt:
           type: string
-          description: Время старта запуска.
         finishedAt:
           type: string
-          description: Время завершения запуска.
         durationMs:
           type: integer
           format: int64
-          description: Длительность выполнения, мс.
+        input:
+          $ref: "#/components/schemas/JsonNode"
         output:
-          description: >
-            Агрегированный output пайплайна — данные терминальных нод. Если терминальная
-            нода одна — её output как есть, иначе объект {nodeId: output}. Null, пока
-            запуск не завершён или выходов нет.
-          nullable: true
-
-    AbAnalyticsResponse:
+          $ref: "#/components/schemas/JsonNode"
+        startNodeId:
+          type: string
+        isDebug:
+          type: boolean
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeRun"
+    DebugNodeRunRequest:
       type: object
-      required: [abNodeId, mode, totalRuns, excludedNoVariant, computedAt, variants, warnings]
       properties:
-        abNodeId: { type: string }
-        mode: { type: string, enum: [pick, split] }
-        totalRuns: { type: integer }
-        excludedNoVariant: { type: integer }
-        computedAt: { type: string, format: date-time }
+        input:
+          $ref: "#/components/schemas/JsonNode"
+    DebugNodeRunResult:
+      required:
+      - nodeId
+      - runId
+      - status
+      - workflowId
+      type: object
+      properties:
+        runId:
+          type: string
+        workflowId:
+          type: string
+        nodeId:
+          type: string
+        status:
+          type: string
+        input:
+          $ref: "#/components/schemas/JsonNode"
+        output:
+          $ref: "#/components/schemas/JsonNode"
+        errorMessage:
+          type: string
+    DebugStartRequest:
+      type: object
+      properties:
+        input:
+          $ref: "#/components/schemas/JsonNode"
+        startNodeId:
+          type: string
+    DebugFailedNode:
+      required:
+      - message
+      - nodeId
+      type: object
+      properties:
+        nodeId:
+          type: string
+        message:
+          type: string
+    DebugSessionDto:
+      required:
+      - completed
+      - createdAt
+      - failed
+      - outputs
+      - ready
+      - readyInputs
+      - sessionId
+      - skipped
+      - status
+      - updatedAt
+      - versionId
+      - workflowId
+      type: object
+      properties:
+        sessionId:
+          type: string
+        workflowId:
+          type: string
+        versionId:
+          type: string
+        status:
+          type: string
+        input:
+          $ref: "#/components/schemas/JsonNode"
+        outputs:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/JsonNode"
+        completed:
+          type: array
+          items:
+            type: string
+        skipped:
+          type: array
+          items:
+            type: string
+        failed:
+          type: array
+          items:
+            $ref: "#/components/schemas/DebugFailedNode"
+        ready:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        readyInputs:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/JsonNode"
+    WebhookAccepted:
+      required:
+      - pollUrl
+      - run
+      type: object
+      properties:
+        run:
+          $ref: "#/components/schemas/WorkflowRun"
+        pollUrl:
+          type: string
+    DebugStepRequest:
+      type: object
+      properties:
+        nodeId:
+          type: string
+    TriggerUpdate:
+      required:
+      - enabled
+      type: object
+      properties:
+        enabled:
+          type: boolean
+    Trigger:
+      required:
+      - enabled
+      - id
+      - nodeId
+      - type
+      - workflowId
+      type: object
+      properties:
+        id:
+          type: string
+        workflowId:
+          type: string
+        nodeId:
+          type: string
+        type:
+          type: string
+        config:
+          $ref: "#/components/schemas/JsonNode"
+        token:
+          type: string
+        enabled:
+          type: boolean
+    AbAnalyticsResponse:
+      required:
+      - abNodeId
+      - computedAt
+      - excludedNoVariant
+      - mode
+      - totalRuns
+      - variants
+      - warnings
+      type: object
+      properties:
+        abNodeId:
+          type: string
+        mode:
+          type: string
+        totalRuns:
+          type: integer
+          format: int32
+        excludedNoVariant:
+          type: integer
+          format: int32
+        computedAt:
+          type: string
+          format: date-time
         variants:
           type: array
-          items: { $ref: '#/components/schemas/AbVariantRow' }
+          items:
+            $ref: "#/components/schemas/AbVariantRow"
         warnings:
           type: array
-          items: { type: string }
+          items:
+            type: string
     AbVariantRow:
+      required:
+      - color
+      - isBaseline
+      - isSignificant
+      - key
+      - label
+      - runs
+      - trafficCount
+      - trafficPct
       type: object
-      required: [key, label, color, runs, trafficCount, trafficPct, isBaseline, isSignificant]
       properties:
-        key: { type: string }
-        label: { type: string }
-        color: { type: string }
-        weight: { type: integer, nullable: true }
-        runs: { type: integer }
-        trafficCount: { type: integer }
-        trafficPct: { type: number, format: double }
-        conversions: { type: integer, nullable: true }
-        conversionPct: { type: number, format: double, nullable: true }
-        ciLow: { type: number, format: double, nullable: true }
-        ciHigh: { type: number, format: double, nullable: true }
-        liftVsBaseline: { type: number, format: double, nullable: true }
-        pValue: { type: number, format: double, nullable: true }
-        isBaseline: { type: boolean }
-        isSignificant: { type: boolean }
+        key:
+          type: string
+        label:
+          type: string
+        color:
+          type: string
+        weight:
+          type: integer
+          format: int32
+        runs:
+          type: integer
+          format: int32
+        trafficCount:
+          type: integer
+          format: int32
+        trafficPct:
+          type: number
+          format: double
+        conversions:
+          type: integer
+          format: int32
+        conversionPct:
+          type: number
+          format: double
+        ciLow:
+          type: number
+          format: double
+        ciHigh:
+          type: number
+          format: double
+        liftVsBaseline:
+          type: number
+          format: double
+        pValue:
+          type: number
+          format: double
+          writeOnly: true
+        isBaseline:
+          type: boolean
+        isSignificant:
+          type: boolean
+        pvalue:
+          type: number
+          format: double
+    WorkflowRunResult:
+      required:
+      - id
+      - status
+      - workflowId
+      type: object
+      properties:
+        id:
+          type: string
+        workflowId:
+          type: string
+        status:
+          type: string
+        startedAt:
+          type: string
+        finishedAt:
+          type: string
+        durationMs:
+          type: integer
+          format: int64
+        output:
+          $ref: "#/components/schemas/JsonNode"

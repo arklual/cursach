@@ -56,9 +56,17 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'results',
-    title: 'Результаты',
-    description: 'Внизу — панель результатов. Здесь отображаются логи выполнения, метрики конверсии и статистика A/B-теста.',
+    title: 'История запусков',
+    description: 'Внизу — панель запусков. Здесь отображаются логи выполнения и вход/выход каждой ноды.',
     highlightElement: '.run-panel',
+    position: 'top',
+    icon: 'analytics'
+  },
+  {
+    id: 'analytics',
+    title: 'A/B-аналитика',
+    description: 'Вкладка «Аналитика» показывает конверсии вариантов, доверительные интервалы и статистически значимый лучший вариант.',
+    highlightElement: '.analytics-panel',
     position: 'top',
     icon: 'analytics'
   }

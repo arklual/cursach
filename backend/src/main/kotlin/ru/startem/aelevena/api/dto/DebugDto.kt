@@ -39,3 +39,22 @@ data class DebugStepRequest(
     /** If null — execute the first ready node. Otherwise execute the named one (must be in `ready`). */
     val nodeId: String? = null,
 )
+
+/** Запрос пошаговой отладки одной ноды: произвольное входное значение без прогона графа. */
+data class DebugNodeRunRequest(
+    val input: JsonNode? = null,
+)
+
+/**
+ * Синхронный результат отладочного запуска одной ноды. Сам запуск также фиксируется
+ * в истории (`workflow_run.is_debug = true`) с единственной записью `node_run`.
+ */
+data class DebugNodeRunResult(
+    val runId: String,
+    val workflowId: String,
+    val nodeId: String,
+    val status: String,
+    val input: JsonNode? = null,
+    val output: JsonNode? = null,
+    val errorMessage: String? = null,
+)

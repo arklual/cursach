@@ -4,78 +4,6 @@
  */
 
 export interface paths {
-    "/workflows": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список workflow
-         * @description Возвращает список всех workflow.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Список workflow. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowMeta"][];
-                    };
-                };
-            };
-        };
-        put?: never;
-        /**
-         * Создать workflow
-         * @description Создаёт новый workflow без привязки к проекту.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Данные для создания workflow. */
-            requestBody: {
-                content: {
-                    "application/json": {
-                        /** @description Название workflow. */
-                        name: string;
-                        /** @description Описание workflow. */
-                        description?: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Workflow успешно создан. */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Workflow"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/workflows/{workflowId}": {
         parameters: {
             query?: never;
@@ -83,194 +11,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Получить workflow
-         * @description Возвращает метаданные и актуальный граф workflow.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Информация о workflow. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Workflow"];
-                    };
-                };
-                /** @description Workflow не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        /**
-         * Обновить метаданные workflow
-         * @description Обновляет базовые поля workflow (название, описание).
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                };
-                cookie?: never;
-            };
-            /** @description Новые метаданные workflow. */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["WorkflowMetaUpdate"];
-                };
-            };
-            responses: {
-                /** @description Метаданные workflow обновлены. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowMeta"];
-                    };
-                };
-                /** @description Workflow не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        get: operations["get"];
+        put: operations["updateMeta"];
         post?: never;
-        /**
-         * Удалить workflow
-         * @description Полностью удаляет workflow и связанные данные.
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Workflow удалён. */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Workflow не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/workflows/{workflowId}/versions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Получить список версий workflow
-         * @description Возвращает все логические версии указанного workflow.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Список версий для workflow. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowVersion"][];
-                    };
-                };
-                /** @description Workflow не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        /**
-         * Создать версию workflow
-         * @description Создаёт логическую версию workflow и привязывает её к текущему графу.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Версия workflow создана. */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowVersion"];
-                    };
-                };
-                /** @description Workflow не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
+        delete: operations["delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -284,46 +28,65 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /**
-         * Обновить граф версии workflow
-         * @description Полностью заменяет граф (ноды и связи) для указанной версии workflow.
-         */
-        put: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор версии workflow. */
-                    versionId: components["parameters"]["VersionId"];
-                };
-                cookie?: never;
-            };
-            /** @description Новый граф workflow. */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["WorkflowGraph"];
-                };
-            };
-            responses: {
-                /** @description Граф для версии workflow обновлён. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowGraph"];
-                    };
-                };
-                /** @description Версия workflow не найдена. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        put: operations["putGraph"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["list"];
+        put?: never;
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{workflowId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Список версий workflow */
+        get: operations["listVersions"];
+        put?: never;
+        /**
+         * Создать именованную версию
+         * @description Фиксирует текущую ревизию как именованную версию (тег опционален)
+         */
+        post: operations["createVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{workflowId}/versions/{versionId}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Откат к версии
+         * @description Создаёт новую (append-only) ревизию с графом указанной версии
+         */
+        post: operations["restoreVersion"];
         delete?: never;
         options?: never;
         head?: never;
@@ -337,128 +100,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Список снепшотов workflow
-         * @description Возвращает все именованные снепшоты текущего workflow (новые сверху).
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Список снепшотов. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowSnapshot"][];
-                    };
-                };
-                /** @description Workflow не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        get: operations["list_1"];
         put?: never;
-        /**
-         * Создать снепшот текущего графа
-         * @description Фиксирует текущую ревизию workflow под человекочитаемым именем — можно вернуться к ней позже.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["CreateSnapshotRequest"];
-                };
-            };
-            responses: {
-                /** @description Снепшот создан. */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowSnapshot"];
-                    };
-                };
-                /** @description Workflow не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        post: operations["create_1"];
         delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/workflows/{workflowId}/snapshots/{snapshotId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Удалить снепшот
-         * @description Удаляет снепшот. Сама ревизия графа остаётся в истории (на неё могут ссылаться runs).
-         */
-        delete: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                    snapshotId: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Снепшот удалён. */
-                204: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description Снепшот не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
         options?: never;
         head?: never;
         patch?: never;
@@ -473,90 +118,107 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Откатить workflow на состояние снепшота
-         * @description Создаёт новую ревизию с графом из снепшота и делает её текущей. История не теряется — откат сам становится точкой в истории, и старые runs продолжают ссылаться на свои ревизии.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                    snapshotId: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Граф восстановлен из снепшота. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowGraph"];
-                    };
-                };
-                /** @description Снепшот или workflow не найдены. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        post: operations["restore"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/workflows/{workflowId}/triggers": {
+    "/workflows/{workflowId}/runs": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Список триггеров workflow
-         * @description Возвращает все триггеры workflow. Триггеры создаются/удаляются автоматически при сохранении графа (по нодам с type trigger.webhook/cron/interval).
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Список триггеров для workflow. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Trigger"][];
-                    };
-                };
-                /** @description Workflow не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        get: operations["listRuns"];
         put?: never;
-        post?: never;
+        post: operations["runWorkflow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{workflowId}/nodes/{nodeId}/debug-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Отладочный запуск одной ноды
+         * @description Исполняет одну выбранную ноду с произвольным входом без прогона графа; результат возвращается синхронно и фиксируется в истории как отладочный запуск.
+         */
+        post: operations["debugRunNode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{workflowId}/debug-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/webhook/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["webhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/debug-sessions/{sessionId}/step": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["step"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/debug-sessions/{sessionId}/run-to-end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["runToEnd"];
         delete?: never;
         options?: never;
         head?: never;
@@ -576,188 +238,19 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /**
-         * Включить/выключить триггер
-         * @description Переключает поле `enabled` у триггера. Для cron/interval включение пере-планирует таск, выключение — отменяет. Для webhook отключённый триггер возвращает 404 при вызове по токену.
-         */
-        patch: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                    /** @description Идентификатор триггера. */
-                    triggerId: number;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["TriggerUpdate"];
-                };
-            };
-            responses: {
-                /** @description Обновлённый триггер. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Trigger"];
-                    };
-                };
-                /** @description Триггер или workflow не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        patch: operations["update"];
         trace?: never;
     };
-    "/webhook/{token}": {
+    "/workflows/{workflowId}/triggers": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["list_2"];
         put?: never;
-        /**
-         * Запуск workflow по webhook
-         * @description Принимает входящий webhook и инициирует запуск связанного workflow.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Публичный токен webhook-триггера. */
-                    token: components["parameters"]["Token"];
-                };
-                cookie?: never;
-            };
-            /** @description Необязательное тело запроса, которое будет передано в workflow. */
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Запуск workflow принят в обработку. */
-                202: {
-                    headers: {
-                        /** @description Абсолютный URL для опроса итогового результата запуска (GET /workflow-runs/{runId}/result). */
-                        Location?: string;
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WebhookAccepted"];
-                    };
-                };
-                /** @description Webhook с таким токеном не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/workflows/{workflowId}/runs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Список запусков workflow
-         * @description Возвращает историю запусков указанного workflow.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Список запусков для workflow. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowRun"][];
-                    };
-                };
-                /** @description Workflow не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
-        put?: never;
-        /**
-         * Ручной запуск workflow
-         * @description Запускает выполнение workflow вручную. Принимает произвольный JSON в теле — он будет доступен нодам как `runInput`. Опционально через `startNodeId` можно стартовать только подграф, достижимый из конкретной ноды.
-         */
-        post: {
-            parameters: {
-                query?: {
-                    /** @description Если указан — исполняем только subgraph, достижимый из этой ноды. */
-                    startNodeId?: string;
-                };
-                header?: never;
-                path: {
-                    /** @description Идентификатор workflow. */
-                    workflowId: components["parameters"]["WorkflowId"];
-                };
-                cookie?: never;
-            };
-            /** @description Произвольный JSON-payload, прокидывается в `runInput` для нод без входов. */
-            requestBody?: {
-                content: {
-                    "application/json": Record<string, never>;
-                };
-            };
-            responses: {
-                /** @description Запуск workflow принят. */
-                202: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowRun"];
-                    };
-                };
-                /** @description Workflow не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -771,45 +264,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Аналитика по выбранной A/B-ноде workflow. */
-        get: {
-            parameters: {
-                query: {
-                    abNodeId: string;
-                };
-                header?: never;
-                path: {
-                    workflowId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["AbAnalyticsResponse"];
-                    };
-                };
-                /** @description BAD REQUEST (node is not an A/B split, or abNodeId blank) */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                /** @description NOT FOUND (workflow or node) */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        get: operations["get_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -825,40 +280,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Получить запуск workflow
-         * @description Возвращает статус и информацию о конкретном запуске workflow.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор запуска workflow. */
-                    runId: components["parameters"]["RunId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Информация о запуске workflow. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowRun"];
-                    };
-                };
-                /** @description Запуск не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        get: operations["getRun"];
         put?: never;
         post?: never;
         delete?: never;
@@ -874,40 +296,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Получить агрегированный результат запуска
-         * @description Возвращает только итог пайплайна (без поноды-разбивки): статус, тайминги и output терминальных нод. Если терминальная нода одна — её output как есть, иначе объект {nodeId: output} по терминальным.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор запуска workflow. */
-                    runId: components["parameters"]["RunId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Итоговый результат запуска. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["WorkflowRunResult"];
-                    };
-                };
-                /** @description Запуск не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        get: operations["getRunResult"];
         put?: never;
         post?: never;
         delete?: never;
@@ -923,43 +312,42 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Получить запуск ноды
-         * @description Возвращает детали выполнения отдельной ноды.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    /** @description Идентификатор запуска отдельной ноды. */
-                    nodeRunId: components["parameters"]["NodeRunId"];
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Информация о выполнении ноды. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["NodeRun"];
-                    };
-                };
-                /** @description Запуск ноды не найден. */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-            };
-        };
+        get: operations["getNodeRun"];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/debug-sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_2"];
+        put?: never;
+        post?: never;
+        delete: operations["close"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflows/{workflowId}/snapshots/{snapshotId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["delete_1"];
         options?: never;
         head?: never;
         patch?: never;
@@ -969,213 +357,170 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description Полное представление workflow, включающее метаданные и граф. */
-        Workflow: {
-            meta?: components["schemas"]["WorkflowMeta"];
-            graph?: components["schemas"]["WorkflowGraph"];
-        };
-        /** @description Метаданные workflow. */
-        WorkflowMeta: {
-            /** @description Идентификатор workflow. */
-            id?: string;
-            /** @description Название workflow. */
-            name?: string;
-            /** @description Описание workflow. */
-            description?: string;
-            /** @description Признак демонстрационного workflow (создан seeder'ом на старте). */
-            isDemo?: boolean;
-            /** @description Количество нод в текущей ревизии workflow. */
-            nodesCount?: number;
-            /** @description Время создания в ISO 8601. */
-            createdAt?: string;
-            /** @description Время последнего изменения в ISO 8601. */
-            updatedAt?: string;
-        };
-        /** @description Изменяемые поля метаданных workflow. */
         WorkflowMetaUpdate: {
-            /** @description Новое название workflow. */
             name?: string;
-            /** @description Новое описание workflow. */
             description?: string;
         };
-        /** @description Логическая версия workflow. */
-        WorkflowVersion: {
-            /** @description Идентификатор версии workflow. */
-            id?: string;
-            /** @description Идентификатор связанного workflow. */
-            workflowId?: string;
-            /** @description Опциональный тег версии (например, v1.0.0). */
-            tag?: string;
-            /** @description Дата создания версии в ISO 8601. */
-            createdAt?: string;
-        };
-        /** @description Именованный снепшот графа workflow — точка восстановления поверх автосейва. */
-        WorkflowSnapshot: {
-            /** @description Идентификатор снепшота. */
-            id?: string;
-            /** @description Идентификатор связанного workflow. */
-            workflowId?: string;
-            /** @description Человекочитаемое имя снепшота (например, "перед релизом v1.2"). */
-            name?: string;
-            /** @description Опциональный комментарий. */
-            description?: string | null;
-            /** @description Дата создания снепшота в ISO 8601. */
-            createdAt?: string;
-        };
-        CreateSnapshotRequest: {
-            /** @description Имя снепшота (обязательное, не пустое). */
+        WorkflowMeta: {
+            id: string;
             name: string;
-            /** @description Опциональный комментарий. */
-            description?: string | null;
+            description?: string;
+            isDemo: boolean;
+            /** Format: int32 */
+            nodesCount: number;
+            createdAt: string;
+            updatedAt: string;
         };
-        /** @description Граф workflow, включающий ноды и связи. */
+        Connection: {
+            id: string;
+            source: string;
+            target: string;
+            sourceHandle?: string;
+            targetHandle?: string;
+            variant?: string;
+        };
+        JsonNode: Record<string, never>;
+        Node: {
+            id: string;
+            type: string;
+            position?: components["schemas"]["Position"];
+            data?: components["schemas"]["NodeData"];
+        };
+        NodeData: {
+            label?: string;
+            config?: components["schemas"]["JsonNode"];
+            abConfig?: components["schemas"]["JsonNode"];
+        };
+        Position: {
+            /** Format: double */
+            x: number;
+            /** Format: double */
+            y: number;
+        };
         WorkflowGraph: {
-            /** @description Идентификатор версии, которой принадлежит граф. */
-            versionId?: string;
-            /** @description Список нод workflow. */
+            versionId: string;
             nodes: components["schemas"]["Node"][];
-            /** @description Список соединений между нодами. */
             connections: components["schemas"]["Connection"][];
         };
-        /** @description Нода workflow. */
-        Node: {
-            /** @description Идентификатор ноды. */
-            id?: string;
-            /** @description Тип ноды (trigger, http, ab-fork и т.д.). */
-            type?: string;
-            /** @description Координаты ноды в редакторе графа. */
-            position?: {
-                /** @description Координата X. */
-                x?: number;
-                /** @description Координата Y. */
-                y?: number;
-            };
-            /** @description Конфигурация ноды и дополнительные данные. */
-            data?: {
-                /** @description Человекочитаемое название ноды. */
-                label?: string;
-                /** @description Произвольная конфигурация ноды. */
-                config?: Record<string, never>;
-                /** @description Конфигурация A/B-теста для ноды, если применимо. */
-                abConfig?: Record<string, never>;
-            };
+        WorkflowCreateRequest: {
+            name: string;
+            description?: string;
         };
-        /** @description Соединение между двумя нодами workflow. */
-        Connection: {
-            /** @description Идентификатор соединения. */
+        Workflow: {
+            meta: components["schemas"]["WorkflowMeta"];
+            graph: components["schemas"]["WorkflowGraph"];
+        };
+        WorkflowVersionCreateRequest: {
+            versionTag?: string;
+        };
+        WorkflowVersion: {
             id: string;
-            /** @description ID исходной ноды. */
-            source: string;
-            /** @description ID целевой ноды. */
-            target: string;
-            /** @description Метка исходящего порта (например, 'A' или 'B'). */
-            sourceHandle?: string;
-            /** @description Метка входящего порта. */
-            targetHandle?: string;
+            workflowId: string;
+            tag?: string;
+            createdAt: string;
         };
-        /** @description Триггер запуска workflow, привязанный к ноде в графе. */
-        Trigger: {
-            /** @description Идентификатор триггера. */
-            id?: string;
-            /** @description Идентификатор workflow. */
-            workflowId?: string;
-            /** @description Идентификатор ноды в графе, к которой привязан триггер. */
-            nodeId?: string;
-            /** @description Тип триггера (webhook, cron, interval). */
-            type?: string;
-            /** @description Конфигурация триггера (например, cron-выражение, everySeconds). */
-            config?: Record<string, never>;
-            /** @description Публичный токен для webhook-триггера (генерируется на бэке). */
-            token?: string;
-            /** @description Активен ли триггер. Для cron/interval отключённый триггер не запускается по расписанию. Для webhook отключённый триггер возвращает 404 при попытке вызова. */
-            enabled?: boolean;
+        CreateSnapshotRequest: {
+            name: string;
+            description?: string;
         };
-        /** @description Тело для PATCH триггера — переключение активности. */
-        TriggerUpdate: {
-            /** @description Включить (true) или выключить (false) триггер. */
-            enabled: boolean;
+        WorkflowSnapshot: {
+            id: string;
+            workflowId: string;
+            name: string;
+            description?: string;
+            createdAt: string;
         };
-        /** @description Один запуск workflow. */
-        WorkflowRun: {
-            /** @description Идентификатор запуска. */
-            id?: string;
-            /** @description Идентификатор workflow. */
-            workflowId?: string;
-            /** @description Статус запуска (queued, running, success, failed). */
-            status?: string;
-            /** @description Время старта запуска (ISO-8601). */
-            startedAt?: string;
-            /** @description Время завершения запуска (ISO-8601). */
-            finishedAt?: string;
-            /**
-             * Format: int64
-             * @description Длительность запуска в миллисекундах. Заполнено только для завершённых запусков.
-             */
-            durationMs?: number;
-            /** @description Входные параметры запуска (что было передано в POST как payload). */
-            input?: Record<string, never>;
-            /** @description Агрегированный результат выполнения workflow. */
-            output?: Record<string, never>;
-            /** @description Если запуск стартован с конкретной ноды (subgraph) — её id. */
-            startNodeId?: string;
-            /** @description Состояние каждой ноды этого запуска в порядке создания node_run-записей. */
-            nodes?: components["schemas"]["NodeRun"][];
-        };
-        /** @description Результат выполнения отдельной ноды. */
         NodeRun: {
-            /** @description Идентификатор запуска ноды. */
-            id?: string;
-            /** @description Идентификатор запуска workflow. */
-            workflowRunId?: string;
-            /** @description Идентификатор ноды. */
-            nodeId?: string;
-            /** @description Статус выполнения ноды. */
-            status?: string;
-            /** @description Время старта ноды. */
+            id: string;
+            workflowRunId: string;
+            nodeId: string;
+            status: string;
             startedAt?: string;
-            /** @description Время завершения ноды. */
             finishedAt?: string;
-            /** @description Входные данные ноды. */
-            input?: Record<string, never>;
-            /** @description Выходные данные ноды. */
-            output?: Record<string, never>;
-            /** @description Текст ошибки, если выполнение завершилось неуспешно. */
+            input?: components["schemas"]["JsonNode"];
+            output?: components["schemas"]["JsonNode"];
             errorMessage?: string;
         };
-        /** @description Подтверждение приёма webhook-а с ссылкой на итоговый результат запуска. */
+        WorkflowRun: {
+            id: string;
+            workflowId: string;
+            status: string;
+            startedAt?: string;
+            finishedAt?: string;
+            /** Format: int64 */
+            durationMs?: number;
+            input?: components["schemas"]["JsonNode"];
+            output?: components["schemas"]["JsonNode"];
+            startNodeId?: string;
+            isDebug: boolean;
+            nodes: components["schemas"]["NodeRun"][];
+        };
+        DebugNodeRunRequest: {
+            input?: components["schemas"]["JsonNode"];
+        };
+        DebugNodeRunResult: {
+            runId: string;
+            workflowId: string;
+            nodeId: string;
+            status: string;
+            input?: components["schemas"]["JsonNode"];
+            output?: components["schemas"]["JsonNode"];
+            errorMessage?: string;
+        };
+        DebugStartRequest: {
+            input?: components["schemas"]["JsonNode"];
+            startNodeId?: string;
+        };
+        DebugFailedNode: {
+            nodeId: string;
+            message: string;
+        };
+        DebugSessionDto: {
+            sessionId: string;
+            workflowId: string;
+            versionId: string;
+            status: string;
+            input?: components["schemas"]["JsonNode"];
+            outputs: {
+                [key: string]: components["schemas"]["JsonNode"];
+            };
+            completed: string[];
+            skipped: string[];
+            failed: components["schemas"]["DebugFailedNode"][];
+            ready: string[];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            readyInputs: {
+                [key: string]: components["schemas"]["JsonNode"];
+            };
+        };
         WebhookAccepted: {
             run: components["schemas"]["WorkflowRun"];
-            /**
-             * Format: uri
-             * @description Абсолютный URL для опроса итогового результата запуска (GET /workflow-runs/{runId}/result).
-             */
             pollUrl: string;
         };
-        /** @description Итоговый результат пайплайна без поноды-разбивки. */
-        WorkflowRunResult: {
-            /** @description Идентификатор запуска. */
+        DebugStepRequest: {
+            nodeId?: string;
+        };
+        TriggerUpdate: {
+            enabled: boolean;
+        };
+        Trigger: {
             id: string;
-            /** @description Идентификатор workflow. */
             workflowId: string;
-            /** @description Статус запуска (queued/running/success/failed). */
-            status: string;
-            /** @description Время старта запуска. */
-            startedAt?: string;
-            /** @description Время завершения запуска. */
-            finishedAt?: string;
-            /**
-             * Format: int64
-             * @description Длительность выполнения, мс.
-             */
-            durationMs?: number;
-            /** @description Агрегированный output пайплайна — данные терминальных нод. Если терминальная нода одна — её output как есть, иначе объект {nodeId: output}. Null, пока запуск не завершён или выходов нет. */
-            output?: unknown;
+            nodeId: string;
+            type: string;
+            config?: components["schemas"]["JsonNode"];
+            token?: string;
+            enabled: boolean;
         };
         AbAnalyticsResponse: {
             abNodeId: string;
-            /** @enum {string} */
-            mode: "pick" | "split";
+            mode: string;
+            /** Format: int32 */
             totalRuns: number;
+            /** Format: int32 */
             excludedNoVariant: number;
             /** Format: date-time */
             computedAt: string;
@@ -1186,42 +531,707 @@ export interface components {
             key: string;
             label: string;
             color: string;
-            weight?: number | null;
+            /** Format: int32 */
+            weight?: number;
+            /** Format: int32 */
             runs: number;
+            /** Format: int32 */
             trafficCount: number;
             /** Format: double */
             trafficPct: number;
-            conversions?: number | null;
+            /** Format: int32 */
+            conversions?: number;
             /** Format: double */
-            conversionPct?: number | null;
+            conversionPct?: number;
             /** Format: double */
-            ciLow?: number | null;
+            ciLow?: number;
             /** Format: double */
-            ciHigh?: number | null;
+            ciHigh?: number;
             /** Format: double */
-            liftVsBaseline?: number | null;
+            liftVsBaseline?: number;
             /** Format: double */
-            pValue?: number | null;
+            pValue?: number;
             isBaseline: boolean;
             isSignificant: boolean;
+            /** Format: double */
+            pvalue?: number;
+        };
+        WorkflowRunResult: {
+            id: string;
+            workflowId: string;
+            status: string;
+            startedAt?: string;
+            finishedAt?: string;
+            /** Format: int64 */
+            durationMs?: number;
+            output?: components["schemas"]["JsonNode"];
         };
     };
     responses: never;
-    parameters: {
-        /** @description Идентификатор workflow. */
-        WorkflowId: string;
-        /** @description Идентификатор версии workflow. */
-        VersionId: string;
-        /** @description Публичный токен webhook-триггера. */
-        Token: string;
-        /** @description Идентификатор запуска workflow. */
-        RunId: string;
-        /** @description Идентификатор запуска отдельной ноды. */
-        NodeRunId: string;
-    };
+    parameters: never;
     requestBodies: never;
     headers: never;
     pathItems: never;
 }
 export type $defs = Record<string, never>;
-export type operations = Record<string, never>;
+export interface operations {
+    get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Workflow"];
+                };
+            };
+        };
+    };
+    updateMeta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowMetaUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowMeta"];
+                };
+            };
+        };
+    };
+    delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    putGraph: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                versionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowGraph"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowGraph"];
+                };
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowMeta"][];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkflowCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Workflow"];
+                };
+            };
+        };
+    };
+    listVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowVersion"][];
+                };
+            };
+        };
+    };
+    createVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["WorkflowVersionCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowVersion"];
+                };
+            };
+        };
+    };
+    restoreVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+                versionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowGraph"];
+                };
+            };
+        };
+    };
+    list_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowSnapshot"][];
+                };
+            };
+        };
+    };
+    create_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSnapshotRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowSnapshot"];
+                };
+            };
+        };
+    };
+    restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+                snapshotId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowGraph"];
+                };
+            };
+        };
+    };
+    listRuns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowRun"][];
+                };
+            };
+        };
+    };
+    runWorkflow: {
+        parameters: {
+            query?: {
+                startNodeId?: string;
+            };
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["JsonNode"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowRun"];
+                };
+            };
+        };
+    };
+    debugRunNode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DebugNodeRunRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DebugNodeRunResult"];
+                };
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DebugStartRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DebugSessionDto"];
+                };
+            };
+        };
+    };
+    webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["JsonNode"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WebhookAccepted"];
+                };
+            };
+        };
+    };
+    step: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DebugStepRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DebugSessionDto"];
+                };
+            };
+        };
+    };
+    runToEnd: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DebugSessionDto"];
+                };
+            };
+        };
+    };
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+                triggerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Trigger"];
+                };
+            };
+        };
+    };
+    list_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Trigger"][];
+                };
+            };
+        };
+    };
+    get_1: {
+        parameters: {
+            query: {
+                abNodeId: string;
+            };
+            header?: never;
+            path: {
+                workflowId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AbAnalyticsResponse"];
+                };
+            };
+        };
+    };
+    getRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowRun"];
+                };
+            };
+        };
+    };
+    getRunResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WorkflowRunResult"];
+                };
+            };
+        };
+    };
+    getNodeRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeRunId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NodeRun"];
+                };
+            };
+        };
+    };
+    get_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DebugSessionDto"];
+                };
+            };
+        };
+    };
+    close: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflowId: string;
+                snapshotId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+}

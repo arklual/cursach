@@ -1,0 +1,67 @@
+# Dev-инфраструктура для локальной разработки и прогона тестов.
+# Поднимает PostgreSQL 16 и MinIO с дефолтами, совпадающими с application.properties.
+#
+#   docker compose -f deploy/docker-compose.dev.yml up -d
+#
+# Затем:
+#   cd backend && mvn spring-boot:run
+#   cd frontend && npm start
+#
+# MinIO Console доступна на http://localhost:6006 (логин/пароль minioadmin/minioadmin),
+# bucket a11a-blobs создаётся автоматически контейнером minio-init.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: a11a-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: a11a
+      POSTGRES_USER: a11a
+      POSTGRES_PASSWORD: a11a
+    ports:
+      - "5432:5432"
+    volumes:
+      - dev-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U a11a -d a11a"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: a11a-dev-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":6006"
+    ports:
+      - "9000:9000"   # S3 API
+      - "6006:6006"   # Web Console (ПМИ: http://localhost:6006)
+    volumes:
+      - dev-minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: a11a-dev-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin &&
+      (mc mb local/a11a-blobs 2>/dev/null || true) &&
+      mc anonymous set download local/a11a-blobs 2>/dev/null || true
+      "
+    restart: "no"
+
+volumes:
+  dev-postgres-data:
+  dev-minio-data:

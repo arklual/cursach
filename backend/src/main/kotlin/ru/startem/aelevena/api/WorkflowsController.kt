@@ -11,16 +11,21 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.tags.Tag
 import ru.startem.aelevena.api.dto.Workflow
 import ru.startem.aelevena.api.dto.WorkflowCreateRequest
+import ru.startem.aelevena.api.dto.WorkflowGraph
 import ru.startem.aelevena.api.dto.WorkflowMeta
 import ru.startem.aelevena.api.dto.WorkflowMetaUpdate
 import ru.startem.aelevena.api.dto.WorkflowVersion
+import ru.startem.aelevena.api.dto.WorkflowVersionCreateRequest
 import ru.startem.aelevena.workflow.WorkflowService
 import java.util.UUID
 
 @RestController
 @RequestMapping("/workflows")
+@Tag(name = "Workflows", description = "Создание, чтение, обновление workflow и управление их версиями")
 class WorkflowsController(
     private val workflowService: WorkflowService,
 ) {
@@ -47,11 +52,23 @@ class WorkflowsController(
     }
 
     @PostMapping("/{workflowId}/versions")
-    fun createVersion(@PathVariable workflowId: UUID): ResponseEntity<WorkflowVersion> =
-        ResponseEntity.status(HttpStatus.CREATED).body(workflowService.createVersion(workflowId))
+    @Operation(summary = "Создать именованную версию", description = "Фиксирует текущую ревизию как именованную версию (тег опционален)")
+    fun createVersion(
+        @PathVariable workflowId: UUID,
+        @RequestBody(required = false) body: WorkflowVersionCreateRequest?,
+    ): ResponseEntity<WorkflowVersion> =
+        ResponseEntity.status(HttpStatus.CREATED).body(workflowService.createVersion(workflowId, body?.versionTag))
 
     @GetMapping("/{workflowId}/versions")
+    @Operation(summary = "Список версий workflow")
     fun listVersions(@PathVariable workflowId: UUID): List<WorkflowVersion> =
         workflowService.listVersions(workflowId)
+
+    @PostMapping("/{workflowId}/versions/{versionId}/restore")
+    @Operation(summary = "Откат к версии", description = "Создаёт новую (append-only) ревизию с графом указанной версии")
+    fun restoreVersion(
+        @PathVariable workflowId: UUID,
+        @PathVariable versionId: Long,
+    ): WorkflowGraph = workflowService.restoreVersion(workflowId, versionId)
 }
 

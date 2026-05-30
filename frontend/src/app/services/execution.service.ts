@@ -93,6 +93,56 @@ export class ExecutionService {
     this.isExecuting.set(false);
   }
 
+  /**
+   * Применяет событие исполнения, пришедшее по WebSocket (STOMP), для мгновенной
+   * визуальной индикации статуса ноды на холсте, не дожидаясь следующего polling-тика.
+   * Polling по-прежнему остаётся источником полных данных (input/output/длительности).
+   */
+  applyRunEvent(evt: { event: string; nodeId?: string; status?: string }): void {
+    if (evt.event === 'workflow_started') {
+      this.isExecuting.set(true);
+      return;
+    }
+    if (evt.event === 'workflow_finished') {
+      this.isExecuting.set(false);
+      return;
+    }
+    if (!evt.nodeId) {
+      return;
+    }
+    const statuses = { ...this.nodeStatuses() };
+    statuses[evt.nodeId] = evt.event === 'node_exited'
+      ? mapNodeRunStatus(evt.status)
+      : 'running';
+    this.nodeStatuses.set(statuses);
+  }
+
+  /** Показывает результат отладочного запуска одной ноды во вкладках Вход/Выход/Ошибка (требование 14). */
+  setDebugNodeResult(res: { nodeId: string; status: string; input?: unknown; output?: unknown; errorMessage?: string }): void {
+    this.cancelPolling();
+    const status: NodeExecutionStatus = res.status === 'success' ? 'success' : 'error';
+    const graphNode = this.workflowService.nodes().find(n => n.id === res.nodeId);
+    const node: NodeExecutionData = {
+      nodeId: res.nodeId,
+      nodeName: graphNode?.data?.label ?? res.nodeId,
+      nodeType: graphNode?.data?.kind ?? '',
+      status,
+      inputData: toExecutionItems(res.input),
+      outputData: toExecutionItems(res.output),
+      error: res.errorMessage ? { message: res.errorMessage } : undefined,
+    };
+    this.nodeStatuses.set({ [res.nodeId]: status });
+    this.currentExecution.set({
+      id: 'debug',
+      workflowId: '',
+      status: status === 'success' ? 'success' : 'error',
+      nodes: [node],
+      nodesTotal: 1,
+      nodesExecuted: 1,
+    });
+    this.isExecuting.set(false);
+  }
+
   getNodeExecutionData(nodeId: string): NodeExecutionData | null {
     const exec = this.currentExecution();
     if (!exec) return null;

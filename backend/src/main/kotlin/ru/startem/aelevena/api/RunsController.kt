@@ -1,6 +1,7 @@
 package ru.startem.aelevena.api
 
 import com.fasterxml.jackson.databind.JsonNode
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -17,6 +18,7 @@ import ru.startem.aelevena.run.RunQueryService
 import java.util.UUID
 
 @RestController
+@Tag(name = "Runs", description = "Запуск workflow и просмотр истории/деталей запусков")
 class RunsController(
     private val runEnqueueService: RunEnqueueService,
     private val runQueryService: RunQueryService,

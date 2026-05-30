@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-001-add-workflow-run-is-debug
+      author: a11a
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: workflow_run
+                columnName: is_debug
+      changes:
+        - addColumn:
+            tableName: workflow_run
+            columns:
+              - column:
+                  name: is_debug
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false

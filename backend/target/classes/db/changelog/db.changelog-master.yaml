@@ -9,4 +9,6 @@ databaseChangeLog:
       file: db/changelog/changes/004-add-is-demo.yaml
   - include:
       file: db/changelog/changes/005-workflow-snapshots.yaml
+  - include:
+      file: db/changelog/changes/006-workflow-run-debug.yaml
 

@@ -1,5 +1,6 @@
 package ru.startem.aelevena.api
 
+import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
@@ -11,6 +12,7 @@ import ru.startem.aelevena.workflow.WorkflowService
 
 @RestController
 @RequestMapping("/workflow-versions")
+@Tag(name = "Versions", description = "Редактирование графа рабочей версии workflow")
 class WorkflowVersionsController(
     private val workflowService: WorkflowService,
 ) {

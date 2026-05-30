@@ -1,6 +1,7 @@
 package ru.startem.aelevena.api
 
 import com.fasterxml.jackson.databind.JsonNode
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpHeaders
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -18,6 +19,7 @@ import ru.startem.aelevena.triggers.TriggerService
 import java.util.UUID
 
 @RestController
+@Tag(name = "Triggers", description = "Управление триггерами (manual, scheduler, webhook) и приём webhook-запросов")
 class TriggersController(
     private val triggerService: TriggerService,
     private val runQueryService: RunQueryService,

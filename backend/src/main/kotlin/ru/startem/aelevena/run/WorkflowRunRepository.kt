@@ -20,6 +20,7 @@ class WorkflowRunRepository(
         val inputJson: String?,
         val outputJson: String?,
         val startNodeId: String?,
+        val isDebug: Boolean,
         val createdAt: OffsetDateTime,
     )
 
@@ -34,22 +35,30 @@ class WorkflowRunRepository(
             inputJson = rs.getString("input"),
             outputJson = rs.getString("output"),
             startNodeId = rs.getString("start_node_id"),
+            isDebug = rs.getBoolean("is_debug"),
             createdAt = rs.getObject("created_at", OffsetDateTime::class.java),
         )
     }
 
-    fun insertQueued(workflowId: UUID, workflowRevisionId: Long, inputJson: String?, startNodeId: String?): Long {
+    fun insertQueued(
+        workflowId: UUID,
+        workflowRevisionId: Long,
+        inputJson: String?,
+        startNodeId: String?,
+        isDebug: Boolean = false,
+    ): Long {
         val params = MapSqlParameterSource()
             .addValue("workflowId", workflowId)
             .addValue("workflowRevisionId", workflowRevisionId)
             .addValue("status", "queued")
             .addValue("input", inputJson)
             .addValue("startNodeId", startNodeId)
+            .addValue("isDebug", isDebug)
 
         return jdbc.queryForObject(
             """
-            insert into workflow_run (workflow_id, workflow_revision_id, status, input, start_node_id)
-            values (:workflowId, :workflowRevisionId, :status, :input::jsonb, :startNodeId)
+            insert into workflow_run (workflow_id, workflow_revision_id, status, input, start_node_id, is_debug)
+            values (:workflowId, :workflowRevisionId, :status, :input::jsonb, :startNodeId, :isDebug)
             returning id
             """.trimIndent(),
             params,
@@ -61,7 +70,7 @@ class WorkflowRunRepository(
         val params = MapSqlParameterSource().addValue("runId", runId)
         val rows = jdbc.query(
             """
-            select id, workflow_id, workflow_revision_id, status, started_at, finished_at, input, output, start_node_id, created_at
+            select id, workflow_id, workflow_revision_id, status, started_at, finished_at, input, output, start_node_id, is_debug, created_at
             from workflow_run
             where id = :runId
             """.trimIndent(),
@@ -75,7 +84,7 @@ class WorkflowRunRepository(
         val params = MapSqlParameterSource().addValue("workflowId", workflowId)
         return jdbc.query(
             """
-            select id, workflow_id, workflow_revision_id, status, started_at, finished_at, input, output, start_node_id, created_at
+            select id, workflow_id, workflow_revision_id, status, started_at, finished_at, input, output, start_node_id, is_debug, created_at
             from workflow_run
             where workflow_id = :workflowId
             order by created_at desc

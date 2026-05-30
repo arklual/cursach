@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service
 import ru.startem.aelevena.api.BadRequestException
 import ru.startem.aelevena.api.NotFoundException
 import ru.startem.aelevena.api.dto.DebugFailedNode
+import ru.startem.aelevena.api.dto.DebugNodeRunResult
 import ru.startem.aelevena.api.dto.DebugSessionDto
 import ru.startem.aelevena.blob.BlobService
 import ru.startem.aelevena.executor.NodeExecutorRegistry
@@ -18,6 +19,7 @@ import ru.startem.aelevena.workflow.model.NodeSkeleton
 import ru.startem.aelevena.workflow.persistence.WorkflowVersionRepository
 import ru.startem.aelevena.workflow.persistence.WorkflowRevisionRepository
 import ru.startem.aelevena.workflow.persistence.WorkflowsRepository
+import ru.startem.aelevena.ws.RunEventBroadcaster
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -40,6 +42,9 @@ class DebugSessionService(
     private val blobService: BlobService,
     private val executors: NodeExecutorRegistry,
     private val objectMapper: ObjectMapper,
+    private val workflowRuns: WorkflowRunRepository,
+    private val nodeRuns: NodeRunRepository,
+    private val runEvents: RunEventBroadcaster,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
     private val sessions = ConcurrentHashMap<String, Session>()
@@ -75,6 +80,87 @@ class DebugSessionService(
         sessions[session.sessionId] = session
         gc()
         return session.toDto()
+    }
+
+    /**
+     * Режим пошаговой отладки workflow (ТЗ 4.1.1, требование 14): запуск ОДНОЙ выбранной ноды
+     * с произвольным входным значением, без полного прогона графа. Использует общий реестр
+     * исполнителей и общий механизм трансляции событий. Результат возвращается синхронно;
+     * запуск фиксируется в истории (`workflow_run.is_debug = true`) с единственной `node_run`.
+     */
+    fun debugRunNode(workflowId: UUID, nodeId: String, input: JsonNode?): DebugNodeRunResult {
+        val workflow = workflows.findById(workflowId) ?: throw NotFoundException("Workflow not found")
+        val versionId = workflow.currentVersionId
+            ?: versions.listByWorkflow(workflowId).firstOrNull()?.id
+            ?: throw NotFoundException("Workflow has no versions")
+        val version = versions.findById(versionId) ?: throw NotFoundException("Version not found")
+        val revision = revisions.findById(version.rootRevisionId)
+            ?: throw NotFoundException("Revision not found")
+        val skeleton = objectMapper.readValue(revision.graphSkeletonJson, GraphSkeleton::class.java)
+        val node = skeleton.nodes.firstOrNull { it.id == nodeId }
+            ?: throw NotFoundException("Node $nodeId not found in workflow")
+
+        val effectiveInput = input ?: NullNode.instance
+        val runId = workflowRuns.insertQueued(
+            workflowId = workflowId,
+            workflowRevisionId = version.rootRevisionId,
+            inputJson = objectMapper.writeValueAsString(effectiveInput),
+            startNodeId = nodeId,
+            isDebug = true,
+        )
+        workflowRuns.markRunning(runId)
+        runEvents.workflowStarted(workflowId, runId)
+
+        // Вход одиночной ноды: предшественники не исполняются, поэтому inputs пуст,
+        // а произвольное значение пользователя кладётся в runInput.
+        val inputNode = objectMapper.createObjectNode().apply {
+            set<JsonNode>("runInput", effectiveInput)
+            set<JsonNode>("inputs", objectMapper.createObjectNode())
+        }
+
+        val nodeRunId = nodeRuns.insertQueued(runId, nodeId, node.data?.configHash)
+        nodeRuns.markRunning(nodeRunId, objectMapper.writeValueAsString(inputNode))
+        runEvents.nodeReached(workflowId, runId, nodeId)
+        runEvents.nodeAction(workflowId, runId, nodeId)
+
+        val config = node.data?.configHash?.let { blobService.getJsonTree(it) }
+        val executor = executors.get(node.type)
+            ?: throw BadRequestException("Unsupported node type: ${node.type}")
+
+        return try {
+            val out = executor.execute(nodeId, config, inputNode)
+            nodeRuns.markSuccess(nodeRunId, objectMapper.writeValueAsString(out))
+            runEvents.nodeExited(workflowId, runId, nodeId, "success")
+            workflowRuns.markFinished(runId, "success", objectMapper.writeValueAsString(mapOf(nodeId to out)))
+            runEvents.workflowFinished(workflowId, runId, "success")
+            DebugNodeRunResult(
+                runId = runId.toString(),
+                workflowId = workflowId.toString(),
+                nodeId = nodeId,
+                status = "success",
+                input = inputNode,
+                output = out,
+            )
+        } catch (ex: Throwable) {
+            val msg = (ex.cause ?: ex).message ?: ex.toString()
+            nodeRuns.markFailed(nodeRunId, msg)
+            runEvents.nodeExited(workflowId, runId, nodeId, "failed")
+            workflowRuns.markFinished(
+                runId,
+                "failed",
+                objectMapper.writeValueAsString(objectMapper.createObjectNode().put("error", msg)),
+            )
+            runEvents.workflowFinished(workflowId, runId, "failed")
+            log.warn("Debug node run {} node {} failed: {}", runId, nodeId, msg)
+            DebugNodeRunResult(
+                runId = runId.toString(),
+                workflowId = workflowId.toString(),
+                nodeId = nodeId,
+                status = "failed",
+                input = inputNode,
+                errorMessage = msg,
+            )
+        }
     }
 
     fun get(sessionId: String): DebugSessionDto {

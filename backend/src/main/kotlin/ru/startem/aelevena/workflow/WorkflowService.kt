@@ -106,7 +106,7 @@ class WorkflowService(
     }
 
     @Transactional
-    fun createVersion(workflowId: UUID): WorkflowVersion {
+    fun createVersion(workflowId: UUID, versionTag: String? = null): WorkflowVersion {
         val workflow = workflows.findById(workflowId) ?: throw NotFoundException("Workflow not found")
         val currentVersionId = workflow.currentVersionId
             ?: versions.listByWorkflow(workflowId).firstOrNull()?.id
@@ -115,12 +115,46 @@ class WorkflowService(
         val currentVersion = versions.findById(currentVersionId) ?: throw NotFoundException("Current version not found")
         val newVersionId = versions.insert(
             workflowId = workflowId,
-            tag = null,
+            tag = versionTag?.trim()?.takeIf { it.isNotEmpty() },
             rootRevisionId = currentVersion.rootRevisionId,
         )
 
         val newVersion = versions.findById(newVersionId) ?: throw IllegalStateException("Just inserted version not found")
         return newVersion.toDto()
+    }
+
+    /**
+     * Откат текущей рабочей версии к графу указанной именованной версии.
+     * Append-only: создаётся новая ревизия с тем же graph_skeleton, исторические ревизии иммутабельны.
+     */
+    @Transactional
+    fun restoreVersion(workflowId: UUID, versionId: Long): WorkflowGraph {
+        val workflow = workflows.findById(workflowId) ?: throw NotFoundException("Workflow not found")
+        val sourceVersion = versions.findById(versionId) ?: throw NotFoundException("Version not found")
+        if (sourceVersion.workflowId != workflowId) {
+            throw NotFoundException("Version not found")
+        }
+
+        val currentVersionId = workflow.currentVersionId
+            ?: versions.listByWorkflow(workflowId).firstOrNull()?.id
+            ?: throw NotFoundException("Workflow has no versions")
+
+        val sourceRevision = revisions.findById(sourceVersion.rootRevisionId)
+            ?: throw NotFoundException("Version revision not found")
+        val skeleton = objectMapper.readValue(sourceRevision.graphSkeletonJson, GraphSkeleton::class.java)
+
+        val newRevisionId = revisions.insert(
+            workflowId = workflowId,
+            revisionNumber = revisions.nextRevisionNumber(workflowId),
+            graphSkeletonJson = sourceRevision.graphSkeletonJson,
+        )
+        versions.updateRootRevision(currentVersionId, newRevisionId)
+        workflows.touchUpdatedAt(workflowId)
+
+        val materialized = materializeGraph(currentVersionId, skeleton)
+        triggerService.syncFromGraph(workflowId, materialized)
+        events.publishEvent(GraphUpdatedEvent(workflowId, materialized))
+        return materialized
     }
 
     @Transactional(readOnly = true)

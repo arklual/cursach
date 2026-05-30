@@ -14,9 +14,11 @@ type ExecutionStatus = 'pending' | 'running' | 'success' | 'error' | 'skipped';
          [style.left.px]="x()"
          [style.top.px]="y()"
          [class.selected]="selected()"
+         [class.is-pending]="executionStatus() === 'pending'"
          [class.executing]="executionStatus() === 'running'"
          [class.success]="executionStatus() === 'success'"
          [class.error]="executionStatus() === 'error'"
+         [class.skipped]="executionStatus() === 'skipped'"
          (mousedown)="onMouseDownEvent.emit($event)">
       <div class="handle handle-left"
            (mousedown)="onHandleMouseDownEvent.emit({ event: $event, type: 'target' })"></div>
@@ -54,19 +56,34 @@ type ExecutionStatus = 'pending' | 'running' | 'success' | 'error' | 'skipped';
       box-shadow: 0 0 0 2px var(--accent), var(--shadow-lg);
     }
 
-    .node-card.executing {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-lg);
+    /* pending — серый (статусная индикация по ТЗ требование 8/10) */
+    .node-card.is-pending {
+      border-color: var(--border);
     }
 
+    /* running — жёлтый */
+    .node-card.executing {
+      border-color: #eab308;
+      box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.35), var(--shadow-lg);
+    }
+
+    /* success — зелёный */
     .node-card.success {
       border-color: var(--success);
       box-shadow: 0 0 0 3px var(--success-glow), var(--shadow-lg);
     }
 
+    /* failed — красный */
     .node-card.error {
       border-color: var(--danger);
       box-shadow: 0 0 0 3px var(--danger-glow), var(--shadow-lg);
+    }
+
+    /* skipped — серый с пунктирной обводкой */
+    .node-card.skipped {
+      border-style: dashed;
+      border-color: var(--fg-muted);
+      opacity: 0.7;
     }
 
     header {

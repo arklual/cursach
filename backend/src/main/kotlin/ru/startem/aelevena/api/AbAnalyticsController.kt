@@ -1,5 +1,6 @@
 package ru.startem.aelevena.api
 
+import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestParam
@@ -9,6 +10,7 @@ import ru.startem.aelevena.analytics.AbAnalyticsService
 import java.util.UUID
 
 @RestController
+@Tag(name = "Analytics", description = "Сводная A/B-аналитика workflow (конверсии, доверительные интервалы, z-тест)")
 class AbAnalyticsController(
     private val service: AbAnalyticsService,
 ) {

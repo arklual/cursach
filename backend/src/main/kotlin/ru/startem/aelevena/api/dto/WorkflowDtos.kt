@@ -36,6 +36,10 @@ data class WorkflowVersion(
     val createdAt: String,
 )
 
+data class WorkflowVersionCreateRequest(
+    val versionTag: String? = null,
+)
+
 data class WorkflowGraph(
     val versionId: String,
     val nodes: List<Node>,

@@ -83,6 +83,19 @@ describe('DebugApiService', () => {
         expect(result?.status).toBe('done');
     });
 
+    it('runNode() POST-ит /workflows/{id}/nodes/{nodeId}/debug-run с input', () => {
+        let result: { runId: string; status: string } | undefined;
+        service.runNode('wf-1', 'node A', { numbers: [1, 2] }).subscribe(r => (result = r));
+
+        const req = httpMock.expectOne(`${base}/workflows/wf-1/nodes/node%20A/debug-run`);
+        expect(req.request.method).toBe('POST');
+        expect(req.request.body).toEqual({ input: { numbers: [1, 2] } });
+        req.flush({ runId: '7', workflowId: 'wf-1', nodeId: 'node A', status: 'success', output: { sum: 3 } });
+
+        expect(result?.runId).toBe('7');
+        expect(result?.status).toBe('success');
+    });
+
     it('close() DELETE-ит /debug-sessions/{id}', () => {
         service.close('ses-1').subscribe();
         const req = httpMock.expectOne(`${base}/debug-sessions/ses-1`);

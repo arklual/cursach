@@ -1,6 +1,7 @@
 import { Component, output, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { CdkDrag, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { WorkflowService } from '../../services/workflow.service';
 import { NodeKind } from '../../models/workflow.model';
 
@@ -26,7 +27,7 @@ interface NodeCategory {
 @Component({
   selector: 'app-palette',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, CdkDrag],
   template: `
     <aside class="palette">
       <header class="palette-header">
@@ -50,8 +51,10 @@ interface NodeCategory {
               @for (item of category.items; track item.id) {
                 <button
                   class="palette-item"
-                  draggable="true"
-                  (dragstart)="onDragStart($event, item)"
+                  cdkDrag
+                  [cdkDragData]="item"
+                  (cdkDragStarted)="dragStart.emit({ kind: item.kind, subtype: item.subtype })"
+                  (cdkDragEnded)="onCdkDragEnded($event, item)"
                   [title]="item.label">
                   <span class="palette-item-icon">
                     <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
@@ -369,6 +372,8 @@ export class PaletteComponent {
   searchQuery = signal<string>('');
 
   dragStart = output<{ kind: NodeKind; subtype?: string }>();
+  /** Дроп палитрной ноды на холст (CDK): координаты указателя в окне. */
+  nodeDropped = output<{ kind: NodeKind; subtype?: string; clientX: number; clientY: number }>();
 
   private readonly icons = {
     webhook: 'M10 4a4 4 0 0 0-3.83 5.14l-2.6 4.5A3.5 3.5 0 1 0 7 16h7.46a3 3 0 1 0 0-2H7a1.5 1.5 0 1 1-1.5-1.5c.06 0 .12 0 .18.01l3.45-5.97A2 2 0 1 1 11.4 7.7L9.62 10.8a4 4 0 1 0 6.96 0L14.9 7.85A4 4 0 0 0 10 4zm6 9a1 1 0 1 1 0 2 1 1 0 0 1 0-2zM5.5 16a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z',
@@ -452,12 +457,19 @@ export class PaletteComponent {
       .filter(category => category.items.length > 0);
   });
 
-  onDragStart(event: DragEvent, item: PaletteItem): void {
-    const payload = item.subtype ? `${item.kind}:${item.subtype}` : item.kind;
-    event.dataTransfer?.setData('application/workflow-node', payload);
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move';
-    }
-    this.dragStart.emit({ kind: item.kind, subtype: item.subtype });
+  /**
+   * Завершение CDK-перетаскивания палитрной ноды: возвращаем элемент на место и сообщаем
+   * родителю координаты дропа, чтобы холст добавил ноду в нужной точке (требование 1/10).
+   */
+  onCdkDragEnded(event: CdkDragEnd, item: PaletteItem): void {
+    const point = event.dropPoint;
+    // Снимаем CSS-трансформ перетаскивания — кнопка палитры остаётся на месте.
+    event.source.reset();
+    this.nodeDropped.emit({
+      kind: item.kind,
+      subtype: item.subtype,
+      clientX: point.x,
+      clientY: point.y,
+    });
   }
 }

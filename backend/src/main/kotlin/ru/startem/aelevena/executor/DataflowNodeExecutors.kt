@@ -44,6 +44,10 @@ private fun resolveStreamInput(input: JsonNode, config: JsonNode?): JsonNode {
     return input
 }
 
+/** Возвращает пользовательское выражение из config.expression (если задано и непустое). */
+private fun expr(config: JsonNode?): String? =
+    config?.get("expression")?.asText()?.takeIf { it.isNotBlank() }
+
 private fun JsonNode?.asArrayOrEmpty(mapper: ObjectMapper): ArrayNode {
     if (this == null || this.isNull) {
         return mapper.createArrayNode()
@@ -94,11 +98,13 @@ private fun compare(a: JsonNode, op: String, b: JsonNode): Boolean {
 @Component
 class FilterNodeExecutor(
     private val objectMapper: ObjectMapper,
+    private val expressions: ExpressionEvaluator = ExpressionEvaluator(objectMapper),
 ) : NodeExecutor {
     override val type: String = "dataflow.filter"
 
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode {
         val items = resolveStreamInput(input, config).asArrayOrEmpty(objectMapper)
+        expr(config)?.let { return expressions.filter(items, it) }
         val field = config?.get("field")?.asText()
         val op = config?.get("op")?.asText()
         val value = config?.get("value")
@@ -129,11 +135,13 @@ class FilterNodeExecutor(
 @Component
 class MapNodeExecutor(
     private val objectMapper: ObjectMapper,
+    private val expressions: ExpressionEvaluator = ExpressionEvaluator(objectMapper),
 ) : NodeExecutor {
     override val type: String = "dataflow.map"
 
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode {
         val items = resolveStreamInput(input, config).asArrayOrEmpty(objectMapper)
+        expr(config)?.let { return expressions.map(items, it) }
         val select = config?.get("select")?.takeIf { it.isArray }?.map { it.asText() }
         val rename = config?.get("rename")?.takeIf { it.isObject }
         val wrap = config?.get("wrap")?.asText()?.takeIf { it.isNotBlank() }
@@ -173,11 +181,16 @@ class MapNodeExecutor(
 @Component
 class ReduceNodeExecutor(
     private val objectMapper: ObjectMapper,
+    private val expressions: ExpressionEvaluator = ExpressionEvaluator(objectMapper),
 ) : NodeExecutor {
     override val type: String = "dataflow.reduce"
 
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode {
         val items = resolveStreamInput(input, config).asArrayOrEmpty(objectMapper)
+        expr(config)?.let { expression ->
+            val initial = config?.get("initialValue") ?: objectMapper.nullNode()
+            return expressions.reduce(items, expression, initial)
+        }
         val op = config?.get("op")?.asText() ?: "count"
         val field = config?.get("field")?.asText()
 
@@ -213,11 +226,14 @@ class ReduceNodeExecutor(
 @Component
 class ForeachNodeExecutor(
     private val objectMapper: ObjectMapper,
+    private val expressions: ExpressionEvaluator = ExpressionEvaluator(objectMapper),
 ) : NodeExecutor {
     override val type: String = "dataflow.foreach"
 
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode {
-        return resolveStreamInput(input, config).asArrayOrEmpty(objectMapper)
+        val items = resolveStreamInput(input, config).asArrayOrEmpty(objectMapper)
+        expr(config)?.let { return expressions.forEach(items, it) }
+        return items
     }
 }
 
@@ -230,11 +246,13 @@ class ForeachNodeExecutor(
 @Component
 class FlatMapNodeExecutor(
     private val objectMapper: ObjectMapper,
+    private val expressions: ExpressionEvaluator = ExpressionEvaluator(objectMapper),
 ) : NodeExecutor {
     override val type: String = "dataflow.flatmap"
 
     override fun execute(nodeId: String, config: JsonNode?, input: JsonNode): JsonNode {
         val items = resolveStreamInput(input, config).asArrayOrEmpty(objectMapper)
+        expr(config)?.let { return expressions.flatMap(items, it) }
         val field = config?.get("field")?.asText()
 
         val out = objectMapper.createArrayNode()

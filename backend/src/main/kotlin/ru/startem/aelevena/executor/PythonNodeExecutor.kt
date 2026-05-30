@@ -35,7 +35,7 @@ class PythonNodeExecutor(
     }
 
     companion object {
-        const val DEFAULT_IMAGE: String = "python:3.12-alpine"
+        const val DEFAULT_IMAGE: String = "python:3.11-slim"
 
         // The runner script — passed as a single argv element (no shell escaping).
         private val RUNNER = """

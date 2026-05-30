@@ -1,6 +1,6 @@
-import { Component, input, output, inject, computed, signal, PLATFORM_ID } from '@angular/core';
+import { Component, input, output, inject, computed, effect, signal, PLATFORM_ID } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormControl, FormGroup, Validators } from '@angular/forms';
 import { WorkflowService } from '../../services/workflow.service';
 import { WorkflowNode } from '../../models/workflow.model';
 import { environment } from '../../../environments/environment';
@@ -11,7 +11,7 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
 @Component({
   selector: 'app-inspector',
   standalone: true,
-  imports: [CommonModule, FormsModule, BranchSplitInspectorComponent, BranchMergeInspectorComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, BranchSplitInspectorComponent, BranchMergeInspectorComponent],
   template: `
     <aside class="inspector" [class.is-readonly]="readOnly()">
       <div class="inspector-head">
@@ -34,6 +34,11 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
             Название
             <input type="text" [ngModel]="node.data.label" (ngModelChange)="updateLabel($event)">
           </label>
+
+          <div class="actions-row">
+            <button class="ghost small" type="button" (click)="debugRunNode.emit(node.id)"
+                    title="Отладочный запуск только этой ноды с произвольным входом">Запустить ноду</button>
+          </div>
 
           @if (upstreamRefs(node); as refs) {
             @if (refs.length > 0) {
@@ -58,10 +63,13 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
               <label>
                 URL
                 <input type="text"
-                       [ngModel]="cfg(node, 'url', '')"
-                       (ngModelChange)="setCfg(node, 'url', $event)"
+                       [formControl]="urlControl"
+                       [class.invalid]="urlControl.invalid"
                        placeholder="https://httpbin.org/get">
               </label>
+              @if (urlControl.invalid) {
+                <span class="field-error">URL обязателен</span>
+              }
               <label>
                 Method
                 <select [ngModel]="cfg(node, 'method', 'GET')"
@@ -74,10 +82,13 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
               </label>
               <label>
                 Timeout, ms
-                <input type="number" min="100" step="100"
-                       [ngModel]="cfg(node, 'timeoutMs', 30000)"
-                       (ngModelChange)="setCfg(node, 'timeoutMs', +$event)">
+                <input type="number" min="1" max="300000" step="100"
+                       [formControl]="timeoutControl"
+                       [class.invalid]="timeoutControl.invalid">
               </label>
+              @if (timeoutControl.invalid) {
+                <span class="field-error">Тайм-аут: 1…300000 мс</span>
+              }
               <label>
                 Headers
                 <textarea rows="3" class="mono"
@@ -258,10 +269,13 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
                 <label>
                   Cron
                   <input type="text" class="mono"
-                         [ngModel]="cfg(node, 'expression', '')"
-                         (ngModelChange)="setCfg(node, 'expression', $event)"
+                         [formControl]="cronControl"
+                         [class.invalid]="cronControl.invalid"
                          placeholder="* * * * *">
                 </label>
+                @if (cronControl.invalid) {
+                  <span class="field-error">Некорректное cron-выражение (5 или 6 полей)</span>
+                }
               }
               @if (getSubtype(node) === 'interval') {
                 <label>
@@ -271,6 +285,10 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
                          (ngModelChange)="setCfg(node, 'periodSeconds', +$event)">
                 </label>
               }
+              <div class="actions-row">
+                <button class="danger small" type="button" (click)="deleteNode(node.id)"
+                        title="Удалить этот триггер">Удалить триггер</button>
+              </div>
             </fieldset>
           }
 
@@ -333,6 +351,15 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
     </aside>
   `,
   styles: [`
+    input.invalid {
+      border-color: var(--danger, #ef4444) !important;
+    }
+    .field-error {
+      display: block;
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--danger, #ef4444);
+    }
     :host {
       display: block;
       height: 100%;
@@ -615,7 +642,54 @@ export class InspectorComponent {
   activeNode = input<WorkflowNode | null>(null);
   triggers = input<Trigger[]>([]);
   readOnly = input<boolean>(false);
+
+  /**
+   * Реактивная форма валидации ключевых полей (ТЗ требование 4/5, надёжность 4.3):
+   * URL HTTP-ноды обязателен, тайм-аут в диапазоне 1..300000, cron — по регулярному выражению.
+   * Значения синхронизируются с config выбранной ноды через valueChanges.
+   */
+  private readonly cronPattern = /^\s*(\*|\?|(\*\/\d+)|([0-9A-Za-z]+(-[0-9A-Za-z]+)?(\/\d+)?)(,[0-9A-Za-z]+(-[0-9A-Za-z]+)?(\/\d+)?)*)(\s+(\*|\?|(\*\/\d+)|([0-9A-Za-z]+(-[0-9A-Za-z]+)?(\/\d+)?)(,[0-9A-Za-z]+(-[0-9A-Za-z]+)?(\/\d+)?)*)){4,5}\s*$/;
+  readonly configForm = new FormGroup({
+    url: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    timeoutMs: new FormControl(30000, { validators: [Validators.min(1), Validators.max(300000)] }),
+    cron: new FormControl('', { validators: [Validators.required] }),
+  });
+  get urlControl(): FormControl { return this.configForm.controls.url; }
+  get timeoutControl(): FormControl { return this.configForm.controls.timeoutMs as FormControl; }
+  get cronControl(): FormControl { return this.configForm.controls.cron as FormControl; }
+
+  constructor() {
+    // Применяем cron-валидатор по паттерну отдельно (Validators.pattern на FormControl).
+    this.cronControl.addValidators(Validators.pattern(this.cronPattern));
+    // Синхронизация значений выбранной ноды → форма (без обратного цикла).
+    effect(() => {
+      const node = this.activeNode();
+      if (!node) { return; }
+      const cfg = node.data.config ?? {};
+      this.configForm.patchValue({
+        url: (cfg['url'] as string) ?? '',
+        timeoutMs: (cfg['timeoutMs'] as number) ?? 30000,
+        cron: (cfg['expression'] as string) ?? '',
+      }, { emitEvent: false });
+    });
+    // Реактивные изменения формы → config выбранной ноды.
+    this.urlControl.valueChanges.subscribe(v => {
+      const node = this.activeNode();
+      if (node && node.data.kind === 'http') { this.setCfg(node, 'url', v); }
+    });
+    this.timeoutControl.valueChanges.subscribe(v => {
+      const node = this.activeNode();
+      if (node && node.data.kind === 'http' && v != null) { this.setCfg(node, 'timeoutMs', +v); }
+    });
+    this.cronControl.valueChanges.subscribe(v => {
+      const node = this.activeNode();
+      if (node && this.getSubtype(node) === 'cron') { this.setCfg(node, 'expression', v); }
+    });
+  }
+
   readonly runFromNode = output<string>();
+  /** Отладочный запуск одной выбранной ноды (требование 14). */
+  readonly debugRunNode = output<string>();
   readonly triggerEnabledChange = output<{ triggerId: string; enabled: boolean }>();
 
   /** Текст и видимость всплывающей плашки после копирования в буфер. */
@@ -726,6 +800,24 @@ export class InspectorComponent {
 
   isJs(node: WorkflowNode): boolean {
     return node.data.kind === 'code' && node.data.__subtype === 'js';
+  }
+
+  /**
+   * Валидация cron-выражения регулярным выражением (ТЗ требование 5).
+   * Принимает 5- или 6-полевой формат Spring; каждое поле может быть звёздочкой,
+   * знаком вопроса, числом, диапазоном, списком или шагом (slash-N, например каждые 5 минут).
+   */
+  isCronValid(expr: string): boolean {
+    const value = (expr ?? '').trim();
+    if (value.length === 0) {
+      return false;
+    }
+    const fields = value.split(/\s+/);
+    if (fields.length !== 5 && fields.length !== 6) {
+      return false;
+    }
+    const field = /^(\*|\?|(\*\/\d+)|([0-9A-Za-z]+(-[0-9A-Za-z]+)?(\/\d+)?)(,[0-9A-Za-z]+(-[0-9A-Za-z]+)?(\/\d+)?)*)$/;
+    return fields.every(f => field.test(f));
   }
 
   codePlaceholder(node: WorkflowNode): string {

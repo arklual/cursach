@@ -5,6 +5,23 @@ import SockJS from 'sockjs-client';
 import { environment } from '../../../environments/environment';
 import type { WorkflowGraph } from '../api/api.models';
 
+/** События жизненного цикла исполнения workflow, транслируемые сервером по STOMP. */
+export type RunEventType =
+    | 'workflow_started'
+    | 'node_reached'
+    | 'node_action'
+    | 'node_exited'
+    | 'workflow_finished';
+
+export interface RunEvent {
+    workflowId: string;
+    event: RunEventType;
+    runId: number;
+    nodeId?: string;
+    status: string;
+    ts?: string;
+}
+
 /**
  * STOMP-клиент над тем же `/ws` SockJS-эндпоинтом, что и бэк (см. `ws/WebSocketConfig.kt`).
  * Подписывается на `/topic/workflows/{id}/graph`; при обновлении графа другим клиентом (или REST putGraph,
@@ -19,9 +36,16 @@ export class WorkflowWsService {
     /** Подписки, которые надо переподнять при каждом успешном (re)connect. */
     private resubscribers = new Set<() => void>();
     private readonly graph$ = new Subject<{ workflowId: string; graph: WorkflowGraph }>();
+    private readonly runEvents$ = new Subject<RunEvent>();
 
     /** Один глобальный поток обновлений графа. Каждое событие — `{ workflowId, graph }`. */
     readonly graphUpdates = this.graph$.asObservable();
+
+    /**
+     * Поток событий исполнения workflow (workflow_started / node_reached / node_action /
+     * node_exited / workflow_finished), приходящих в тот же топик `/topic/workflows/{id}/graph`.
+     */
+    readonly runEvents = this.runEvents$.asObservable();
 
     /** Подключиться один раз на всё приложение. Если уже подключён — no-op. */
     connect(): void {
@@ -61,8 +85,15 @@ export class WorkflowWsService {
             }
             stompSub = this.client.subscribe(topic, (msg: IMessage) => {
                 try {
-                    const payload = JSON.parse(msg.body) as WorkflowGraph;
-                    this.zone.run(() => this.graph$.next({ workflowId, graph: payload }));
+                    const payload = JSON.parse(msg.body) as Record<string, unknown>;
+                    // Сообщения исполнения несут поле `event`; сообщения синхронизации графа — нет.
+                    if (typeof payload['event'] === 'string') {
+                        const evt = payload as unknown as RunEvent;
+                        this.zone.run(() => this.runEvents$.next(evt));
+                    } else {
+                        const graph = payload as unknown as WorkflowGraph;
+                        this.zone.run(() => this.graph$.next({ workflowId, graph }));
+                    }
                 } catch (err) {
                     console.warn('WS: failed to parse message', err);
                 }

@@ -76,6 +76,25 @@ describe('WorkflowWsService', () => {
     expect(emitted[0].graph).toEqual({ nodes: [], connections: [] } as never);
   });
 
+  it('эмитит runEvents для сообщений с полем event и не эмитит graphUpdates', () => {
+    const runEvents: Array<{ event: string; nodeId?: string; status: string }> = [];
+    const graphEvents: unknown[] = [];
+    svc.runEvents.subscribe(e => runEvents.push(e));
+    svc.graphUpdates.subscribe(e => graphEvents.push(e));
+
+    svc.subscribeToWorkflow('wf-7');
+    const client = (svc as unknown as { client: Client }).client;
+    client.onConnect?.({} as never);
+    const [, cb] = subscribeSpy.calls.mostRecent().args as [string, (m: IMessage) => void];
+
+    cb({ body: JSON.stringify({ event: 'node_reached', workflowId: 'wf-7', runId: 5, nodeId: 'n1', status: 'running' }) } as IMessage);
+
+    expect(runEvents.length).toBe(1);
+    expect(runEvents[0].event).toBe('node_reached');
+    expect(runEvents[0].nodeId).toBe('n1');
+    expect(graphEvents.length).toBe(0);
+  });
+
   it('некорректный JSON в сообщении не падает и не эмитит', () => {
     const emitted: unknown[] = [];
     svc.graphUpdates.subscribe(e => emitted.push(e));

@@ -10,6 +10,39 @@ describe('WorkflowService', () => {
     svc = TestBed.inject(WorkflowService);
   });
 
+  describe('multi-select', () => {
+    it('toggleNodeSelection накапливает выделение, removeSelectedNodes удаляет все', () => {
+      const a = svc.addNode('http', { x: 0, y: 0 });
+      const b = svc.addNode('http', { x: 50, y: 0 });
+      const c = svc.addNode('http', { x: 100, y: 0 });
+      svc.setActiveNode(a);
+      svc.toggleNodeSelection(b);
+      expect(svc.selectedNodeIds().has(a)).toBeTrue();
+      expect(svc.selectedNodeIds().has(b)).toBeTrue();
+      expect(svc.selectedNodeIds().has(c)).toBeFalse();
+
+      const removed = svc.removeSelectedNodes();
+      expect(removed).toBe(2);
+      expect(svc.nodes().map(n => n.id)).toEqual([c]);
+      expect(svc.selectedNodeIds().size).toBe(0);
+    });
+
+    it('toggle убирает уже выделенную ноду', () => {
+      const a = svc.addNode('http', { x: 0, y: 0 });
+      svc.setActiveNode(a);
+      svc.toggleNodeSelection(a);
+      expect(svc.selectedNodeIds().has(a)).toBeFalse();
+    });
+
+    it('removeSelectedNodes без выделения удаляет активную ноду', () => {
+      const a = svc.addNode('http', { x: 0, y: 0 });
+      svc.clearSelection();
+      svc.setActiveNode(a);
+      expect(svc.removeSelectedNodes()).toBe(1);
+      expect(svc.nodes().length).toBe(0);
+    });
+  });
+
   describe('addNode', () => {
     it('добавляет ноду и делает её активной', () => {
       const id = svc.addNode('trigger', { x: 10, y: 20 });

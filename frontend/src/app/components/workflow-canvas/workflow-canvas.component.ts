@@ -105,7 +105,7 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
             <div class="node-wrap"
                  [style.left.px]="node.position.x"
                  [style.top.px]="node.position.y"
-                 [class.selected]="node.id === activeNodeId()"
+                 [class.selected]="node.id === activeNodeId() || ws.selectedNodeIds().has(node.id)"
                  [class.executing]="executionStatus()[node.id] === 'running'"
                  [class.success]="executionStatus()[node.id] === 'success'"
                  [class.error]="executionStatus()[node.id] === 'error'"
@@ -676,7 +676,7 @@ import { CanvasEmptyComponent } from '../canvas-empty/canvas-empty.component';
   `]
 })
 export class WorkflowCanvasComponent implements AfterViewInit {
-  private ws = inject(WorkflowService);
+  protected ws = inject(WorkflowService);
 
   nodes = input.required<WorkflowNode[]>();
   edges = input.required<WorkflowEdge[]>();
@@ -806,7 +806,8 @@ export class WorkflowCanvasComponent implements AfterViewInit {
 
     e.preventDefault();
     const oldZoom = this.zoom();
-    const delta = e.deltaY > 0 ? 0.95 : 1.05;
+    // Коэффициент масштабирования за шаг колеса: 0.8 (отдаление) … 1.25 (приближение) — ТЗ требование 1.
+    const delta = e.deltaY > 0 ? 0.8 : 1.25;
     const newZoom = Math.max(0.3, Math.min(2, oldZoom * delta));
     if (newZoom === oldZoom) return;
 
@@ -1127,7 +1128,13 @@ export class WorkflowCanvasComponent implements AfterViewInit {
   selectNode(e: Event, id: string) {
     e.stopPropagation();
     this.nodeSelected.emit(id);
-    this.ws.setActiveNode(id);
+    // Shift/Ctrl/Cmd-клик — групповая селекция (ТЗ требование 1); обычный клик — одиночный выбор.
+    const me = e as MouseEvent;
+    if (me.shiftKey || me.ctrlKey || me.metaKey) {
+      this.ws.toggleNodeSelection(id);
+    } else {
+      this.ws.setActiveNode(id);
+    }
     this.selectedEdgeId.set(null);
   }
 
@@ -1193,22 +1200,49 @@ export class WorkflowCanvasComponent implements AfterViewInit {
     if (this.readOnly()) return;
     const raw = e.dataTransfer?.getData('application/workflow-node');
     if (!raw) return;
-
     const [kindStr, subtype] = raw.split(':');
-    const kind = kindStr as NodeKind;
-    if (!kind) return;
+    this.addNodeAtClientPoint(kindStr, subtype, e.clientX, e.clientY);
+  }
 
+  /**
+   * Добавляет ноду по координатам указателя в окне (page coords). Используется как нативным
+   * drop-обработчиком, так и CDK-перетаскиванием из палитры (требование 1/10).
+   * Возвращает true, если точка попала в область холста и нода добавлена.
+   */
+  addNodeAtClientPoint(kindStr: string, subtype: string | undefined, clientX: number, clientY: number): boolean {
+    if (this.readOnly()) return false;
+    if (!kindStr) return false;
+    // Нормализуем shorthand-вид ('filter' → dataflow/filter), сохраняя полный вид ('dataflow:filter').
+    const { kind, subtype: derivedSubtype } = this.normalizeNodeKind(kindStr);
+    const finalSubtype = subtype ?? derivedSubtype;
     const rect = this.canvasArea()?.nativeElement.getBoundingClientRect();
-    if (!rect) return;
-
-    const viewX = e.clientX - rect.left;
-    const viewY = e.clientY - rect.top;
+    if (!rect) return false;
+    const viewX = clientX - rect.left;
+    const viewY = clientY - rect.top;
     const canvas = this.viewToCanvas(viewX, viewY);
-
     this.ws.addNode(kind, {
       x: canvas.x - this.NODE_W / 2,
       y: canvas.y - this.NODE_H / 2,
-    }, subtype);
+    }, finalSubtype);
+    return true;
+  }
+
+  /** Приводит идентификатор ноды к {kind, subtype}: принимает как kind, так и subtype-shorthand. */
+  private normalizeNodeKind(kindStr: string): { kind: NodeKind; subtype?: string } {
+    const validKinds: NodeKind[] = ['trigger', 'http', 'dataflow', 'code', 'ab', 'join'];
+    if ((validKinds as string[]).includes(kindStr)) {
+      return { kind: kindStr as NodeKind };
+    }
+    if (['filter', 'map', 'reduce', 'foreach', 'flatmap'].includes(kindStr)) {
+      return { kind: 'dataflow', subtype: kindStr };
+    }
+    if (['python', 'js', 'javascript'].includes(kindStr)) {
+      return { kind: 'code', subtype: kindStr };
+    }
+    if (['scheduler', 'webhook', 'manual', 'cron', 'interval'].includes(kindStr)) {
+      return { kind: 'trigger', subtype: kindStr };
+    }
+    return { kind: kindStr as NodeKind };
   }
 
   /** Обработчик добавления ноды из CanvasEmptyComponent */

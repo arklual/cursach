@@ -13,6 +13,7 @@ import ru.startem.aelevena.executor.SplitEnvelope
 import ru.startem.aelevena.workflow.model.ConnectionSkeleton
 import ru.startem.aelevena.workflow.model.GraphSkeleton
 import ru.startem.aelevena.workflow.persistence.WorkflowRevisionRepository
+import ru.startem.aelevena.ws.RunEventBroadcaster
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionException
 import java.util.concurrent.ConcurrentHashMap
@@ -31,6 +32,7 @@ class WorkflowExecutionService(
     private val workflowExecutor: ExecutorService,
     /** Тяжёлый пул для собственно исполнения нод (HTTP/Python/Dataflow). */
     @Qualifier("nodeExecutor") private val nodeExecutor: ExecutorService,
+    private val runEvents: RunEventBroadcaster,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -69,7 +71,7 @@ class WorkflowExecutionService(
         allNodeIds.forEach { outgoingAll[it] = mutableSetOf() }
         skeleton.connections.forEach { c ->
             if (!allNodeIds.contains(c.source) || !allNodeIds.contains(c.target)) {
-                workflowRuns.markFinished(runId, "failed", outputJson = null)
+                workflowRuns.markFinished(runId, "failed", outputJson = errorJson("Invalid graph: connection references unknown node"))
                 return
             }
             outgoingAll.getValue(c.source).add(c.target)
@@ -77,7 +79,7 @@ class WorkflowExecutionService(
 
         val reachableNodeIds: Set<String> = run.startNodeId?.let { startId ->
             if (!allNodeIds.contains(startId)) {
-                workflowRuns.markFinished(runId, "failed", outputJson = null)
+                workflowRuns.markFinished(runId, "failed", outputJson = errorJson("Invalid start node: $startId"))
                 return
             }
             val visited = mutableSetOf<String>()
@@ -110,7 +112,9 @@ class WorkflowExecutionService(
 
         val topo = topologicalOrder(incoming.mapValues { it.value.size }, outgoing)
         if (topo == null) {
-            workflowRuns.markFinished(runId, "failed", outputJson = null)
+            // Цикл в графе — топологическая сортировка по алгоритму Кана не охватила все узлы.
+            // Фиксируем диагностическое сообщение; ни одна нода в статус running не переводится.
+            workflowRuns.markFinished(runId, "failed", outputJson = errorJson("Cycle detected in workflow graph"))
             return
         }
 
@@ -125,6 +129,8 @@ class WorkflowExecutionService(
         }
 
         workflowRuns.markRunning(runId)
+        val workflowId = run.workflowId
+        runEvents.workflowStarted(workflowId, runId)
 
         val started = ConcurrentHashMap.newKeySet<String>()
         val outputs = ConcurrentHashMap<String, JsonNode>()
@@ -157,6 +163,7 @@ class WorkflowExecutionService(
                 if (incomingEdges.isNotEmpty() && liveIncoming.isEmpty()) {
                     skippedSet.add(nodeId)
                     nodeRuns.markSkipped(nodeRunId, "Branch not selected")
+                    runEvents.nodeExited(workflowId, runId, nodeId, "skipped")
                     return@thenApplyAsync NullNode.instance as JsonNode
                 }
 
@@ -164,22 +171,27 @@ class WorkflowExecutionService(
                 val inputNode = buildNodeInput(run.inputJson, liveIncoming, outputs, skippedSet)
                 started.add(nodeId)
                 nodeRuns.markRunning(nodeRunId, objectMapper.writeValueAsString(inputNode))
+                runEvents.nodeReached(workflowId, runId, nodeId)
 
                 val config = node.data?.configHash?.let { blobService.getJsonTree(it) }
                 val executor = executors.get(node.type)
                     ?: throw IllegalArgumentException("Unsupported node type: ${node.type}")
 
+                runEvents.nodeAction(workflowId, runId, nodeId)
                 val out = executor.execute(nodeId, config, inputNode)
                 outputs[nodeId] = out
                 nodeRuns.markSuccess(nodeRunId, objectMapper.writeValueAsString(out))
+                runEvents.nodeExited(workflowId, runId, nodeId, "success")
                 out
             }, nodeExecutor).whenComplete { _, ex ->
                 if (ex != null && !skippedSet.contains(nodeId)) {
                     val nodeRunId = nodeRunIds.getValue(nodeId)
                     if (started.contains(nodeId)) {
                         nodeRuns.markFailed(nodeRunId, rootMessage(ex))
+                        runEvents.nodeExited(workflowId, runId, nodeId, "failed")
                     } else {
                         nodeRuns.markSkipped(nodeRunId, "Dependency failed")
+                        runEvents.nodeExited(workflowId, runId, nodeId, "skipped")
                     }
                 }
             }
@@ -195,6 +207,7 @@ class WorkflowExecutionService(
                 val status = if (ex == null) "success" else "failed"
                 val outputJson = objectMapper.writeValueAsString(outputsToJson(outputs))
                 workflowRuns.markFinished(runId, status = status, outputJson = outputJson)
+                runEvents.workflowFinished(workflowId, runId, status)
             } catch (finalEx: Throwable) {
                 log.error("Run {} finalize failed", runId, finalEx)
                 runCatching { workflowRuns.markFinished(runId, "failed", outputJson = null) }
@@ -261,6 +274,10 @@ class WorkflowExecutionService(
 
         return if (result.size == inDegree.size) result else null
     }
+
+    /** Машинно-читаемое тело ошибки для workflow_run.output, когда run падает до запуска нод. */
+    private fun errorJson(message: String): String =
+        objectMapper.writeValueAsString(objectMapper.createObjectNode().put("error", message))
 
     private fun rootMessage(ex: Throwable): String {
         val root = when (ex) {

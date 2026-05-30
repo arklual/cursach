@@ -20,7 +20,9 @@ import { ExecutionService } from '../../services/execution.service';
 import { ExecutionPanelComponent } from '../../components/execution-panel/execution-panel.component';
 import { SnapshotsPanelComponent } from '../../components/snapshots-panel/snapshots-panel.component';
 import { DebugPanelComponent } from '../../components/debug-panel/debug-panel.component';
+import { OnboardingTourComponent } from '../../components/onboarding-tour/onboarding-tour.component';
 import { DebugSessionService } from '../../services/debug-session.service';
+import { DebugApiService } from '../../core/api/debug.api';
 
 @Component({
   selector: 'app-workflow-editor',
@@ -37,6 +39,7 @@ import { DebugSessionService } from '../../services/debug-session.service';
     ExecutionPanelComponent,
     SnapshotsPanelComponent,
     DebugPanelComponent,
+    OnboardingTourComponent,
   ],
   template: `
     <div class="app-shell">
@@ -144,7 +147,9 @@ import { DebugSessionService } from '../../services/debug-session.service';
                [class.collapsed]="paletteCollapsed()">
             @if (!paletteCollapsed()) {
               <div class="panel-content" [style.width.px]="paletteWidth()">
-                <app-palette></app-palette>
+                <app-palette
+                  (nodeDropped)="canvasCmp.addNodeAtClientPoint($event.kind, $event.subtype, $event.clientX, $event.clientY)">
+                </app-palette>
               </div>
               <div class="resize-handle resize-handle-right"
                    (mousedown)="startResize($event, 'palette')"></div>
@@ -165,6 +170,7 @@ import { DebugSessionService } from '../../services/debug-session.service';
         }
 
         <app-workflow-canvas
+          #canvasCmp
           [nodes]="workflowService.nodes()"
           [edges]="workflowService.edges()"
           [activeNodeId]="workflowService.activeNodeId()"
@@ -229,6 +235,7 @@ import { DebugSessionService } from '../../services/debug-session.service';
                       [triggers]="triggers()"
                       [readOnly]="isMobile()"
                       (runFromNode)="executeFromNode($event)"
+                      (debugRunNode)="onDebugRunNode($event)"
                       (triggerEnabledChange)="setTriggerEnabled($event)">
                     </app-inspector>
                   }
@@ -461,6 +468,11 @@ import { DebugSessionService } from '../../services/debug-session.service';
         [wide]="true"
         (close)="closeModal('guide')">
         <div class="guide">
+          <div class="actions-row">
+            <button class="primary" type="button" (click)="closeModal('guide'); tour.start()">
+              ▶ Запустить интерактивный тур
+            </button>
+          </div>
           <p class="guide-lead">
             Этот редактор позволяет собрать workflow из HTTP-запросов, Python-кода и
             dataflow-операций (filter / map / reduce / foreach / flatmap), запустить его на бэкенде
@@ -532,6 +544,29 @@ import { DebugSessionService } from '../../services/debug-session.service';
               <li>Граф сохраняется автоматически через ~0.5 сек после правки.</li>
               <li>Имя workflow меняется кликом по заголовку в шапке.</li>
             </ul>
+          </div>
+        </div>
+      </app-modal>
+
+      <!-- Интерактивный онбординг-тур (требование 1/8) -->
+      <app-onboarding-tour #tour></app-onboarding-tour>
+
+      <!-- Single-node Debug Run Modal (требование 14) -->
+      <app-modal
+        [open]="debugModalOpen()"
+        [title]="'Запустить ноду в режиме отладки'"
+        (close)="debugModalOpen.set(false)">
+        <div class="debug-run-modal">
+          <p>Входное значение (JSON) для выбранной ноды:</p>
+          <textarea class="debug-input" rows="6" [ngModel]="debugInputJson()"
+                    (ngModelChange)="debugInputJson.set($event)"
+                    spellcheck="false"></textarea>
+          @if (debugInputError()) {
+            <span class="field-error">{{ debugInputError() }}</span>
+          }
+          <div class="actions-row">
+            <button class="primary" type="button" (click)="confirmDebugRun()">Запустить</button>
+            <button class="ghost" type="button" (click)="debugModalOpen.set(false)">Отмена</button>
           </div>
         </div>
       </app-modal>
@@ -1758,6 +1793,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
 
   private wsUnsubscribe: (() => void) | null = null;
   private wsGraphSub: import('rxjs').Subscription | null = null;
+  private wsRunSub: import('rxjs').Subscription | null = null;
 
   private currentWorkflowId = signal<string | null>(null);
   private currentVersionId = signal<string | null>(null);
@@ -1827,9 +1863,9 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
 
   // Effect для отслеживания исполнения
   constructor() {
-    // Сохраняем граф через 500ms после ЛЮБОГО изменения nodes/edges. Это надёжнее, чем
-    // полагаться на ngOnDestroy при выходе из редактора (HTTP может не успеть уйти при
-    // SPA-навигации / browser back / закрытии вкладки).
+    // Debounced-save: сохраняем граф через 1 секунду после последнего изменения nodes/edges
+    // (ТЗ требование 1). Это надёжнее, чем полагаться на ngOnDestroy при выходе из редактора
+    // (HTTP может не успеть уйти при SPA-навигации / browser back / закрытии вкладки).
     effect(() => {
       const nodes = this.workflowService.nodes();
       const edges = this.workflowService.edges();
@@ -1841,7 +1877,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
       if (this.saveDebounceTimer) {
         clearTimeout(this.saveDebounceTimer);
       }
-      this.saveDebounceTimer = setTimeout(() => this.saveGraphToBackend(), 500);
+      this.saveDebounceTimer = setTimeout(() => this.saveGraphToBackend(), 1000);
     });
     
     // Проверка валидации при изменении графа
@@ -1900,6 +1936,13 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   /** Вкладка нижней панели: лог / запуски / триггеры. */
   readonly bottomTab = signal<'log' | 'runs' | 'analytics' | 'debug'>('log');
   readonly debugSession = inject(DebugSessionService);
+  private debugApi = inject(DebugApiService);
+
+  // Состояние модалки отладочного запуска одной ноды (требование 14).
+  debugModalOpen = signal(false);
+  debugInputJson = signal('{}');
+  debugInputError = signal<string | null>(null);
+  private pendingDebugNodeId: string | null = null;
 
   modals = signal({
     guide: false,
@@ -2086,6 +2129,7 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     this.resizing = null;
     this.wsUnsubscribe?.();
     this.wsGraphSub?.unsubscribe();
+    this.wsRunSub?.unsubscribe();
   }
 
   /** Закрытие вкладки / reload: keepalive-fetch гарантирует, что PUT долетит до бэка. */
@@ -2120,7 +2164,15 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   private subscribeWs(workflowId: string): void {
     this.wsUnsubscribe?.();
     this.wsGraphSub?.unsubscribe();
+    this.wsRunSub?.unsubscribe();
     this.wsUnsubscribe = this.ws.subscribeToWorkflow(workflowId);
+    // Мгновенная индикация статусов нод по событиям исполнения (workflow_started,
+    // node_reached/action/exited, workflow_finished), дополняющая REST-polling.
+    this.wsRunSub = this.ws.runEvents.subscribe(evt => {
+      if (evt.workflowId === workflowId) {
+        this.executionService.applyRunEvent(evt);
+      }
+    });
     this.wsGraphSub = this.ws.graphUpdates.subscribe(evt => {
       if (evt.workflowId !== workflowId) {
         return;
@@ -2340,6 +2392,43 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
     this.runWorkflow(nodeId);
   }
 
+  /** Открыть модалку ввода JSON для отладочного запуска выбранной ноды. */
+  onDebugRunNode(nodeId: string): void {
+    this.pendingDebugNodeId = nodeId;
+    this.debugInputJson.set('{}');
+    this.debugInputError.set(null);
+    this.debugModalOpen.set(true);
+  }
+
+  /** Выполнить отладочный запуск одной ноды с введённым JSON и показать результат во вкладках. */
+  confirmDebugRun(): void {
+    const nodeId = this.pendingDebugNodeId;
+    const workflowId = this.currentWorkflowId();
+    if (!nodeId || !workflowId) {
+      return;
+    }
+    let input: unknown;
+    try {
+      input = JSON.parse(this.debugInputJson() || 'null');
+    } catch {
+      this.debugInputError.set('Невалидный JSON');
+      return;
+    }
+    this.debugInputError.set(null);
+    this.debugApi.runNode(workflowId, nodeId, input).subscribe({
+      next: (res) => {
+        this.debugModalOpen.set(false);
+        this.workflowService.setActiveNode(nodeId);
+        this.executionService.setDebugNodeResult(res);
+        this.inspectorTab.set('results');
+        this.selectedExecutionNodeId.set(nodeId);
+      },
+      error: (err) => {
+        this.debugInputError.set(err?.error?.message || err?.message || 'Ошибка отладочного запуска');
+      },
+    });
+  }
+
   private runWorkflow(fromNodeId?: string, input?: unknown): void {
     const workflowId = this.currentWorkflowId();
     if (!workflowId) {
@@ -2421,5 +2510,25 @@ export class WorkflowEditorComponent implements OnInit, OnDestroy {
   @HostListener('document:mouseup')
   onMouseUp(): void {
     this.resizing = null;
+  }
+
+  /**
+   * Удаление выделенной ноды по клавише Delete/Backspace (ТЗ требование 1).
+   * Игнорируем нажатия при фокусе в полях ввода/редактирования, чтобы не мешать набору текста.
+   */
+  @HostListener('document:keydown', ['$event'])
+  onKeyDown(e: KeyboardEvent): void {
+    if (e.key !== 'Delete' && e.key !== 'Backspace') {
+      return;
+    }
+    const target = e.target as HTMLElement | null;
+    const tag = target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
+      return;
+    }
+    const removed = this.workflowService.removeSelectedNodes();
+    if (removed > 0) {
+      e.preventDefault();
+    }
   }
 }
