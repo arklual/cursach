@@ -46,6 +46,10 @@ function toBackendType(kind: NodeKind, subtype: string | undefined): string {
     if (kind === 'http') {
         return 'http';
     }
+    if (kind === 'ai') {
+        // Один backend-executor "ai"; провайдер (openai/anthropic/gemini) живёт в config.provider.
+        return 'ai';
+    }
     if (kind === 'trigger') {
         const sub = (TRIGGER_SUBTYPES as readonly string[]).includes(subtype ?? '')
             ? subtype
@@ -97,6 +101,9 @@ function fromBackendType(type: string | undefined, originalKind?: NodeKind): { k
     }
     if (type === 'http') {
         return { kind: 'http' };
+    }
+    if (type === 'ai') {
+        return { kind: 'ai' };
     }
     return { kind: (type ?? 'http') as NodeKind };
 }

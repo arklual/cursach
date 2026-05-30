@@ -323,6 +323,73 @@ import { BranchMergeInspectorComponent } from './branch-merge-inspector.componen
               </label>
             </fieldset>
           }
+
+          @if (node.data.kind === 'ai') {
+            <fieldset class="config-section">
+              <legend>AI · {{ aiProviderLabel(node) }}</legend>
+              <label>
+                Провайдер
+                <select [ngModel]="cfg(node, 'provider', 'openai')"
+                        (ngModelChange)="setCfg(node, 'provider', $event)">
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic (Claude)</option>
+                  <option value="gemini">Google (Gemini)</option>
+                </select>
+              </label>
+              <label>
+                Модель
+                <input type="text"
+                       [ngModel]="cfg(node, 'model', '')"
+                       (ngModelChange)="setCfg(node, 'model', $event)"
+                       [placeholder]="aiModelPlaceholder(node)">
+              </label>
+              <label>
+                API-ключ
+                <input type="password" autocomplete="off" class="mono"
+                       [ngModel]="cfg(node, 'apiKey', '')"
+                       (ngModelChange)="setCfg(node, 'apiKey', $event)"
+                       placeholder="sk-…">
+              </label>
+              <p class="hint">Оставьте ключ пустым, чтобы взять его из переменной окружения сервера
+                ({{ aiEnvVarHint(node) }}).</p>
+              <label>
+                System (системный промпт)
+                <textarea rows="2"
+                          [ngModel]="cfg(node, 'system', '')"
+                          (ngModelChange)="setCfg(node, 'system', $event)"
+                          placeholder="Ты — полезный ассистент."></textarea>
+              </label>
+              <label>
+                Prompt (запрос)
+                <textarea rows="5"
+                          [ngModel]="cfg(node, 'prompt', '')"
+                          (ngModelChange)="setCfg(node, 'prompt', $event)"
+                          placeholder="Суммируй: &#36;{inputs.fetch.body.text}"></textarea>
+              </label>
+              <p class="hint">В промпте можно ссылаться на данные предыдущих нод через
+                &#36;{{ '{' }}inputs.nodeId.field{{ '}' }}.</p>
+              <label>
+                Temperature
+                <input type="number" min="0" max="2" step="0.1"
+                       [ngModel]="cfg(node, 'temperature', 0.7)"
+                       (ngModelChange)="setCfg(node, 'temperature', +$event)">
+              </label>
+              <label>
+                Max tokens
+                <input type="number" min="1" step="1"
+                       [ngModel]="cfg(node, 'maxTokens', 1024)"
+                       (ngModelChange)="setCfg(node, 'maxTokens', +$event)">
+              </label>
+              <label>
+                Base URL (опционально)
+                <input type="text" class="mono"
+                       [ngModel]="cfg(node, 'baseUrl', '')"
+                       (ngModelChange)="setCfg(node, 'baseUrl', $event)"
+                       [placeholder]="aiBaseUrlPlaceholder(node)">
+              </label>
+            </fieldset>
+          }
+
           @if (activeNode()?.data?.kind === 'ab') {
             <app-branch-split-inspector
                 [node]="activeNode()!"
@@ -832,6 +899,39 @@ export class InspectorComponent {
       'def run(input):',
       '    return input.get("runInput")',
     ].join('\n');
+  }
+
+  /** Текущий провайдер AI-ноды (по умолчанию openai). */
+  private aiProvider(node: WorkflowNode): string {
+    return (node.data.config?.['provider'] as string) || 'openai';
+  }
+
+  aiProviderLabel(node: WorkflowNode): string {
+    const p = this.aiProvider(node);
+    if (p === 'anthropic') return 'Claude';
+    if (p === 'gemini') return 'Gemini';
+    return 'OpenAI';
+  }
+
+  aiModelPlaceholder(node: WorkflowNode): string {
+    const p = this.aiProvider(node);
+    if (p === 'anthropic') return 'claude-3-5-sonnet-latest';
+    if (p === 'gemini') return 'gemini-1.5-flash';
+    return 'gpt-4o-mini';
+  }
+
+  aiBaseUrlPlaceholder(node: WorkflowNode): string {
+    const p = this.aiProvider(node);
+    if (p === 'anthropic') return 'https://api.anthropic.com';
+    if (p === 'gemini') return 'https://generativelanguage.googleapis.com';
+    return 'https://api.openai.com/v1';
+  }
+
+  aiEnvVarHint(node: WorkflowNode): string {
+    const p = this.aiProvider(node);
+    if (p === 'anthropic') return 'ANTHROPIC_API_KEY';
+    if (p === 'gemini') return 'GEMINI_API_KEY / GOOGLE_API_KEY';
+    return 'OPENAI_API_KEY';
   }
 
   dataflowLegend(node: WorkflowNode): string {

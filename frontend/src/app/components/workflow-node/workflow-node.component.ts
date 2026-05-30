@@ -162,6 +162,10 @@ export class WorkflowNodeComponent {
     if (d.kind === 'dataflow' && d.__subtype) {
       return d.__subtype;
     }
+    if (d.kind === 'ai') {
+      const provider = (d.config?.['provider'] as string) || 'openai';
+      return provider === 'anthropic' ? 'claude' : provider;
+    }
     return d.kind;
   }
 }

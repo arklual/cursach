@@ -64,6 +64,19 @@ describe('WorkflowService', () => {
       expect(svc.getNodeById(id)?.data.label).toBe('Webhook');
     });
 
+    it('ai нода получает дефолтный config с провайдером по subtype', () => {
+      const openaiId = svc.addNode('ai', { x: 0, y: 0 }, 'openai');
+      const openaiCfg = svc.getNodeById(openaiId)?.data.config as { provider: string; model: string };
+      expect(svc.getNodeById(openaiId)?.data.label).toBe('OpenAI');
+      expect(openaiCfg.provider).toBe('openai');
+      expect(openaiCfg.model).toBe('gpt-4o-mini');
+
+      const claudeId = svc.addNode('ai', { x: 0, y: 0 }, 'anthropic');
+      const claudeCfg = svc.getNodeById(claudeId)?.data.config as { provider: string };
+      expect(svc.getNodeById(claudeId)?.data.label).toBe('Claude');
+      expect(claudeCfg.provider).toBe('anthropic');
+    });
+
     it('ab нода получает дефолтный config с двумя variants 50/50', () => {
       const id = svc.addNode('ab', { x: 0, y: 0 });
       const cfg = svc.getNodeById(id)?.data.config as { variants: Array<{ key: string; weight: number }> };
@@ -213,8 +226,8 @@ describe('WorkflowService', () => {
   });
 
   describe('nodeTemplates', () => {
-    it('содержит все 6 видов нод', () => {
-      const kinds: NodeKind[] = ['trigger', 'http', 'dataflow', 'code', 'ab', 'join'];
+    it('содержит все 7 видов нод', () => {
+      const kinds: NodeKind[] = ['trigger', 'http', 'dataflow', 'code', 'ab', 'join', 'ai'];
       for (const k of kinds) {
         expect(svc.nodeTemplates[k]).toBeTruthy();
         expect(svc.nodeTemplates[k].label).toBeTruthy();

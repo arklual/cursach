@@ -12,8 +12,9 @@ interface PaletteItem {
   label: string;
   /** Underlying NodeKind for the workflow service. */
   kind: NodeKind;
-  /** Optional subtype (dataflow operation, code language, or trigger flavour). */
-  subtype?: 'filter' | 'map' | 'reduce' | 'foreach' | 'flatmap' | 'js' | 'webhook' | 'cron' | 'interval' | 'manual';
+  /** Optional subtype (dataflow operation, code language, trigger flavour, or AI provider). */
+  subtype?: 'filter' | 'map' | 'reduce' | 'foreach' | 'flatmap' | 'js' | 'webhook' | 'cron' | 'interval' | 'manual'
+    | 'openai' | 'anthropic' | 'gemini' | 'custom';
   iconPath: string;
 }
 
@@ -390,6 +391,7 @@ export class PaletteComponent {
     flatmap: 'M22 11V9h-3.34c-.16-.53-.41-1.03-.7-1.49L20 5.5l-1.41-1.41-2.04 2.04C16.07 6.04 15.57 5.79 15 5.63V2H9v3.63c-.57.16-1.07.41-1.55.7L5.41 4.29 4 5.71l2 2.04c-.29.46-.54.96-.7 1.49H2v2h3.31c-.05.34-.07.66-.07 1 0 .35.02.66.07 1H2v2h3.34c.16.53.41 1.03.7 1.49L4 18.29l1.41 1.41 2.04-2.04c.48.29.98.54 1.55.7V22h6v-3.63c.57-.16 1.07-.41 1.55-.7l2.04 2.04L20 18.29l-2.04-2.04c.29-.46.54-.96.7-1.49H22v-2h-3.31c.05-.34.07-.66.07-1 0-.34-.02-.66-.07-1H22z',
     split: 'M3 6h6l4 6-4 6h-6 M14 12h7',
     merge: 'M3 6h6l4 6-4 6h-6 M14 12h7 M14 12L8 6 M14 12L8 18',
+    ai: 'M12 2l1.6 4.8L18.4 8l-4.8 1.2L12 14l-1.6-4.8L5.6 8l4.8-1.2L12 2zm6.5 9l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.6zM6 13l.8 2.2L9 16l-2.2.8L6 19l-.8-2.2L3 16l2.2-.8L6 13z',
   } as const;
 
   private readonly categories: NodeCategory[] = [
@@ -410,6 +412,17 @@ export class PaletteComponent {
       color: 'var(--warning, #f5a524)',
       items: [
         { id: 'http', label: 'HTTP', kind: 'http', iconPath: this.icons.http },
+      ],
+    },
+    {
+      id: 'ai',
+      name: 'AI',
+      color: 'var(--success, #10a37f)',
+      items: [
+        { id: 'ai:openai', label: 'OpenAI', kind: 'ai', subtype: 'openai', iconPath: this.icons.ai },
+        { id: 'ai:anthropic', label: 'Claude', kind: 'ai', subtype: 'anthropic', iconPath: this.icons.ai },
+        { id: 'ai:gemini', label: 'Gemini', kind: 'ai', subtype: 'gemini', iconPath: this.icons.ai },
+        { id: 'ai:custom', label: 'AI (Custom)', kind: 'ai', subtype: 'custom', iconPath: this.icons.ai },
       ],
     },
     {

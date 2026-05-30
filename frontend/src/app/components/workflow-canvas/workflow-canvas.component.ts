@@ -1229,12 +1229,15 @@ export class WorkflowCanvasComponent implements AfterViewInit {
 
   /** Приводит идентификатор ноды к {kind, subtype}: принимает как kind, так и subtype-shorthand. */
   private normalizeNodeKind(kindStr: string): { kind: NodeKind; subtype?: string } {
-    const validKinds: NodeKind[] = ['trigger', 'http', 'dataflow', 'code', 'ab', 'join'];
+    const validKinds: NodeKind[] = ['trigger', 'http', 'dataflow', 'code', 'ab', 'join', 'ai'];
     if ((validKinds as string[]).includes(kindStr)) {
       return { kind: kindStr as NodeKind };
     }
     if (['filter', 'map', 'reduce', 'foreach', 'flatmap'].includes(kindStr)) {
       return { kind: 'dataflow', subtype: kindStr };
+    }
+    if (['openai', 'anthropic', 'claude', 'gemini', 'google', 'custom'].includes(kindStr)) {
+      return { kind: 'ai', subtype: kindStr };
     }
     if (['python', 'js', 'javascript'].includes(kindStr)) {
       return { kind: 'code', subtype: kindStr };

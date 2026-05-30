@@ -239,6 +239,53 @@ describe('workflow.mapper', () => {
         });
     });
 
+    describe('ai node mapping', () => {
+        it('kind=ai → backend type=ai, провайдер и config выживают round-trip', () => {
+            const node: FrontNode = {
+                id: 'ai-1',
+                type: 'workflowNode',
+                position: { x: 5, y: 6 },
+                data: {
+                    id: 'ai-1',
+                    kind: 'ai',
+                    label: 'OpenAI',
+                    color: '#10a37f',
+                    successProb: 0.5,
+                    variants: [],
+                    randomization: 'simple',
+                    metrics: { reached: 0, converted: 0, pHat: 0, variance: 0, ci: [0, 0], users: [], events: [] },
+                    config: {
+                        provider: 'openai',
+                        model: 'gpt-4o-mini',
+                        prompt: 'Hello',
+                        temperature: 0.7,
+                        maxTokens: 1024,
+                    },
+                },
+            };
+
+            const backend = frontNodeToBackend(node);
+            expect(backend.type).toBe('ai');
+
+            const restored = backendNodeToFront(backend);
+            expect(restored.data.kind).toBe('ai');
+            expect(restored.data.config?.['provider']).toBe('openai');
+            expect(restored.data.config?.['model']).toBe('gpt-4o-mini');
+            expect(restored.data.config?.['prompt']).toBe('Hello');
+            expect(restored.data.config?.['maxTokens']).toBe(1024);
+        });
+
+        it('backend type=ai → front kind=ai', () => {
+            const back = {
+                id: 'ai-2', type: 'ai', position: { x: 0, y: 0 },
+                data: { label: 'Claude', config: { provider: 'anthropic' } as never },
+            };
+            const front = backendNodeToFront(back as never);
+            expect(front.data.kind).toBe('ai');
+            expect(front.data.config?.['provider']).toBe('anthropic');
+        });
+    });
+
     describe('branch.split / branch.merge', () => {
         it('frontNodeToBackend для kind=ab выдаёт type=branch.split', () => {
             const front: FrontNode = {

@@ -38,6 +38,7 @@ export class WorkflowService {
     code: { label: 'Python', color: '#06b6d4', success: 0.4 },
     ab: { label: 'A/B Fork', color: '#f472b6', success: 0.0 },
     join: { label: 'Join', color: '#c084fc', success: 0.5 },
+    ai: { label: 'AI', color: '#10a37f', success: 0.5 },
   };
 
   private readonly dataflowSubtypeLabels: Record<string, string> = {
@@ -59,6 +60,13 @@ export class WorkflowService {
     interval: 'Interval',
   };
 
+  private readonly aiSubtypeLabels: Record<string, string> = {
+    openai: 'OpenAI',
+    anthropic: 'Claude',
+    gemini: 'Gemini',
+    custom: 'AI (Custom)',
+  };
+
   private nodesSignal = signal<WorkflowNode[]>([]);
   private edgesSignal = signal<WorkflowEdge[]>([]);
   private activeNodeIdSignal = signal<string | null>(null);
@@ -77,7 +85,7 @@ export class WorkflowService {
     return this.nodesSignal().find(n => n.id === id) || null;
   });
 
-  private buildDefaultConfig(kind: NodeKind): Record<string, unknown> | undefined {
+  private buildDefaultConfig(kind: NodeKind, subtype?: string): Record<string, unknown> | undefined {
     if (kind === 'ab') {
       return {
         mode: 'split',
@@ -91,7 +99,34 @@ export class WorkflowService {
     if (kind === 'join') {
       return { tagField: '_variant', preserveExistingTag: true };
     }
+    if (kind === 'ai') {
+      return this.buildAiConfig(subtype);
+    }
     return undefined;
+  }
+
+  /** Дефолтный конфиг AI-ноды. Подтип палитры (openai/anthropic/gemini/custom) задаёт провайдера и модель. */
+  private buildAiConfig(subtype?: string): Record<string, unknown> {
+    const provider = subtype === 'anthropic' ? 'anthropic'
+      : subtype === 'gemini' ? 'gemini'
+      : 'openai';
+    const model = provider === 'anthropic' ? 'claude-3-5-sonnet-latest'
+      : provider === 'gemini' ? 'gemini-1.5-flash'
+      : 'gpt-4o-mini';
+    const config: Record<string, unknown> = {
+      provider,
+      model: subtype === 'custom' ? '' : model,
+      apiKey: '',
+      system: '',
+      prompt: 'Кратко представься.',
+      temperature: 0.7,
+      maxTokens: 1024,
+    };
+    if (subtype === 'custom') {
+      // Generic OpenAI-совместимый endpoint: пользователь указывает baseUrl (Groq, OpenRouter, Ollama…).
+      config['baseUrl'] = '';
+    }
+    return config;
   }
 
   private createDefaultMetrics(): NodeMetrics {
@@ -115,8 +150,10 @@ export class WorkflowService {
       label = this.codeSubtypeLabels[subtype] ?? template.label;
     } else if (type === 'trigger' && subtype) {
       label = this.triggerSubtypeLabels[subtype] ?? template.label;
+    } else if (type === 'ai' && subtype) {
+      label = this.aiSubtypeLabels[subtype] ?? template.label;
     }
-    const cfg = this.buildDefaultConfig(type);
+    const cfg = this.buildDefaultConfig(type, subtype);
     const defaultVariants: Variant[] = (cfg?.['variants'] as Array<{ label?: string; weight: number }> | undefined)
       ?.map(v => ({ label: v.label ?? '', weight: v.weight })) ?? [];
     const data: NodeData = {

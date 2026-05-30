@@ -87,6 +87,11 @@ services:
       APP_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       DOCKER_HOST: tcp://docker-proxy:2375
       APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-https://fluxpilot.ru,https://www.fluxpilot.ru}
+      # API-ключи для AI-нод. Если заданы здесь — пользователю не нужно вписывать ключ в config ноды
+      # (нода берёт ключ из окружения, когда поле apiKey пустое). Опционально.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     healthcheck:
       # Actuator не подключён в pom.xml — используем GET /v1/workflows (вернёт 200 + []).
       # Когда добавите spring-boot-starter-actuator + management.endpoints.web.exposure.include=health

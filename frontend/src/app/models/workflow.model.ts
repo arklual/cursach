@@ -46,6 +46,7 @@ export interface NodeData {
    *   dataflow.map: { select | rename | wrap }
    *   dataflow.reduce / flatmap: { op?, field? }
    *   code: { image?, code, timeoutMs?, memoryMb? }
+   *   ai: { provider, model?, apiKey?, prompt | messages, system?, temperature?, maxTokens?, baseUrl? }
    * Mapper кладёт это в node.data.config на бэке.
    */
   config?: Record<string, unknown>;
@@ -79,7 +80,7 @@ export interface WorkflowEdge {
   data?: { variant?: string };
 }
 
-export type NodeKind = 'trigger' | 'http' | 'dataflow' | 'code' | 'ab' | 'join';
+export type NodeKind = 'trigger' | 'http' | 'dataflow' | 'code' | 'ab' | 'join' | 'ai';
 
 export interface NodeTemplate {
   label: string;
