@@ -44,7 +44,15 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add .github/badges/jacoco.svg
             git commit -m "ci(coverage): refresh JaCoCo badge [skip ci]"
-            git push
+            for attempt in 1 2 3; do
+              if git push; then
+                exit 0
+              fi
+              echo "Push rejected (attempt $attempt) — rebasing on latest main and retrying"
+              git pull --rebase origin main
+            done
+            echo "Failed to push badge after 3 attempts"
+            exit 1
           else
             echo "Coverage badge unchanged — no commit"
           fi
