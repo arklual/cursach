@@ -1,0 +1,37 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-001-drop-existing-triggers
+      author: a11a
+      changes:
+        - delete:
+            tableName: triggers
+
+  - changeSet:
+      id: 002-002-add-trigger-node-id
+      author: a11a
+      changes:
+        - addColumn:
+            tableName: triggers
+            columns:
+              - column:
+                  name: node_id
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: triggers
+            columnNames: workflow_id, node_id
+            constraintName: uq_triggers_workflow_node
+
+  - changeSet:
+      id: 002-003-add-workflow-run-start-node-id
+      author: a11a
+      changes:
+        - addColumn:
+            tableName: workflow_run
+            columns:
+              - column:
+                  name: start_node_id
+                  type: varchar(64)
+                  constraints:
+                    nullable: true

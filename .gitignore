@@ -1,0 +1,13 @@
+node_modules/
+target/
+.idea/
+.vscode/
+.DS_Store
+dist/
+*.log
+.env
+.env.local
+*.crt
+*.key
+*.pem
+memory-bank/

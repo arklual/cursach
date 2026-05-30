@@ -1,0 +1,106 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kursach-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-a11a}
+      POSTGRES_USER: ${POSTGRES_USER:-a11a}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-a11a} -d ${POSTGRES_DB:-a11a}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: kursach-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: kursach-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} &&
+      (mc mb local/${MINIO_BUCKET:-a11a-blobs} 2>/dev/null || true) &&
+      mc anonymous set download local/${MINIO_BUCKET:-a11a-blobs} 2>/dev/null || true
+      "
+    restart: "no"
+
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:0.3.0
+    container_name: kursach-docker-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      POST: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  backend:
+    image: ghcr.io/${GHCR_OWNER}/kursach-backend:${BACKEND_TAG:-latest}
+    container_name: kursach-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      docker-proxy:
+        condition: service_started
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-a11a}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-a11a}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_S3_ENDPOINT: http://minio:9000
+      APP_S3_BUCKET: ${MINIO_BUCKET:-a11a-blobs}
+      APP_S3_ACCESS_KEY: ${MINIO_ROOT_USER}
+      APP_S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      DOCKER_HOST: tcp://docker-proxy:2375
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-https://fluxpilot.ru,https://www.fluxpilot.ru}
+      WS_ALLOWED_ORIGINS: ${WS_ALLOWED_ORIGINS:-https://fluxpilot.ru,https://www.fluxpilot.ru}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/v1/workflows >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  frontend:
+    image: ghcr.io/${GHCR_OWNER}/kursach-frontend:${FRONTEND_TAG:-latest}
+    container_name: kursach-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ${SSL_CERT_PATH:-/opt/kursach/ssl/tls.crt}:/etc/nginx/ssl/tls.crt:ro
+      - ${SSL_KEY_PATH:-/opt/kursach/ssl/tls.key}:/etc/nginx/ssl/tls.key:ro
+
+volumes:
+  postgres-data:
+  minio-data:

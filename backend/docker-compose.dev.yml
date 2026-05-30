@@ -1,0 +1,42 @@
+services:
+  postgres-dev:
+    image: postgres:16-alpine
+    container_name: a11a-postgres-dev
+    environment:
+      POSTGRES_DB: a11a
+      POSTGRES_USER: a11a
+      POSTGRES_PASSWORD: a11a
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U a11a -d a11a"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-dev:
+    image: minio/minio:latest
+    container_name: a11a-minio-dev
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "6005:9000"
+      - "6006:9001"
+
+  minio-init-dev:
+    image: minio/mc:latest
+    container_name: a11a-minio-init-dev
+    depends_on:
+      - minio-dev
+    entrypoint: >
+      /bin/sh -c "
+      for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+        mc alias set local http://minio-dev:9000 minioadmin minioadmin && break;
+        sleep 1;
+      done;
+      mc mb -p local/a11a-blobs || true;
+      mc anonymous set download local/a11a-blobs || true;
+      exit 0;
+      "

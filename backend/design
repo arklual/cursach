@@ -1,0 +1,64 @@
+@startuml
+title Архитектура: CAS поверх S3 + версионирование (BFF = админка, Gateway = исполнение)
+
+' Compact layout params
+skinparam componentStyle rect
+skinparam shadowing false
+skinparam dpi 140
+skinparam Padding 8
+skinparam Nodesep 15
+skinparam Ranksep 20
+
+' --- Клиенты / Входящие ---
+actor "Frontend\n(Admin UI)" as Frontend
+actor "Another Backend\n(Executor Client)" as OtherBackend
+
+' --- API / Coordination ---
+package "API Layer" {
+  component "BFF / Admin API\n(manage workflows, autosave)" as BFF
+  component "Gateway\n(execution entrypoint)" as Gateway
+}
+
+' --- Execution Layer ---
+package "Execution Layer" {
+  component "Orchestrator\nRunner System" as Orchestrator
+  component "Workers\n(Sandboxed runners)" as Workers
+}
+
+' --- Хранилища / Мониторинг ---
+package "Storage & Observability" {
+  database "Postgres\n(skeleton + index)" as Postgres
+  component "S3 Bucket\n(immutable blobs by HASH)" as S3
+  component "Grafana\n(metrics)" as Grafana
+}
+
+' --- Потоки ---
+Frontend --> BFF : autosave (graph + node content)
+OtherBackend --> Gateway : run / webhook / enqueue
+
+BFF --> Postgres : check blob_index\ninsert workflow_revision (skeleton with hashes)
+BFF --> S3 : upload blob if new
+BFF --> S3 : presigned GET (diff/view)
+
+Gateway --> Orchestrator : trigger run / enqueue
+BFF --> Orchestrator : admin-triggered run / management actions
+Orchestrator --> Workers : schedule node runs (fetch code by HASH)
+Workers --> S3 : GET blob (by HASH)
+
+Orchestrator --> Grafana : metrics/events
+
+' --- Примечания ---
+note right of Postgres
+  Postgres хранит:
+  - workflow_revision (легковесный skeleton)
+  - blob_index (content_hash -> s3_key)
+  - metadata, deployments
+end note
+
+note left of BFF
+  Роль BFF (админка):
+  - autosave от UI
+  - вычисляет SHA256 и сохраняет только хэши в skeleton
+end note
+
+@enduml

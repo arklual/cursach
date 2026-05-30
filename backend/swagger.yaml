@@ -1,0 +1,1127 @@
+openapi: 3.0.1
+info:
+  title: FluxPilot API
+  description: "REST API платформы FluxPilot для управления workflow, их версиями\
+    , снапшотами, триггерами, запусками и A/B-аналитикой."
+  version: 1.0.0
+servers:
+- url: /v1
+  description: Основной API сервер
+tags:
+- name: Workflows
+  description: "Создание, чтение, обновление workflow и управление их версиями"
+- name: Triggers
+  description: "Управление триггерами (manual, scheduler, webhook) и приём webhook-з\
+    апросов"
+- name: Runs
+  description: Запуск workflow и просмотр истории/деталей запусков
+- name: Analytics
+  description: "Сводная A/B-аналитика workflow (конверсии, доверительные интервалы\
+    , z-тест)"
+- name: Debug
+  description: Пошаговая отладка workflow
+- name: Versions
+  description: Редактирование графа рабочей версии workflow
+- name: Snapshots
+  description: Именованные снапшоты workflow уровня документа
+paths:
+  /workflows/{workflowId}:
+    get:
+      tags:
+      - Workflows
+      operationId: get
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Workflow"
+    put:
+      tags:
+      - Workflows
+      operationId: updateMeta
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowMetaUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowMeta"
+    delete:
+      tags:
+      - Workflows
+      operationId: delete
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+  /workflow-versions/{versionId}/graph:
+    put:
+      tags:
+      - Versions
+      operationId: putGraph
+      parameters:
+      - name: versionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowGraph"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowGraph"
+  /workflows:
+    get:
+      tags:
+      - Workflows
+      operationId: list
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowMeta"
+    post:
+      tags:
+      - Workflows
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowCreateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Workflow"
+  /workflows/{workflowId}/versions:
+    get:
+      tags:
+      - Workflows
+      summary: Список версий workflow
+      operationId: listVersions
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowVersion"
+    post:
+      tags:
+      - Workflows
+      summary: Создать именованную версию
+      description: Фиксирует текущую ревизию как именованную версию (тег опционален)
+      operationId: createVersion
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowVersionCreateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowVersion"
+  /workflows/{workflowId}/versions/{versionId}/restore:
+    post:
+      tags:
+      - Workflows
+      summary: Откат к версии
+      description: Создаёт новую (append-only) ревизию с графом указанной версии
+      operationId: restoreVersion
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: versionId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowGraph"
+  /workflows/{workflowId}/snapshots:
+    get:
+      tags:
+      - Snapshots
+      operationId: list_1
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowSnapshot"
+    post:
+      tags:
+      - Snapshots
+      operationId: create_1
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSnapshotRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowSnapshot"
+  /workflows/{workflowId}/snapshots/{snapshotId}/restore:
+    post:
+      tags:
+      - Snapshots
+      operationId: restore
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: snapshotId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowGraph"
+  /workflows/{workflowId}/runs:
+    get:
+      tags:
+      - Runs
+      operationId: listRuns
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkflowRun"
+    post:
+      tags:
+      - Runs
+      operationId: runWorkflow
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: startNodeId
+        in: query
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonNode"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowRun"
+  /workflows/{workflowId}/nodes/{nodeId}/debug-run:
+    post:
+      tags:
+      - Debug
+      summary: Отладочный запуск одной ноды
+      description: Исполняет одну выбранную ноду с произвольным входом без прогона
+        графа; результат возвращается синхронно и фиксируется в истории как отладочный
+        запуск.
+      operationId: debugRunNode
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: nodeId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DebugNodeRunRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DebugNodeRunResult"
+  /workflows/{workflowId}/debug-sessions:
+    post:
+      tags:
+      - Debug
+      operationId: start
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DebugStartRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DebugSessionDto"
+  /webhook/{token}:
+    post:
+      tags:
+      - Triggers
+      operationId: webhook
+      parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonNode"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WebhookAccepted"
+  /debug-sessions/{sessionId}/step:
+    post:
+      tags:
+      - Debug
+      operationId: step
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DebugStepRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DebugSessionDto"
+  /debug-sessions/{sessionId}/run-to-end:
+    post:
+      tags:
+      - Debug
+      operationId: runToEnd
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DebugSessionDto"
+  /workflows/{workflowId}/triggers/{triggerId}:
+    patch:
+      tags:
+      - Triggers
+      operationId: update
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: triggerId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TriggerUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Trigger"
+  /workflows/{workflowId}/triggers:
+    get:
+      tags:
+      - Triggers
+      operationId: list_2
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Trigger"
+  /workflows/{workflowId}/ab-analytics:
+    get:
+      tags:
+      - Analytics
+      operationId: get_1
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: abNodeId
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AbAnalyticsResponse"
+  /workflow-runs/{runId}:
+    get:
+      tags:
+      - Runs
+      operationId: getRun
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowRun"
+  /workflow-runs/{runId}/result:
+    get:
+      tags:
+      - Runs
+      operationId: getRunResult
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WorkflowRunResult"
+  /node-runs/{nodeRunId}:
+    get:
+      tags:
+      - Runs
+      operationId: getNodeRun
+      parameters:
+      - name: nodeRunId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NodeRun"
+  /debug-sessions/{sessionId}:
+    get:
+      tags:
+      - Debug
+      operationId: get_2
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DebugSessionDto"
+    delete:
+      tags:
+      - Debug
+      operationId: close
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+  /workflows/{workflowId}/snapshots/{snapshotId}:
+    delete:
+      tags:
+      - Snapshots
+      operationId: delete_1
+      parameters:
+      - name: workflowId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: snapshotId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
+    WorkflowMetaUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    WorkflowMeta:
+      required:
+      - createdAt
+      - id
+      - isDemo
+      - name
+      - nodesCount
+      - updatedAt
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        isDemo:
+          type: boolean
+        nodesCount:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    Connection:
+      required:
+      - id
+      - source
+      - target
+      type: object
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        target:
+          type: string
+        sourceHandle:
+          type: string
+        targetHandle:
+          type: string
+        variant:
+          type: string
+    JsonNode:
+      type: object
+    Node:
+      required:
+      - id
+      - type
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        position:
+          $ref: "#/components/schemas/Position"
+        data:
+          $ref: "#/components/schemas/NodeData"
+    NodeData:
+      type: object
+      properties:
+        label:
+          type: string
+        config:
+          $ref: "#/components/schemas/JsonNode"
+        abConfig:
+          $ref: "#/components/schemas/JsonNode"
+    Position:
+      required:
+      - x
+      - "y"
+      type: object
+      properties:
+        x:
+          type: number
+          format: double
+        "y":
+          type: number
+          format: double
+    WorkflowGraph:
+      required:
+      - connections
+      - nodes
+      - versionId
+      type: object
+      properties:
+        versionId:
+          type: string
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Node"
+        connections:
+          type: array
+          items:
+            $ref: "#/components/schemas/Connection"
+    WorkflowCreateRequest:
+      required:
+      - name
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    Workflow:
+      required:
+      - graph
+      - meta
+      type: object
+      properties:
+        meta:
+          $ref: "#/components/schemas/WorkflowMeta"
+        graph:
+          $ref: "#/components/schemas/WorkflowGraph"
+    WorkflowVersionCreateRequest:
+      type: object
+      properties:
+        versionTag:
+          type: string
+    WorkflowVersion:
+      required:
+      - createdAt
+      - id
+      - workflowId
+      type: object
+      properties:
+        id:
+          type: string
+        workflowId:
+          type: string
+        tag:
+          type: string
+        createdAt:
+          type: string
+    CreateSnapshotRequest:
+      required:
+      - name
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    WorkflowSnapshot:
+      required:
+      - createdAt
+      - id
+      - name
+      - workflowId
+      type: object
+      properties:
+        id:
+          type: string
+        workflowId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        createdAt:
+          type: string
+    NodeRun:
+      required:
+      - id
+      - nodeId
+      - status
+      - workflowRunId
+      type: object
+      properties:
+        id:
+          type: string
+        workflowRunId:
+          type: string
+        nodeId:
+          type: string
+        status:
+          type: string
+        startedAt:
+          type: string
+        finishedAt:
+          type: string
+        input:
+          $ref: "#/components/schemas/JsonNode"
+        output:
+          $ref: "#/components/schemas/JsonNode"
+        errorMessage:
+          type: string
+    WorkflowRun:
+      required:
+      - id
+      - isDebug
+      - nodes
+      - status
+      - workflowId
+      type: object
+      properties:
+        id:
+          type: string
+        workflowId:
+          type: string
+        status:
+          type: string
+        startedAt:
+          type: string
+        finishedAt:
+          type: string
+        durationMs:
+          type: integer
+          format: int64
+        input:
+          $ref: "#/components/schemas/JsonNode"
+        output:
+          $ref: "#/components/schemas/JsonNode"
+        startNodeId:
+          type: string
+        isDebug:
+          type: boolean
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeRun"
+    DebugNodeRunRequest:
+      type: object
+      properties:
+        input:
+          $ref: "#/components/schemas/JsonNode"
+    DebugNodeRunResult:
+      required:
+      - nodeId
+      - runId
+      - status
+      - workflowId
+      type: object
+      properties:
+        runId:
+          type: string
+        workflowId:
+          type: string
+        nodeId:
+          type: string
+        status:
+          type: string
+        input:
+          $ref: "#/components/schemas/JsonNode"
+        output:
+          $ref: "#/components/schemas/JsonNode"
+        errorMessage:
+          type: string
+    DebugStartRequest:
+      type: object
+      properties:
+        input:
+          $ref: "#/components/schemas/JsonNode"
+        startNodeId:
+          type: string
+    DebugFailedNode:
+      required:
+      - message
+      - nodeId
+      type: object
+      properties:
+        nodeId:
+          type: string
+        message:
+          type: string
+    DebugSessionDto:
+      required:
+      - completed
+      - createdAt
+      - failed
+      - outputs
+      - ready
+      - readyInputs
+      - sessionId
+      - skipped
+      - status
+      - updatedAt
+      - versionId
+      - workflowId
+      type: object
+      properties:
+        sessionId:
+          type: string
+        workflowId:
+          type: string
+        versionId:
+          type: string
+        status:
+          type: string
+        input:
+          $ref: "#/components/schemas/JsonNode"
+        outputs:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/JsonNode"
+        completed:
+          type: array
+          items:
+            type: string
+        skipped:
+          type: array
+          items:
+            type: string
+        failed:
+          type: array
+          items:
+            $ref: "#/components/schemas/DebugFailedNode"
+        ready:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        readyInputs:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/JsonNode"
+    WebhookAccepted:
+      required:
+      - pollUrl
+      - run
+      type: object
+      properties:
+        run:
+          $ref: "#/components/schemas/WorkflowRun"
+        pollUrl:
+          type: string
+    DebugStepRequest:
+      type: object
+      properties:
+        nodeId:
+          type: string
+    TriggerUpdate:
+      required:
+      - enabled
+      type: object
+      properties:
+        enabled:
+          type: boolean
+    Trigger:
+      required:
+      - enabled
+      - id
+      - nodeId
+      - type
+      - workflowId
+      type: object
+      properties:
+        id:
+          type: string
+        workflowId:
+          type: string
+        nodeId:
+          type: string
+        type:
+          type: string
+        config:
+          $ref: "#/components/schemas/JsonNode"
+        token:
+          type: string
+        enabled:
+          type: boolean
+    AbAnalyticsResponse:
+      required:
+      - abNodeId
+      - computedAt
+      - excludedNoVariant
+      - mode
+      - totalRuns
+      - variants
+      - warnings
+      type: object
+      properties:
+        abNodeId:
+          type: string
+        mode:
+          type: string
+        totalRuns:
+          type: integer
+          format: int32
+        excludedNoVariant:
+          type: integer
+          format: int32
+        computedAt:
+          type: string
+          format: date-time
+        variants:
+          type: array
+          items:
+            $ref: "#/components/schemas/AbVariantRow"
+        warnings:
+          type: array
+          items:
+            type: string
+    AbVariantRow:
+      required:
+      - color
+      - isBaseline
+      - isSignificant
+      - key
+      - label
+      - runs
+      - trafficCount
+      - trafficPct
+      type: object
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+        color:
+          type: string
+        weight:
+          type: integer
+          format: int32
+        runs:
+          type: integer
+          format: int32
+        trafficCount:
+          type: integer
+          format: int32
+        trafficPct:
+          type: number
+          format: double
+        conversions:
+          type: integer
+          format: int32
+        conversionPct:
+          type: number
+          format: double
+        ciLow:
+          type: number
+          format: double
+        ciHigh:
+          type: number
+          format: double
+        liftVsBaseline:
+          type: number
+          format: double
+        pValue:
+          type: number
+          format: double
+          writeOnly: true
+        isBaseline:
+          type: boolean
+        isSignificant:
+          type: boolean
+        pvalue:
+          type: number
+          format: double
+    WorkflowRunResult:
+      required:
+      - id
+      - status
+      - workflowId
+      type: object
+      properties:
+        id:
+          type: string
+        workflowId:
+          type: string
+        status:
+          type: string
+        startedAt:
+          type: string
+        finishedAt:
+          type: string
+        durationMs:
+          type: integer
+          format: int64
+        output:
+          $ref: "#/components/schemas/JsonNode"

@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-001-add-workflow-run-trigger-type
+      author: a11a
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: workflow_run
+                columnName: trigger_type
+      changes:
+        - addColumn:
+            tableName: workflow_run
+            columns:
+              - column:
+                  name: trigger_type
+                  type: varchar(32)
+                  defaultValue: manual
+                  constraints:
+                    nullable: false
+  - changeSet:
+      id: 007-002-add-node-run-node-type
+      author: a11a
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: node_run
+                columnName: node_type
+      changes:
+        - addColumn:
+            tableName: node_run
+            columns:
+              - column:
+                  name: node_type
+                  type: varchar(64)

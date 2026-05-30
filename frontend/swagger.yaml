@@ -1,0 +1,692 @@
+
+openapi: 3.1.0
+info:
+  title: FlowForge Workflow BFF API
+  version: 1.0.0
+  description: >
+    BFF API для управления workflow, их версиями, триггерами и запусками.
+
+servers:
+  - url: https://api.flowforge.local/v1
+    description: Основной API сервер
+
+tags:
+  - name: Workflows
+    description: CRUD по workflow
+  - name: Workflow Versions
+    description: Версионирование workflow и работа с графом
+  - name: Triggers
+    description: Триггеры запуска workflow
+  - name: Runs
+    description: Запуски workflow и отдельных нод
+
+paths:
+  /workflows:
+    post:
+      tags: [Workflows]
+      summary: Создать workflow
+      description: Создаёт новый workflow без привязки к проекту.
+      requestBody:
+        required: true
+        description: Данные для создания workflow.
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Тело запроса на создание workflow.
+              properties:
+                name:
+                  type: string
+                  description: Название workflow.
+                description:
+                  type: string
+                  description: Описание workflow.
+              required: [name]
+      responses:
+        '201':
+          description: Workflow успешно создан.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+    get:
+      tags: [Workflows]
+      summary: Список workflow
+      description: Возвращает список всех workflow.
+      responses:
+        '200':
+          description: Список workflow.
+          content:
+            application/json:
+              schema:
+                type: array
+                description: Массив workflow.
+                items:
+                  $ref: '#/components/schemas/WorkflowMeta'
+
+  /workflows/{workflowId}:
+    get:
+      tags: [Workflows]
+      summary: Получить workflow
+      description: Возвращает метаданные и актуальный граф workflow.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '200':
+          description: Информация о workflow.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workflow'
+        '404':
+          description: Workflow не найден.
+    put:
+      tags: [Workflows]
+      summary: Обновить метаданные workflow
+      description: Обновляет базовые поля workflow (название, описание).
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      requestBody:
+        required: true
+        description: Новые метаданные workflow.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowMetaUpdate'
+      responses:
+        '200':
+          description: Метаданные workflow обновлены.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowMeta'
+        '404':
+          description: Workflow не найден.
+    delete:
+      tags: [Workflows]
+      summary: Удалить workflow
+      description: Полностью удаляет workflow и связанные данные.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '204':
+          description: Workflow удалён.
+        '404':
+          description: Workflow не найден.
+
+  /workflows/{workflowId}/versions:
+    post:
+      tags: [Workflow Versions]
+      summary: Создать версию workflow
+      description: Создаёт логическую версию workflow и привязывает её к текущему графу.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '201':
+          description: Версия workflow создана.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowVersion'
+        '404':
+          description: Workflow не найден.
+    get:
+      tags: [Workflow Versions]
+      summary: Получить список версий workflow
+      description: Возвращает все логические версии указанного workflow.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '200':
+          description: Список версий для workflow.
+          content:
+            application/json:
+              schema:
+                type: array
+                description: Массив версий workflow.
+                items:
+                  $ref: '#/components/schemas/WorkflowVersion'
+        '404':
+          description: Workflow не найден.
+
+  /workflow-versions/{versionId}/graph:
+    put:
+      tags: [Workflow Versions]
+      summary: Обновить граф версии workflow
+      description: Полностью заменяет граф (ноды и связи) для указанной версии workflow.
+      parameters:
+        - $ref: '#/components/parameters/VersionId'
+      requestBody:
+        required: true
+        description: Новый граф workflow.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowGraph'
+      responses:
+        '200':
+          description: Граф для версии workflow обновлён.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowGraph'
+        '404':
+          description: Версия workflow не найдена.
+
+  /workflows/{workflowId}/triggers:
+    get:
+      tags: [Triggers]
+      summary: Список триггеров workflow
+      description: >
+        Возвращает все триггеры workflow. Триггеры создаются/удаляются автоматически
+        при сохранении графа (по нодам с type trigger.webhook/cron/interval).
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '200':
+          description: Список триггеров для workflow.
+          content:
+            application/json:
+              schema:
+                type: array
+                description: Массив триггеров.
+                items:
+                  $ref: '#/components/schemas/Trigger'
+        '404':
+          description: Workflow не найден.
+
+  /workflows/{workflowId}/triggers/{triggerId}:
+    patch:
+      tags: [Triggers]
+      summary: Включить/выключить триггер
+      description: >
+        Переключает поле `enabled` у триггера. Для cron/interval включение пере-планирует таск,
+        выключение — отменяет. Для webhook отключённый триггер возвращает 404 при вызове по токену.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+        - name: triggerId
+          in: path
+          required: true
+          description: Идентификатор триггера.
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TriggerUpdate'
+      responses:
+        '200':
+          description: Обновлённый триггер.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trigger'
+        '404':
+          description: Триггер или workflow не найден.
+
+  /webhook/{token}:
+    post:
+      tags: [Triggers]
+      summary: Запуск workflow по webhook
+      description: Принимает входящий webhook и инициирует запуск связанного workflow.
+      parameters:
+        - $ref: '#/components/parameters/Token'
+      requestBody:
+        required: false
+        description: Необязательное тело запроса, которое будет передано в workflow.
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Произвольный JSON-пейлоуд webhook-а.
+      responses:
+        '202':
+          description: Запуск workflow принят в обработку.
+          headers:
+            Location:
+              description: Абсолютный URL для опроса итогового результата запуска (GET /workflow-runs/{runId}/result).
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAccepted'
+        '404':
+          description: Webhook с таким токеном не найден.
+
+  /workflows/{workflowId}/runs:
+    post:
+      tags: [Runs]
+      summary: Ручной запуск workflow
+      description: >
+        Запускает выполнение workflow вручную. Принимает произвольный JSON в теле — он будет
+        доступен нодам как `runInput`. Опционально через `startNodeId` можно стартовать только
+        подграф, достижимый из конкретной ноды.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+        - name: startNodeId
+          in: query
+          required: false
+          description: Если указан — исполняем только subgraph, достижимый из этой ноды.
+          schema:
+            type: string
+      requestBody:
+        required: false
+        description: Произвольный JSON-payload, прокидывается в `runInput` для нод без входов.
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Произвольный контекст запуска.
+      responses:
+        '202':
+          description: Запуск workflow принят.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+        '404':
+          description: Workflow не найден.
+    get:
+      tags: [Runs]
+      summary: Список запусков workflow
+      description: Возвращает историю запусков указанного workflow.
+      parameters:
+        - $ref: '#/components/parameters/WorkflowId'
+      responses:
+        '200':
+          description: Список запусков для workflow.
+          content:
+            application/json:
+              schema:
+                type: array
+                description: Массив запусков workflow.
+                items:
+                  $ref: '#/components/schemas/WorkflowRun'
+        '404':
+          description: Workflow не найден.
+
+  /workflow-runs/{runId}:
+    get:
+      tags: [Runs]
+      summary: Получить запуск workflow
+      description: Возвращает статус и информацию о конкретном запуске workflow.
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Информация о запуске workflow.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRun'
+        '404':
+          description: Запуск не найден.
+
+  /workflow-runs/{runId}/result:
+    get:
+      tags: [Runs]
+      summary: Получить агрегированный результат запуска
+      description: >
+        Возвращает только итог пайплайна (без поноды-разбивки): статус, тайминги и output
+        терминальных нод. Если терминальная нода одна — её output как есть, иначе объект
+        {nodeId: output} по терминальным.
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Итоговый результат запуска.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRunResult'
+        '404':
+          description: Запуск не найден.
+
+  /node-runs/{nodeRunId}:
+    get:
+      tags: [Runs]
+      summary: Получить запуск ноды
+      description: Возвращает детали выполнения отдельной ноды.
+      parameters:
+        - $ref: '#/components/parameters/NodeRunId'
+      responses:
+        '200':
+          description: Информация о выполнении ноды.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRun'
+        '404':
+          description: Запуск ноды не найден.
+
+components:
+  parameters:
+    WorkflowId:
+      name: workflowId
+      in: path
+      required: true
+      description: Идентификатор workflow.
+      schema:
+        type: string
+    VersionId:
+      name: versionId
+      in: path
+      required: true
+      description: Идентификатор версии workflow.
+      schema:
+        type: string
+    Token:
+      name: token
+      in: path
+      required: true
+      description: Публичный токен webhook-триггера.
+      schema:
+        type: string
+    RunId:
+      name: runId
+      in: path
+      required: true
+      description: Идентификатор запуска workflow.
+      schema:
+        type: string
+    NodeRunId:
+      name: nodeRunId
+      in: path
+      required: true
+      description: Идентификатор запуска отдельной ноды.
+      schema:
+        type: string
+
+  schemas:
+    Workflow:
+      type: object
+      description: Полное представление workflow, включающее метаданные и граф.
+      properties:
+        meta:
+          $ref: '#/components/schemas/WorkflowMeta'
+        graph:
+          $ref: '#/components/schemas/WorkflowGraph'
+
+    WorkflowMeta:
+      type: object
+      description: Метаданные workflow.
+      properties:
+        id:
+          type: string
+          description: Идентификатор workflow.
+        name:
+          type: string
+          description: Название workflow.
+        description:
+          type: string
+          description: Описание workflow.
+        isDemo:
+          type: boolean
+          description: Признак демонстрационного workflow (создан seeder'ом на старте).
+        nodesCount:
+          type: integer
+          description: Количество нод в текущей ревизии workflow.
+        createdAt:
+          type: string
+          description: Время создания в ISO 8601.
+        updatedAt:
+          type: string
+          description: Время последнего изменения в ISO 8601.
+
+    WorkflowMetaUpdate:
+      type: object
+      description: Изменяемые поля метаданных workflow.
+      properties:
+        name:
+          type: string
+          description: Новое название workflow.
+        description:
+          type: string
+          description: Новое описание workflow.
+
+    WorkflowVersion:
+      type: object
+      description: Логическая версия workflow.
+      properties:
+        id:
+          type: string
+          description: Идентификатор версии workflow.
+        workflowId:
+          type: string
+          description: Идентификатор связанного workflow.
+        tag:
+          type: string
+          description: Опциональный тег версии (например, v1.0.0).
+        createdAt:
+          type: string
+          description: Дата создания версии в ISO 8601.
+
+    WorkflowGraph:
+      type: object
+      description: Граф workflow, включающий ноды и связи.
+      properties:
+        versionId:
+          type: string
+          description: Идентификатор версии, которой принадлежит граф.
+        nodes:
+          type: array
+          description: Список нод workflow.
+          items:
+            $ref: '#/components/schemas/Node'
+        connections:
+          type: array
+          description: Список соединений между нодами.
+          items:
+            $ref: '#/components/schemas/Connection'
+      required: [nodes, connections]
+
+    Node:
+      type: object
+      description: Нода workflow.
+      properties:
+        id:
+          type: string
+          description: Идентификатор ноды.
+        type:
+          type: string
+          description: Тип ноды (trigger, http, ab-fork и т.д.).
+        position:
+          type: object
+          description: Координаты ноды в редакторе графа.
+          properties:
+            x:
+              type: number
+              description: Координата X.
+            y:
+              type: number
+              description: Координата Y.
+        data:
+          type: object
+          description: Конфигурация ноды и дополнительные данные.
+          properties:
+            label:
+              type: string
+              description: Человекочитаемое название ноды.
+            config:
+              type: object
+              description: Произвольная конфигурация ноды.
+            abConfig:
+              type: object
+              description: Конфигурация A/B-теста для ноды, если применимо.
+
+    Connection:
+      type: object
+      description: Соединение между двумя нодами workflow.
+      properties:
+        id:
+          type: string
+          description: Идентификатор соединения.
+        source:
+          type: string
+          description: ID исходной ноды.
+        target:
+          type: string
+          description: ID целевой ноды.
+        sourceHandle:
+          type: string
+          description: Метка исходящего порта (например, 'A' или 'B').
+        targetHandle:
+          type: string
+          description: Метка входящего порта.
+      required: [id, source, target]
+
+    Trigger:
+      type: object
+      description: Триггер запуска workflow, привязанный к ноде в графе.
+      properties:
+        id:
+          type: string
+          description: Идентификатор триггера.
+        workflowId:
+          type: string
+          description: Идентификатор workflow.
+        nodeId:
+          type: string
+          description: Идентификатор ноды в графе, к которой привязан триггер.
+        type:
+          type: string
+          description: Тип триггера (webhook, cron, interval).
+        config:
+          type: object
+          description: Конфигурация триггера (например, cron-выражение, everySeconds).
+        token:
+          type: string
+          description: Публичный токен для webhook-триггера (генерируется на бэке).
+        enabled:
+          type: boolean
+          description: >
+            Активен ли триггер. Для cron/interval отключённый триггер не запускается по расписанию.
+            Для webhook отключённый триггер возвращает 404 при попытке вызова.
+
+    TriggerUpdate:
+      type: object
+      description: Тело для PATCH триггера — переключение активности.
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+          description: Включить (true) или выключить (false) триггер.
+
+    WorkflowRun:
+      type: object
+      description: Один запуск workflow.
+      properties:
+        id:
+          type: string
+          description: Идентификатор запуска.
+        workflowId:
+          type: string
+          description: Идентификатор workflow.
+        status:
+          type: string
+          description: Статус запуска (queued, running, success, failed).
+        startedAt:
+          type: string
+          description: Время старта запуска (ISO-8601).
+        finishedAt:
+          type: string
+          description: Время завершения запуска (ISO-8601).
+        durationMs:
+          type: integer
+          format: int64
+          description: Длительность запуска в миллисекундах. Заполнено только для завершённых запусков.
+        input:
+          type: object
+          description: Входные параметры запуска (что было передано в POST как payload).
+        output:
+          type: object
+          description: Агрегированный результат выполнения workflow.
+        startNodeId:
+          type: string
+          description: Если запуск стартован с конкретной ноды (subgraph) — её id.
+        nodes:
+          type: array
+          description: Состояние каждой ноды этого запуска в порядке создания node_run-записей.
+          items:
+            $ref: '#/components/schemas/NodeRun'
+
+    NodeRun:
+      type: object
+      description: Результат выполнения отдельной ноды.
+      properties:
+        id:
+          type: string
+          description: Идентификатор запуска ноды.
+        workflowRunId:
+          type: string
+          description: Идентификатор запуска workflow.
+        nodeId:
+          type: string
+          description: Идентификатор ноды.
+        status:
+          type: string
+          description: Статус выполнения ноды.
+        startedAt:
+          type: string
+          description: Время старта ноды.
+        finishedAt:
+          type: string
+          description: Время завершения ноды.
+        input:
+          type: object
+          description: Входные данные ноды.
+        output:
+          type: object
+          description: Выходные данные ноды.
+        errorMessage:
+          type: string
+          description: Текст ошибки, если выполнение завершилось неуспешно.
+
+    WebhookAccepted:
+      type: object
+      description: Подтверждение приёма webhook-а с ссылкой на итоговый результат запуска.
+      required: [run, pollUrl]
+      properties:
+        run:
+          $ref: '#/components/schemas/WorkflowRun'
+        pollUrl:
+          type: string
+          format: uri
+          description: Абсолютный URL для опроса итогового результата запуска (GET /workflow-runs/{runId}/result).
+
+    WorkflowRunResult:
+      type: object
+      description: Итоговый результат пайплайна без поноды-разбивки.
+      required: [id, workflowId, status]
+      properties:
+        id:
+          type: string
+          description: Идентификатор запуска.
+        workflowId:
+          type: string
+          description: Идентификатор workflow.
+        status:
+          type: string
+          description: Статус запуска (queued/running/success/failed).
+        startedAt:
+          type: string
+          description: Время старта запуска.
+        finishedAt:
+          type: string
+          description: Время завершения запуска.
+        durationMs:
+          type: integer
+          format: int64
+          description: Длительность выполнения, мс.
+        output:
+          description: >
+            Агрегированный output пайплайна — данные терминальных нод. Если терминальная
+            нода одна — её output как есть, иначе объект {nodeId: output}. Null, пока
+            запуск не завершён или выходов нет.
+          nullable: true
+

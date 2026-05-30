@@ -1,0 +1,126 @@
+name: backend / build & deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+      - 'deploy/docker-compose.prod.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/kursach-backend
+
+jobs:
+  build-and-push:
+    name: Build image and push to GHCR
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+  deploy:
+    name: Deploy to VPS
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    env:
+      VPS_HOST_RAW: ${{ secrets.VPS_HOST }}
+      VPS_USER_RAW: ${{ secrets.VPS_USER }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Sanitize secrets and warm up known_hosts
+        run: |
+          VPS_HOST="$(printf '%s' "$VPS_HOST_RAW" | tr -d '\r\n[:space:]')"
+          VPS_USER="$(printf '%s' "$VPS_USER_RAW" | tr -d '\r\n[:space:]')"
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
+            echo "::error::VPS_HOST or VPS_USER is empty after sanitize"
+            exit 1
+          fi
+          echo "VPS_HOST=$VPS_HOST" >> "$GITHUB_ENV"
+          echo "VPS_USER=$VPS_USER" >> "$GITHUB_ENV"
+          mkdir -p ~/.ssh
+          ssh-keyscan -p 22 -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Copy compose file to server
+        run: |
+          scp deploy/docker-compose.prod.yml \
+              "${VPS_USER}@${VPS_HOST}:/opt/kursach/docker-compose.prod.yml"
+
+      - name: Login server's Docker to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh "${VPS_USER}@${VPS_HOST}" \
+              "echo '$GHCR_TOKEN' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
+
+      - name: Pull new image and restart backend
+        run: |
+          ssh "${VPS_USER}@${VPS_HOST}" \
+              "cd /opt/kursach && \
+               docker compose -f docker-compose.prod.yml --env-file .env pull backend && \
+               docker compose -f docker-compose.prod.yml --env-file .env up -d backend && \
+               docker image prune -f"
+
+      - name: Smoke test backend (внутри контейнера)
+        run: |
+          sleep 20
+          ssh "${VPS_USER}@${VPS_HOST}" \
+              "for i in 1 2 3 4 5 6; do \
+                 if docker exec kursach-backend wget -qO- http://localhost:8080/v1/workflows >/dev/null 2>&1; then \
+                   echo 'Backend is up'; exit 0; \
+                 fi; \
+                 echo 'Waiting backend... attempt '\$i; sleep 5; \
+               done; \
+               echo 'Backend smoke failed'; exit 1"

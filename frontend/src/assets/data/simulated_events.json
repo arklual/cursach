@@ -1,0 +1,23 @@
+[
+  {
+    "event": "node_reached",
+    "workflow_id": "wf-analytics",
+    "run_id": "run-001",
+    "node_id": "trigger-1",
+    "variant": null,
+    "user_id_hash": "usr_120394",
+    "timestamp": "2025-11-18T09:01:00Z",
+    "payload_summary": { "plan": "pro", "device": "ios" },
+    "path": ["trigger-1"],
+    "session_id": "sess-120394"
+  },
+  {
+    "event": "node_action",
+    "action_type": "click",
+    "node_id": "ab-1",
+    "workflow_id": "wf-analytics",
+    "user_id_hash": "usr_120394",
+    "timestamp": "2025-11-18T09:01:02Z",
+    "metadata": { "latency_ms": 84, "error": null }
+  }
+]

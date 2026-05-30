@@ -1,0 +1,385 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-002-restore-after-drop
+      author: a11a
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - tableExists:
+                tableName: workflows
+      changes:
+        - createTable:
+            tableName: blob_index
+            columns:
+              - column:
+                  name: content_hash
+                  type: char(64)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: s3_key
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: size_bytes
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: storage_class
+                  type: varchar(32)
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - createTable:
+            tableName: workflows
+            columns:
+              - column:
+                  name: id
+                  type: uuid
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: text
+              - column:
+                  name: current_version_id
+                  type: bigint
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+
+        - createTable:
+            tableName: workflow_revision
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: workflow_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: revision_number
+                  type: int
+                  constraints:
+                    nullable: false
+              - column:
+                  name: graph_skeleton
+                  type: jsonb
+                  constraints:
+                    nullable: false
+              - column:
+                  name: author_id
+                  type: uuid
+              - column:
+                  name: change_summary
+                  type: varchar(255)
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: workflow_revision
+            baseColumnNames: workflow_id
+            referencedTableName: workflows
+            referencedColumnNames: id
+            constraintName: fk_workflow_revision_workflow
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: workflow_revision
+            columnNames: workflow_id, revision_number
+            constraintName: uq_workflow_revision_workflow_revnum
+        - createIndex:
+            tableName: workflow_revision
+            indexName: ix_workflow_revision_workflow_created_at
+            columns:
+              - column:
+                  name: workflow_id
+              - column:
+                  name: created_at
+
+        - createTable:
+            tableName: workflow_version
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: workflow_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: version_tag
+                  type: varchar(64)
+              - column:
+                  name: root_revision_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: workflow_version
+            baseColumnNames: workflow_id
+            referencedTableName: workflows
+            referencedColumnNames: id
+            constraintName: fk_workflow_version_workflow
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: workflow_version
+            baseColumnNames: root_revision_id
+            referencedTableName: workflow_revision
+            referencedColumnNames: id
+            constraintName: fk_workflow_version_root_revision
+            onDelete: RESTRICT
+        - createIndex:
+            tableName: workflow_version
+            indexName: ix_workflow_version_workflow_id
+            columns:
+              - column:
+                  name: workflow_id
+
+        - addForeignKeyConstraint:
+            baseTableName: workflows
+            baseColumnNames: current_version_id
+            referencedTableName: workflow_version
+            referencedColumnNames: id
+            constraintName: fk_workflows_current_version
+            onDelete: SET NULL
+
+        - createTable:
+            tableName: triggers
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: workflow_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: type
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: config
+                  type: jsonb
+              - column:
+                  name: token
+                  type: varchar(128)
+              - column:
+                  name: enabled
+                  type: boolean
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: node_id
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: triggers
+            baseColumnNames: workflow_id
+            referencedTableName: workflows
+            referencedColumnNames: id
+            constraintName: fk_triggers_workflow
+            onDelete: CASCADE
+        - addUniqueConstraint:
+            tableName: triggers
+            columnNames: token
+            constraintName: uq_triggers_token
+        - addUniqueConstraint:
+            tableName: triggers
+            columnNames: workflow_id, node_id
+            constraintName: uq_triggers_workflow_node
+        - createIndex:
+            tableName: triggers
+            indexName: ix_triggers_workflow_id
+            columns:
+              - column:
+                  name: workflow_id
+
+        - createTable:
+            tableName: workflow_run
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: workflow_id
+                  type: uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: workflow_revision_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: started_at
+                  type: timestamptz
+              - column:
+                  name: finished_at
+                  type: timestamptz
+              - column:
+                  name: input
+                  type: jsonb
+              - column:
+                  name: output
+                  type: jsonb
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: CURRENT_TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: start_node_id
+                  type: varchar(64)
+                  constraints:
+                    nullable: true
+        - addForeignKeyConstraint:
+            baseTableName: workflow_run
+            baseColumnNames: workflow_id
+            referencedTableName: workflows
+            referencedColumnNames: id
+            constraintName: fk_workflow_run_workflow
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: workflow_run
+            baseColumnNames: workflow_revision_id
+            referencedTableName: workflow_revision
+            referencedColumnNames: id
+            constraintName: fk_workflow_run_workflow_revision
+            onDelete: RESTRICT
+        - createIndex:
+            tableName: workflow_run
+            indexName: ix_workflow_run_workflow_created_at
+            columns:
+              - column:
+                  name: workflow_id
+              - column:
+                  name: created_at
+
+        - createTable:
+            tableName: node_run
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: workflow_run_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: node_id
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: config_hash
+                  type: char(64)
+              - column:
+                  name: status
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: started_at
+                  type: timestamptz
+              - column:
+                  name: finished_at
+                  type: timestamptz
+              - column:
+                  name: input_json
+                  type: jsonb
+              - column:
+                  name: output_json
+                  type: jsonb
+              - column:
+                  name: error_message
+                  type: text
+        - addForeignKeyConstraint:
+            baseTableName: node_run
+            baseColumnNames: workflow_run_id
+            referencedTableName: workflow_run
+            referencedColumnNames: id
+            constraintName: fk_node_run_workflow_run
+            onDelete: CASCADE
+        - createIndex:
+            tableName: node_run
+            indexName: ix_node_run_workflow_run_id
+            columns:
+              - column:
+                  name: workflow_run_id

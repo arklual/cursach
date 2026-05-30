@@ -1,0 +1,36 @@
+import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
+import type { WebhookAccepted } from './api.models';
+
+export interface Trigger {
+    id: string;
+    workflowId: string;
+    nodeId: string;
+    type: 'webhook' | 'cron' | 'interval';
+    config?: Record<string, unknown> | null;
+    token?: string | null;
+    enabled?: boolean;
+}
+
+@Injectable({ providedIn: 'root' })
+export class TriggerApiService {
+    private readonly http = inject(HttpClient);
+    private readonly base = environment.apiBaseUrl;
+
+    list(workflowId: string): Observable<Trigger[]> {
+        return this.http.get<Trigger[]>(`${this.base}/workflows/${workflowId}/triggers`);
+    }
+
+    setEnabled(workflowId: string, triggerId: string, enabled: boolean): Observable<Trigger> {
+        return this.http.patch<Trigger>(
+            `${this.base}/workflows/${workflowId}/triggers/${triggerId}`,
+            { enabled },
+        );
+    }
+
+    invokeWebhook(token: string, payload: unknown): Observable<WebhookAccepted> {
+        return this.http.post<WebhookAccepted>(`${this.base}/webhook/${token}`, payload);
+    }
+}
